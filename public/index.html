@@ -290,98 +290,78 @@
       return { remove(){ el.remove() } };
     }
 
-    // ======= Core flow =======
-    async function sendMessage(text, isHtml = false){
-      ensureThread();
-      const id = uid();
-      const userMsg = { id, threadId: currentThreadId, role: 'user', content: text, ts: Date.now() };
-      messages.push(userMsg); save();
+      // ======= Core flow =======
+      async function sendMessage(text, isHtml = false, imageFile = null){
+        ensureThread();
+        const id = uid();
+        const userMsg = { id, threadId: currentThreadId, role: 'user', content: text, ts: Date.now() };
+        messages.push(userMsg); save();
 
-      chatEl.appendChild(messageTemplate('user', isHtml ? text : mdEscape(text)));
-      scrollToBottom();
-
-      const typing = typingIndicator();
-      statusEl.textContent = 'Đang trả lời...';
-      try{
-          const formData = new FormData();
-formData.append("labResults", text); // nếu có text
-formData.append("images", file);     // nếu có file ảnh (có thể append nhiều ảnh)
-
-const res = await fetch("https://api-jaremis-pro.onrender.com/api/diagnose", {
-  method: "POST",
-  body: formData
-});
-const data = await res.json();
-
-          const answer = data.diagnosis || JSON.stringify(data, null, 2);
-
-        await new Promise(r => setTimeout(r, 400 + Math.random()*600));
-
-        const asMsg = { id: uid(), threadId: currentThreadId, role: 'assistant', content: answer, ts: Date.now() };
-        messages.push(asMsg); save();
-
-        typing.remove();
-        chatEl.appendChild(messageTemplate('assistant', mdEscape(answer)));
+        chatEl.appendChild(messageTemplate('user', isHtml ? text : mdEscape(text)));
         scrollToBottom();
-        updateThreadTitle();
-      }catch(err){
-        typing.remove();
-        statusEl.textContent = 'Lỗi';
-        chatEl.appendChild(messageTemplate('assistant', mdEscape('❌ Lỗi gửi tin nhắn: ' + (err.message || err))));
-      }finally{
-        statusEl.textContent = 'Rảnh';
-      }
-    }
 
-    function getThreadMessages(){ return messages.filter(m => m.threadId === currentThreadId) }
+        const typing = typingIndicator();
+        statusEl.textContent = 'Đang trả lời...';
 
-    function renderMessages(){
-      chatEl.innerHTML = '';
-      const threadMsgs = getThreadMessages();
-      if(threadMsgs.length === 0){
-        // keep welcome message
-        chatEl.innerHTML = '';
-      }else{
-        for(const m of threadMsgs){
-          chatEl.appendChild(messageTemplate(m.role, mdEscape(m.content)));
+        try{
+          let res;
+          if (imageFile) {
+            // 🔹 gửi ảnh + text
+            const formData = new FormData();
+            formData.append("labResults", text);
+            formData.append("images", imageFile);
+
+            res = await fetch("https://api-jaremis-pro.onrender.com/api/diagnose", {
+              method: "POST",
+              body: formData
+            });
+          } else {
+            // 🔹 chỉ gửi text
+            res = await fetch("https://api-jaremis-pro.onrender.com/api/diagnose", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ labResults: text })
+            });
+          }
+
+          const data = await res.json();
+          const answer = data.diagnosis || data.warning || "Không có phản hồi";
+
+          typing.remove();
+          chatEl.appendChild(messageTemplate('assistant', mdEscape(answer)));
+          scrollToBottom();
+
+          const asMsg = { id: uid(), threadId: currentThreadId, role: 'assistant', content: answer, ts: Date.now() };
+          messages.push(asMsg); save();
+          updateThreadTitle();
+
+        }catch(err){
+          typing.remove();
+          statusEl.textContent = 'Lỗi';
+          chatEl.appendChild(messageTemplate('assistant', mdEscape('❌ Lỗi gửi tin nhắn: ' + (err.message || err))));
+        }finally{
+          statusEl.textContent = 'Rảnh';
         }
       }
-      scrollToBottom();
-    }
 
-    function updateThreadTitle(){
-      const ms = getThreadMessages();
-      const u = ms.find(m => m.role === 'user');
-      if(!u) return;
-      const title = (u.content || 'Cuộc trò chuyện mới').slice(0, 40);
-      const t = threads.find(t => t.id === currentThreadId);
-      if(t){ t.title = title; save(); renderHistory(); }
-    }
+      // ======= Events =======
+      imageBtn.addEventListener('click', () => {
+        imageInput.click();
+      });
 
-    function demoReply(text){
-      // Trả lời đơn giản để test UI
-      if(/hello|hi|chào/i.test(text)) return 'Chào bạn! Mình có thể giúp gì?';
-      if(/markdown|code/i.test(text)) return '```js\\nconsole.log("Xin chào từ Chat AI UI!")\\n```';
-      return 'Bạn vừa gửi: ' + text + '\\n\\n(Đây là câu trả lời mẫu. Hãy gắn API thật ở hàm sendMessage)';
-    }
+      imageInput.addEventListener('change', () => {
+        const file = imageInput.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const imgHtml = `<img src="${reader.result}" alt="Hình ảnh" style="max-width:100%; border-radius:8px">`;
+            // gửi ảnh thật tới API
+            sendMessage(imgHtml, true, file);
+          };
+          reader.readAsDataURL(file);
+        }
+      });
 
-    // ======= Events =======
-    // Sự kiện gửi ảnh
-    imageBtn.addEventListener('click', () => {
-      imageInput.click();
-    });
-
-    imageInput.addEventListener('change', () => {
-      const file = imageInput.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const imgHtml = `<img src="${reader.result}" alt="Hình ảnh" style="max-width:100%; border-radius:8px">`;
-          sendMessage(imgHtml, true);
-        };
-        reader.readAsDataURL(file);
-      }
-    });
 
     formEl.addEventListener('submit', e => {
       e.preventDefault();
