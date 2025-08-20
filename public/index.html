@@ -303,12 +303,16 @@
       const typing = typingIndicator();
       statusEl.textContent = 'Đang trả lời...';
       try{
-          const res = await fetch("https://api-jaremis-pro.onrender.com", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ labResults: text })
-          });
-          const data = await res.json();
+          const formData = new FormData();
+formData.append("labResults", text); // nếu có text
+formData.append("images", file);     // nếu có file ảnh (có thể append nhiều ảnh)
+
+const res = await fetch("https://api-jaremis-pro.onrender.com/api/diagnose", {
+  method: "POST",
+  body: formData
+});
+const data = await res.json();
+
           const answer = data.diagnosis || JSON.stringify(data, null, 2);
 
         await new Promise(r => setTimeout(r, 400 + Math.random()*600));
