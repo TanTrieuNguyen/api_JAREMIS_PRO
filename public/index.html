@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chat AI</title>
+  <style>
+    /* ====== Design tokens ====== */
+    :root{
+      --bg: #0b0f14;          /* page */
+      --panel: #0f1720;       /* surfaces */
+      --soft: #131c28;
+      --text: #e6edf3;        /* primary text */
+      --muted: #9db0c7;       /* secondary text */
+      --accent: #4f9cff;      /* brand */
+      --accent-2: #7cd4ff;
+      --border: #1f2a39;
+      --user: #1b3a2a;        /* user bubble */
+      --assistant: #13243a;   /* assistant bubble */
+      --danger: #ff6363;
+      --success: #2dcc70;
+      --radius: 16px;
+      --radius-lg: 22px;
+      --shadow: 0 4px 28px rgba(0,0,0,.3);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji";
+    }
+
+    * { box-sizing: border-box }
+    html, body { height: 100% }
+    body{
+      margin:0; background: var(--bg); color: var(--text);
+      font-family: var(--sans); line-height: 1.55;
+    }
+    a { color: var(--accent); text-decoration: none }
+
+    /* ====== Layout ====== */
+    .app{ display: grid; grid-template-columns: 280px 1fr; height: 100vh }
+    @media (max-width: 920px){ .app{ grid-template-columns: 1fr } .sidebar{ display:none } }
+
+    .sidebar{
+      background: linear-gradient(180deg, #0e1622, #0b111a);
+      border-right: 1px solid var(--border);
+      padding: 16px; gap: 12px; display: flex; flex-direction: column;
+    }
+    .brand{ display:flex; align-items:center; gap:10px; padding:10px 8px; border-radius: 12px; background: var(--soft); }
+    .brand .logo{ width:28px; height:28px; border-radius:8px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: var(--shadow) }
+    .brand h1{ font-size: 16px; margin:0 }
+
+    .btn{ background: var(--accent); color:#071019; border:none; border-radius: 12px; padding: 10px 12px; font-weight: 600; cursor:pointer }
+    .btn:disabled{ opacity:.6; cursor:not-allowed }
+    .btn.secondary{ background: transparent; color: var(--text); border:1px solid var(--border) }
+
+    .history{ flex:1; overflow:auto; border-radius: 12px; border:1px solid var(--border) }
+    .history h3{ font-size: 12px; letter-spacing:.06em; color: var(--muted); margin: 10px 12px }
+    .history ul{ list-style:none; margin:0; padding:0 }
+    .history li{ padding:12px; border-top:1px solid var(--border); cursor:pointer }
+    .history li:hover{ background: #0e1520 }
+
+    .main{ display:flex; flex-direction: column; height: 100vh }
+    .topbar{
+      display:flex; align-items:center; justify-content: space-between;
+      padding: 12px 16px; border-bottom:1px solid var(--border); background: rgba(8,12,18,.6); backdrop-filter: blur(6px);
+      position: sticky; top:0; z-index: 5;
+    }
+    .title{ display:flex; align-items:center; gap:10px }
+    .title .badge{ font-size:12px; color: var(--muted); padding: 2px 8px; border:1px solid var(--border); border-radius: 999px }
+    .actions{ display:flex; gap:8px; align-items:center }
+
+    .chat{
+      flex:1; overflow:auto; padding: 24px; scroll-behavior: smooth;
+      background:
+       radial-gradient(1200px 600px at 20% -10%, rgba(79,156,255,.08), transparent 60%),
+       radial-gradient(900px 500px at 90% 0%, rgba(124,212,255,.06), transparent 60%);
+    }
+
+    .bubble{ max-width: 900px; margin: 0 auto 18px; display:flex; gap:12px }
+    .bubble .avatar{ width:34px; height:34px; border-radius: 10px; flex:0 0 34px; display:grid; place-items:center }
+    .bubble .content{ flex:1; padding: 14px 16px; border:1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow) }
+
+    .bubble.user .avatar{ background: linear-gradient(135deg, #8bffbd33, #2dcc7033); border:1px solid #2dcc7060 }
+    .bubble.user .content{ background: linear-gradient(180deg, #0f1618, var(--user)) }
+
+    .bubble.assistant .avatar{ background: linear-gradient(135deg, #7cd4ff33, #4f9cff33); border:1px solid #4f9cff60 }
+    .bubble.assistant .content{ background: linear-gradient(180deg, #0f151d, var(--assistant)) }
+
+    .content p{ margin: 0 0 10px }
+    .content p:last-child{ margin:0 }
+
+    /* Code blocks */
+    pre, code{ font-family: var(--mono) }
+    pre{ background:#0b0f14; border:1px solid var(--border); padding:14px; border-radius: 12px; overflow:auto }
+    code{ background:#0b0f14; border:1px solid var(--border); padding:2px 6px; border-radius:8px }
+
+    /* Composer */
+    .composer{
+      position: sticky; bottom:0; left:0; right:0;
+      padding: 14px; background: linear-gradient(180deg, transparent, #0b0f14 40%);
+    }
+    .composer .inner{
+      max-width: 980px; margin: 0 auto; background: var(--panel); border:1px solid var(--border);
+      border-radius: 20px; padding: 10px; box-shadow: var(--shadow)
+    }
+    .row{ display:flex; gap:10px; align-items:flex-end }
+    textarea{
+      flex:1; min-height: 48px; max-height: 200px; resize: none; outline: none;
+      background: #0c121a; color: var(--text); border:1px solid var(--border); border-radius: 14px; padding: 12px 12px;
+      line-height: 1.45; box-shadow: inset 0 1px 0 rgba(255,255,255,.03)
+    }
+    .hint{ font-size: 12px; color: var(--muted); padding: 8px 4px 0 }
+
+    .kbd{ font-family: var(--mono); font-size: 12px; padding: 2px 6px; border:1px solid var(--border); border-radius: 8px; color: var(--muted) }
+
+    .typing{ display:inline-flex; gap:6px; align-items:center }
+    .dot{ width:6px; height:6px; border-radius:999px; background: var(--muted); opacity:.5; animation: blink 1.2s infinite }
+    .dot:nth-child(2){ animation-delay: .15s }
+    .dot:nth-child(3){ animation-delay: .3s }
+    @keyframes blink{ 0%,80%,100%{ opacity:.2 } 40%{ opacity: 1 } }
+
+    .small{ font-size: 12px; color: var(--muted) }
+
+    .copy{ background: transparent; color: var(--muted); border:1px solid var(--border); border-radius: 10px; padding: 6px 8px; cursor:pointer; font-size:12px }
+    .bubble .head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px }
+
+    .toggle{ background: transparent; border:1px solid var(--border); color: var(--muted); border-radius: 999px; padding: 6px 10px; cursor:pointer }
+    .light{ --bg:#f6f7fb; --panel:#ffffff; --soft:#f0f4ff; --text:#0e1320; --muted:#5c6573; --border:#e3e7ef; --user:#eafaf0; --assistant:#eef5ff }
+  </style>
+</head>
+<body>
+  <div class="app" id="app">
+    <!-- ===== Sidebar ===== -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo" aria-hidden></div>
+        <h1>Chat AI</h1>
+      </div>
+      <div style="display:flex; gap:8px">
+        <button class="btn" id="newChat">+ Cuộc trò chuyện mới</button>
+        <button class="btn secondary" id="exportBtn" title="Xuất lịch sử">Xuất</button>
+      </div>
+      <div class="history" id="history">
+        <h3>Lịch sử</h3>
+        <ul id="historyList"></ul>
+      </div>
+      <div class="small">Made with ❤ — TT1403 & Ant.</div>
+    </aside>
+
+    <!-- ===== Main ===== -->
+    <main class="main">
+      <header class="topbar">
+        <div class="title">
+          <strong>Chat AI</strong>
+          <span class="badge">Beta UI</span>
+        </div>
+        <div class="actions">
+          <!-- Added: theme toggle + model select so script doesn't error -->
+          <button class="toggle" id="themeToggle" title="Đổi giao diện">🌓</button>
+          <select id="model" class="toggle" title="Chọn model">
+            <option selected>JAREMIS beta</option>
+          </select>
+        </div>
+      </header>
+
+      <section class="chat" id="chat">
+        <!-- Messages will render here -->
+        <div class="bubble assistant">
+          <div class="avatar">🤖</div>
+          <div class="content">
+            <div class="head">
+              <div class="small">Trợ lý</div>
+            </div>
+            <p>Chào bạn 👋 Mình là giao diện mẫu. Hãy nhập câu hỏi phía dưới, code đã sẵn sàng để bạn gắn API!</p>
+            <p class="small">Mẹo: Nhấn <span class="kbd">Shift</span> + <span class="kbd">Enter</span> để xuống dòng • <span class="kbd">Enter</span> để gửi.</p>
+          </div>
+        </div>
+      </section>
+
+      <footer class="composer">
+        <form class="inner" id="composerForm">
+          <div class="row">
+            <textarea id="input" placeholder="Nhập tin nhắn..." autocomplete="off"></textarea>
+
+            <!-- Nút gửi ảnh -->
+            <input type="file" id="imageInput" accept="image/*" style="display:none">
+            <button type="button" class="btn secondary" id="imageBtn" title="Gửi ảnh">📷</button>
+
+            <button type="submit" class="btn" id="sendBtn">Gửi</button>
+          </div>
+          <div class="hint">
+            Model: <span id="modelName">JAREMIS beta</span> • Trạng thái: <span id="status">Rảnh</span>
+          </div>
+        </form>
+      </footer>
+    </main>
+  </div>
+
+  <script>
+    // ======= State =======
+    const chatEl = document.getElementById('chat');
+    const inputEl = document.getElementById('input');
+    const formEl = document.getElementById('composerForm');
+    const statusEl = document.getElementById('status');
+    const modelEl = document.getElementById('model');
+    const modelNameEl = document.getElementById('modelName');
+    const themeToggle = document.getElementById('themeToggle');
+    const newChatBtn = document.getElementById('newChat');
+    const exportBtn = document.getElementById('exportBtn');
+    const historyList = document.getElementById('historyList');
+
+    // === Biến cho nút gửi ảnh ===
+    const imageBtn = document.getElementById('imageBtn');
+    const imageInput = document.getElementById('imageInput');
+
+    let messages = JSON.parse(localStorage.getItem('messages') || '[]');
+    let threads = JSON.parse(localStorage.getItem('threads') || '[]');
+    let currentThreadId = localStorage.getItem('currentThreadId') || null;
+
+    // ======= Helpers =======
+    function uid(){ return Math.random().toString(36).slice(2, 10) }
+
+    function save(){
+      localStorage.setItem('messages', JSON.stringify(messages));
+      localStorage.setItem('threads', JSON.stringify(threads));
+      localStorage.setItem('currentThreadId', currentThreadId || '');
+    }
+
+    function ensureThread(){
+      if(!currentThreadId){
+        currentThreadId = uid();
+        threads.unshift({ id: currentThreadId, title: 'Cuộc trò chuyện mới', createdAt: Date.now() });
+        save();
+      }
+    }
+
+    function renderHistory(){
+      historyList.innerHTML = '';
+      for(const t of threads){
+        const li = document.createElement('li');
+        li.textContent = t.title;
+        li.onclick = () => { currentThreadId = t.id; save(); renderAll() };
+        historyList.appendChild(li);
+      }
+    }
+
+    function renderAll(){
+      renderHistory();
+      renderMessages();
+      modelNameEl.textContent = modelEl.value;
+    }
+
+    function messageTemplate(role, html){
+      const isUser = role === 'user';
+      const wrapper = document.createElement('div');
+      wrapper.className = `bubble ${isUser ? 'user' : 'assistant'}`;
+      wrapper.innerHTML = `
+        <div class="avatar">${isUser ? '🧑‍💻' : '🤖'}</div>
+        <div class="content">
+          <div class="head">
+            <div class="small">${isUser ? 'Bạn' : 'Trợ lý'}</div>
+            <button class="copy" title="Sao chép">Sao chép</button>
+          </div>
+          <div class="md">${html}</div>
+        </div>
+      `;
+      wrapper.querySelector('.copy').onclick = () => {
+        const text = wrapper.querySelector('.md').innerText;
+        navigator.clipboard.writeText(text);
+      };
+      return wrapper;
+    }
+
+    function mdEscape(s){
+      return s
+        .replace(/&/g,'&amp;')
+        .replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;')
+        .replace(/\n/g,'<br>');
+    }
+
+    function scrollToBottom(){ chatEl.scrollTop = chatEl.scrollHeight }
+
+    function typingIndicator(){
+      const el = document.createElement('div');
+      el.className = 'bubble assistant';
+      el.innerHTML = `
+        <div class="avatar">🤖</div>
+        <div class="content"><span class="typing"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span></div>`;
+      chatEl.appendChild(el);
+      scrollToBottom();
+      return { remove(){ el.remove() } };
+    }
+
+    // ======= Core flow =======
+    async function sendMessage(text, isHtml = false){
+      ensureThread();
+      const id = uid();
+      const userMsg = { id, threadId: currentThreadId, role: 'user', content: text, ts: Date.now() };
+      messages.push(userMsg); save();
+
+      chatEl.appendChild(messageTemplate('user', isHtml ? text : mdEscape(text)));
+      scrollToBottom();
+
+      const typing = typingIndicator();
+      statusEl.textContent = 'Đang trả lời...';
+      try{
+          const res = await fetch("http://localhost:3000/api/diagnose", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ labResults: text })
+          });
+          const data = await res.json();
+          const answer = data.diagnosis || JSON.stringify(data, null, 2);
+
+        await new Promise(r => setTimeout(r, 400 + Math.random()*600));
+
+        const asMsg = { id: uid(), threadId: currentThreadId, role: 'assistant', content: answer, ts: Date.now() };
+        messages.push(asMsg); save();
+
+        typing.remove();
+        chatEl.appendChild(messageTemplate('assistant', mdEscape(answer)));
+        scrollToBottom();
+        updateThreadTitle();
+      }catch(err){
+        typing.remove();
+        statusEl.textContent = 'Lỗi';
+        chatEl.appendChild(messageTemplate('assistant', mdEscape('❌ Lỗi gửi tin nhắn: ' + (err.message || err))));
+      }finally{
+        statusEl.textContent = 'Rảnh';
+      }
+    }
+
+    function getThreadMessages(){ return messages.filter(m => m.threadId === currentThreadId) }
+
+    function renderMessages(){
+      chatEl.innerHTML = '';
+      const threadMsgs = getThreadMessages();
+      if(threadMsgs.length === 0){
+        // keep welcome message
+        chatEl.innerHTML = '';
+      }else{
+        for(const m of threadMsgs){
+          chatEl.appendChild(messageTemplate(m.role, mdEscape(m.content)));
+        }
+      }
+      scrollToBottom();
+    }
+
+    function updateThreadTitle(){
+      const ms = getThreadMessages();
+      const u = ms.find(m => m.role === 'user');
+      if(!u) return;
+      const title = (u.content || 'Cuộc trò chuyện mới').slice(0, 40);
+      const t = threads.find(t => t.id === currentThreadId);
+      if(t){ t.title = title; save(); renderHistory(); }
+    }
+
+    function demoReply(text){
+      // Trả lời đơn giản để test UI
+      if(/hello|hi|chào/i.test(text)) return 'Chào bạn! Mình có thể giúp gì?';
+      if(/markdown|code/i.test(text)) return '```js\\nconsole.log("Xin chào từ Chat AI UI!")\\n```';
+      return 'Bạn vừa gửi: ' + text + '\\n\\n(Đây là câu trả lời mẫu. Hãy gắn API thật ở hàm sendMessage)';
+    }
+
+    // ======= Events =======
+    // Sự kiện gửi ảnh
+    imageBtn.addEventListener('click', () => {
+      imageInput.click();
+    });
+
+    imageInput.addEventListener('change', () => {
+      const file = imageInput.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const imgHtml = `<img src="${reader.result}" alt="Hình ảnh" style="max-width:100%; border-radius:8px">`;
+          sendMessage(imgHtml, true);
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    formEl.addEventListener('submit', e => {
+      e.preventDefault();
+      const text = inputEl.value.trim();
+      if(!text) return;
+      inputEl.value = '';
+      sendMessage(text);
+    });
+
+    inputEl.addEventListener('keydown', e => {
+      if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); formEl.requestSubmit() }
+    });
+
+    modelEl.addEventListener('change', () => { modelNameEl.textContent = modelEl.value });
+
+    themeToggle.addEventListener('click', () => {
+      document.documentElement.classList.toggle('light');
+      localStorage.setItem('theme', document.documentElement.classList.contains('light') ? 'light' : 'dark');
+    });
+
+    newChatBtn.addEventListener('click', () => {
+      currentThreadId = null; ensureThread(); renderAll();
+      // thêm bong bóng chào mừng
+      chatEl.innerHTML = '';
+      chatEl.appendChild(messageTemplate('assistant', 'Bắt đầu cuộc trò chuyện mới ✨'));
+      save();
+    });
+
+    exportBtn.addEventListener('click', () => {
+      const data = { threads, messages };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'chat-history.json'; a.click(); URL.revokeObjectURL(url);
+    });
+
+    // ======= Init =======
+    (function init(){
+      // theme
+      const savedTheme = localStorage.getItem('theme');
+      if(savedTheme === 'light') document.documentElement.classList.add('light');
+      ensureThread();
+      renderAll();
+    })();
+  </script>
+</body>
+</html>
