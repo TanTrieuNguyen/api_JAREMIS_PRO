@@ -303,7 +303,7 @@
       const typing = typingIndicator();
       statusEl.textContent = 'Đang trả lời...';
       try{
-          const res = await fetch("http://localhost:3000/api/diagnose", {
+          const res = await fetch("https://api-jaremis-pro.onrender.com", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ labResults: text })
