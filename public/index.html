@@ -247,6 +247,22 @@
         }
 
         /* === Hết phần thêm === */
+        /* ✅ Giữ ô nhập tin nhắn luôn cố định ở dưới */
+.chat-input-area {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--chat-bg);
+    border-top: 1px solid var(--border-color);
+    z-index: 50;
+}
+
+/* ✅ Chừa khoảng trống bên dưới để nội dung không bị che */
+.chat-messages {
+    margin-bottom: 120px; /* cao hơn chiều cao input area */
+}
+
 
     </style>
 </head>
@@ -1080,3 +1096,4 @@
     </script>
 </body>
 </html>
+
