@@ -1,0 +1,27 @@
+[
+  {
+    "name": "Cảm cúm",
+    "symptoms": ["sốt", "ho", "đau họng", "mệt mỏi", "đau đầu"],
+    "description": "Nhiễm virus gây sốt, ho, đau họng..."
+  },
+  {
+    "name": "Cảm lạnh",
+    "symptoms": ["sổ mũi", "hắt hơi", "đau họng", "ho nhẹ"],
+    "description": "Virus gây nghẹt mũi, hắt hơi, thường nhẹ hơn cúm."
+  },
+  {
+    "name": "Viêm dạ dày",
+    "symptoms": ["đau bụng", "buồn nôn", "nôn", "tiêu chảy"],
+    "description": "Viêm nhiễm hoặc rối loạn dạ dày-ruột."
+  },
+  {
+    "name": "Viêm họng",
+    "symptoms": ["đau họng", "khó nuốt", "sốt"],
+    "description": "Viêm nhiễm ở họng, có thể do virus hoặc vi khuẩn."
+  },
+  {
+    "name": "Không rõ/Khác",
+    "symptoms": [],
+    "description": "Không nằm trong danh sách bệnh đã biết."
+  }
+]

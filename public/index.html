@@ -1,411 +1,1040 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Chat AI</title>
-  <style>
-    /* ====== Design tokens ====== */
-    :root{
-      --bg: #0b0f14;          /* page */
-      --panel: #0f1720;       /* surfaces */
-      --soft: #131c28;
-      --text: #e6edf3;        /* primary text */
-      --muted: #9db0c7;       /* secondary text */
-      --accent: #4f9cff;      /* brand */
-      --accent-2: #7cd4ff;
-      --border: #1f2a39;
-      --user: #1b3a2a;        /* user bubble */
-      --assistant: #13243a;   /* assistant bubble */
-      --danger: #ff6363;
-      --success: #2dcc70;
-      --radius: 16px;
-      --radius-lg: 22px;
-      --shadow: 0 4px 28px rgba(0,0,0,.3);
-      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji";
-    }
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>JAREMIS - AI Chat</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --sidebar-width: 260px;
+            --bg-color: #0d1117;
+            --sidebar-bg: #161b22;
+            --chat-bg: #010409;
+            --input-bg: #161b22;
+            --bot-bubble-bg: #161b22;
+            --user-bubble-bg: #003666;
+            --text-color: #c9d1d9;
+            --text-secondary-color: #8b949e;
+            --border-color: #30363d;
+            --accent-color: #2f81f7;
+            --error-color: #f85149;
+            --success-color: #238636;
+            --who-bg: #212013;
+            --mic-red: #ff4d4d;
+        }
 
-    * { box-sizing: border-box }
-    html, body { height: 100% }
-    body{
-      margin:0; background: var(--bg); color: var(--text);
-      font-family: var(--sans); line-height: 1.55;
-    }
-    a { color: var(--accent); text-decoration: none }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
-    /* ====== Layout ====== */
-    .app{ display: grid; grid-template-columns: 280px 1fr; height: 100vh }
-    @media (max-width: 920px){ .app{ grid-template-columns: 1fr } .sidebar{ display:none } }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
 
-    .sidebar{
-      background: linear-gradient(180deg, #0e1622, #0b111a);
-      border-right: 1px solid var(--border);
-      padding: 16px; gap: 12px; display: flex; flex-direction: column;
-    }
-    .brand{ display:flex; align-items:center; gap:10px; padding:10px 8px; border-radius: 12px; background: var(--soft); }
-    .brand .logo{ width:28px; height:28px; border-radius:8px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: var(--shadow) }
-    .brand h1{ font-size: 16px; margin:0 }
+        .chat-container { display: flex; width: 100%; height: 100%; }
 
-    .btn{ background: var(--accent); color:#071019; border:none; border-radius: 12px; padding: 10px 12px; font-weight: 600; cursor:pointer }
-    .btn:disabled{ opacity:.6; cursor:not-allowed }
-    .btn.secondary{ background: transparent; color: var(--text); border:1px solid var(--border) }
+        /* Sidebar */
+        .sidebar {
+            width: var(--sidebar-width);
+            min-width: 200px;
+            max-width: 500px;
+            background-color: var(--sidebar-bg);
+            display: flex;
+            flex-direction: column;
+            padding: 16px;
+            transition: width 0.1s ease-out;
+            flex-shrink: 0;
+        }
+        .resizer { width: 5px; cursor: col-resize; background-color: transparent; flex-shrink: 0; position: relative; z-index: 10; }
+        .resizer:hover { background-color: var(--accent-color); }
 
-    .history{ flex:1; overflow:auto; border-radius: 12px; border:1px solid var(--border) }
-    .history h3{ font-size: 12px; letter-spacing:.06em; color: var(--muted); margin: 10px 12px }
-    .history ul{ list-style:none; margin:0; padding:0 }
-    .history li{ padding:12px; border-top:1px solid var(--border); cursor:pointer }
-    .history li:hover{ background: #0e1520 }
+        .sidebar-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; gap:8px; }
+        .new-chat-btn {
+            display:flex; align-items:center; gap:8px; width:100%; padding:10px; background:transparent; color:var(--text-color);
+            border:1px solid var(--border-color); border-radius:6px; font-size:14px; cursor:pointer;
+        }
+        .new-chat-btn:hover { background-color:#2c313a; }
 
-    .main{ display:flex; flex-direction: column; height: 100vh }
-    .topbar{
-      display:flex; align-items:center; justify-content: space-between;
-      padding: 12px 16px; border-bottom:1px solid var(--border); background: rgba(8,12,18,.6); backdrop-filter: blur(6px);
-      position: sticky; top:0; z-index: 5;
-    }
-    .title{ display:flex; align-items:center; gap:10px }
-    .title .badge{ font-size:12px; color: var(--muted); padding: 2px 8px; border:1px solid var(--border); border-radius: 999px }
-    .actions{ display:flex; gap:8px; align-items:center }
+        .history { flex-grow:1; overflow-y:auto; margin-top:10px; }
+        .history h3 { font-size:12px; color:var(--text-secondary-color); margin-bottom:8px; text-transform:uppercase; display:flex; justify-content:space-between; align-items:center; }
+        .history ul { list-style:none; padding:0; display:flex; flex-direction:column; gap:6px; }
+        .history li { padding:8px; border-radius:6px; cursor:pointer; color:var(--text-color); background:transparent; border:1px solid transparent; font-size:13px; }
+        .history li:hover { background:#111720; border-color:var(--border-color); }
+        .sidebar-footer { font-size:12px; color:var(--text-secondary-color); text-align:center; margin-top:10px; }
 
-    .chat{
-      flex:1; overflow:auto; padding: 24px; scroll-behavior: smooth;
-      background:
-       radial-gradient(1200px 600px at 20% -10%, rgba(79,156,255,.08), transparent 60%),
-       radial-gradient(900px 500px at 90% 0%, rgba(124,212,255,.06), transparent 60%);
-    }
+        /* Chat area */
+        .chat-area { flex-grow:1; display:flex; flex-direction:column; background-color:var(--chat-bg); border-left:1px solid var(--border-color); position:relative; }
+        .chat-messages { flex-grow:1; padding:24px; overflow-y:auto; display:flex; flex-direction:column; gap:20px; }
+        .chat-bubble { max-width:80%; padding:16px; border-radius:12px; line-height:1.6; word-wrap:break-word; }
+        .bot-bubble { background-color:var(--bot-bubble-bg); align-self:flex-start; border:1px solid var(--border-color); }
+        .user-bubble { background-color:var(--user-bubble-bg); align-self:flex-end; color:#fff; }
 
-    .bubble{ max-width: 900px; margin: 0 auto 18px; display:flex; gap:12px }
-    .bubble .avatar{ width:34px; height:34px; border-radius: 10px; flex:0 0 34px; display:grid; place-items:center }
-    .bubble .content{ flex:1; padding: 14px 16px; border:1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow) }
+        .user-bubble-content p { margin-bottom:12px; }
+        .user-images-preview { display:flex; gap:10px; flex-wrap:wrap; }
+        .user-images-preview img { width:80px; height:80px; object-fit:cover; border-radius:8px; border:1px solid var(--border-color); }
 
-    .bubble.user .avatar{ background: linear-gradient(135deg, #8bffbd33, #2dcc7033); border:1px solid #2dcc7060 }
-    .bubble.user .content{ background: linear-gradient(180deg, #0f1618, var(--user)) }
+        .chat-input-area { padding:16px 24px; border-top:1px solid var(--border-color); display:flex; flex-direction:column; gap:8px; }
+        .input-wrapper { position:relative; display:flex; align-items:center; background-color:var(--input-bg); border:1px solid var(--border-color); border-radius:8px; padding:8px; gap:8px; }
 
-    .bubble.assistant .avatar{ background: linear-gradient(135deg, #7cd4ff33, #4f9cff33); border:1px solid #4f9cff60 }
-    .bubble.assistant .content{ background: linear-gradient(180deg, #0f151d, var(--assistant)) }
+        #chat-input { flex-grow:1; background:transparent; border:none; color:var(--text-color); font-size:16px; padding:8px; resize:none; max-height:200px; overflow-y:auto; }
+        #chat-input:focus { outline:none; }
 
-    .content p{ margin: 0 0 10px }
-    .content p:last-child{ margin:0 }
+        .input-actions { display:flex; align-items:center; gap:8px; }
+        .action-btn {
+            background:none; border:none; color:var(--text-secondary-color); font-size:20px; cursor:pointer; width:40px; height:40px; border-radius:6px;
+            display:flex; align-items:center; justify-content:center;
+        }
+        .action-btn:hover { background-color:#2c313a; color:var(--text-color); }
+        #send-btn { background-color:var(--accent-color); color:white; border-radius:6px; width:44px; height:40px; display:flex; align-items:center; justify-content:center; }
+        #send-btn:disabled { background-color:#30363d; cursor:not-allowed; }
 
-    /* Code blocks */
-    pre, code{ font-family: var(--mono) }
-    pre{ background:#0b0f14; border:1px solid var(--border); padding:14px; border-radius: 12px; overflow:auto }
-    code{ background:#0b0f14; border:1px solid var(--border); padding:2px 6px; border-radius:8px }
+        #image-preview-container { display:flex; gap:10px; margin-top:10px; padding:0 8px; }
+        .preview-item { position:relative; }
+        .preview-item img { width:60px; height:60px; object-fit:cover; border-radius:6px; }
+        .remove-btn { position:absolute; top:-5px; right:-5px; background:var(--error-color); color:white; border:none; width:20px; height:20px; border-radius:50%; cursor:pointer; font-size:12px; display:flex; align-items:center; justify-content:center; }
 
-    /* Composer */
-    .composer{
-      position: sticky; bottom:0; left:0; right:0;
-      padding: 14px; background: linear-gradient(180deg, transparent, #0b0f14 40%);
-    }
-    .composer .inner{
-      max-width: 980px; margin: 0 auto; background: var(--panel); border:1px solid var(--border);
-      border-radius: 20px; padding: 10px; box-shadow: var(--shadow)
-    }
-    .row{ display:flex; gap:10px; align-items:flex-end }
-    textarea{
-      flex:1; min-height: 48px; max-height: 200px; resize: none; outline: none;
-      background: #0c121a; color: var(--text); border:1px solid var(--border); border-radius: 14px; padding: 12px 12px;
-      line-height: 1.45; box-shadow: inset 0 1px 0 rgba(255,255,255,.03)
-    }
-    .hint{ font-size: 12px; color: var(--muted); padding: 8px 4px 0 }
+        /* Analysis steps */
+        .analysis-steps { display:flex; flex-direction:column; gap:12px; }
+        .step-item { display:flex; align-items:center; gap:12px; font-size:14px; transition:color 0.3s ease; }
+        .step-item .icon { width:20px; text-align:center; }
+        .step-item.pending { color:var(--text-secondary-color); }
+        .step-item.active { color:var(--text-color); font-weight:600; }
+        .step-item.completed { color:var(--success-color); }
+        .fa-spinner { animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform:rotate(0deg); } 100% { transform:rotate(360deg); } }
 
-    .kbd{ font-family: var(--mono); font-size: 12px; padding: 2px 6px; border:1px solid var(--border); border-radius: 8px; color: var(--muted) }
+        /* Result */
+        .error-message { color:var(--error-color); }
+        .confidence-meter { background:#2c313a; border-radius:20px; height:24px; margin:16px 0; overflow:hidden; position:relative; }
+        .confidence-bar { background:var(--success-color); height:100%; display:flex; align-items:center; padding-left:12px; color:white; font-weight:bold; font-size:12px; transition: width 0.5s ease; }
 
-    .typing{ display:inline-flex; gap:6px; align-items:center }
-    .dot{ width:6px; height:6px; border-radius:999px; background: var(--muted); opacity:.5; animation: blink 1.2s infinite }
-    .dot:nth-child(2){ animation-delay: .15s }
-    .dot:nth-child(3){ animation-delay: .3s }
-    @keyframes blink{ 0%,80%,100%{ opacity:.2 } 40%{ opacity: 1 } }
+        .disease-list { margin:20px 0; display:flex; flex-direction:column; gap:15px; }
+        .disease-item { border-left:3px solid var(--accent-color); padding-left:15px; }
+        .probability-bar { height:8px; background:#30363d; border-radius:10px; overflow:hidden; margin-top:8px; }
+        .probability-fill { height:100%; background:var(--accent-color); transition:width 0.5s ease; }
 
-    .small{ font-size: 12px; color: var(--muted) }
+        .diagnosis-details h2, .diagnosis-details h3 { border-bottom:1px solid var(--border-color); padding-bottom:8px; margin:20px 0 10px 0; font-size:1.1em; }
+        .references-section { margin-top:25px; padding:15px; background:rgba(47,129,247,0.1); border-radius:8px; }
+        .reference-item { margin-top:10px; }
+        .reference-item a { color:var(--accent-color); text-decoration:none; }
+        .reference-item a:hover { text-decoration:underline; }
+        .reference-source { font-size:0.8em; color:var(--text-secondary-color); margin-top:4px; }
 
-    .copy{ background: transparent; color: var(--muted); border:1px solid var(--border); border-radius: 10px; padding: 6px 8px; cursor:pointer; font-size:12px }
-    .bubble .head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px }
+        .warning { margin-top:20px; padding:12px; background:var(--who-bg); border-left:4px solid #f1e05a; color:#d4c873; font-size:14px; border-radius:4px; }
+        .warning strong { color:#f1e05a; }
 
-    .toggle{ background: transparent; border:1px solid var(--border); color: var(--muted); border-radius: 999px; padding: 6px 10px; cursor:pointer }
-    .light{ --bg:#f6f7fb; --panel:#ffffff; --soft:#f0f4ff; --text:#0e1320; --muted:#5c6573; --border:#e3e7ef; --user:#eafaf0; --assistant:#eef5ff }
-  </style>
+        /* Think button style */
+        #think-btn { background:none; border:1px solid var(--border-color); border-radius:6px; padding:6px 8px; color:var(--text-secondary-color); cursor:pointer; width:auto; height:40px; display:flex; align-items:center; justify-content:center; }
+        #think-btn.active { background: linear-gradient(90deg, rgba(47,129,247,0.12), rgba(47,129,247,0.06)); color:var(--text-color); border-color: rgba(47,129,247,0.6); }
+        #model-status { font-size:12px; color:var(--text-secondary-color); margin-left:8px; align-self:center; }
+
+        /* Mic button style */
+        #mic-btn { background:none; border:1px solid var(--border-color); border-radius:6px; padding:6px 8px; color:var(--text-secondary-color); cursor:pointer; width:auto; height:40px; display:flex; align-items:center; justify-content:center; }
+        #mic-btn.recording { background: rgba(255,77,77,0.12); color: var(--text-color); border-color: rgba(255,77,77,0.5); box-shadow: 0 0 8px rgba(255,77,77,0.12); }
+        #mic-indicator {
+            width:8px; height:8px; border-radius:50%; background:var(--mic-red); margin-left:6px; display:inline-block; opacity:0;
+            box-shadow: 0 0 6px rgba(255,77,77,0.8);
+            animation: pulse 1.2s infinite;
+        }
+        #mic-btn.recording #mic-indicator { opacity:1; }
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 0.9; }
+            50% { transform: scale(1.5); opacity: 0.5; }
+            100% { transform: scale(1); opacity: 0.9; }
+        }
+
+        /* Auth UI (top-right) */
+        .auth-controls {
+            position: absolute;
+            top: 12px;
+            right: 18px;
+            display:flex;
+            gap:8px;
+            align-items:center;
+            z-index: 40;
+        }
+        .auth-btn {
+            background: transparent;
+            color: var(--text-secondary-color);
+            border: 1px solid var(--border-color);
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .auth-btn:hover { background: #1f272e; color: var(--text-color); }
+
+        /* Modal */
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 60;
+        }
+        .modal {
+            background: #0b1116;
+            border: 1px solid var(--border-color);
+            padding: 18px;
+            border-radius: 10px;
+            width: 360px;
+            max-width: 92%;
+            color: var(--text-color);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+        }
+        .modal h3 { margin-bottom: 10px; font-size: 18px; }
+        .tabs { display:flex; gap:8px; margin-bottom:12px; }
+        .tab { padding:8px 12px; border-radius:6px; cursor:pointer; background:transparent; color:var(--text-secondary-color); border:1px solid transparent; }
+        .tab.active { background: rgba(47,129,247,0.12); color:var(--text-color); border-color: rgba(47,129,247,0.2); }
+        .form-row { margin-bottom:10px; display:flex; flex-direction:column; gap:6px; }
+        .form-row input { background: #071018; border: 1px solid var(--border-color); color: var(--text-color); padding:8px 10px; border-radius:6px; }
+        .form-actions { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top:8px; }
+        .btn-primary { background: var(--accent-color); color: #fff; padding:8px 12px; border-radius:6px; border:none; cursor:pointer; }
+        .btn-ghost { background:transparent; color:var(--text-secondary-color); border:1px solid var(--border-color); padding:8px 10px; border-radius:6px; cursor:pointer; }
+
+        .small-muted { font-size:12px; color:var(--text-secondary-color); margin-top:8px; }
+
+        /* small responsive */
+        @media (max-width: 900px) {
+            .sidebar { display:none; }
+            .resizer { display:none; }
+            .auth-controls { right: 8px; top: 8px; }
+        }
+    </style>
 </head>
 <body>
-  <div class="app" id="app">
-    <!-- ===== Sidebar ===== -->
-    <aside class="sidebar">
-      <div class="brand">
-        <div class="logo" aria-hidden></div>
-        <h1>Chat AI</h1>
-      </div>
-      <div style="display:flex; gap:8px">
-        <button class="btn" id="newChat">+ Cuộc trò chuyện mới</button>
-        <button class="btn secondary" id="exportBtn" title="Xuất lịch sử">Xuất</button>
-      </div>
-      <div class="history" id="history">
-        <h3>Lịch sử</h3>
-        <ul id="historyList"></ul>
-      </div>
-      <div class="small">Made with ❤ — TT1403 & Ant.</div>
-    </aside>
-
-    <!-- ===== Main ===== -->
-    <main class="main">
-      <header class="topbar">
-        <div class="title">
-          <strong>Chat AI</strong>
-          <span class="badge">Beta UI</span>
-        </div>
-        <div class="actions">
-          <!-- Added: theme toggle + model select so script doesn't error -->
-          <button class="toggle" id="themeToggle" title="Đổi giao diện">🌓</button>
-          <select id="model" class="toggle" title="Chọn model">
-            <option selected>JAREMIS beta</option>
-          </select>
-        </div>
-      </header>
-
-      <section class="chat" id="chat">
-        <!-- Messages will render here -->
-        <div class="bubble assistant">
-          <div class="avatar">🤖</div>
-          <div class="content">
-            <div class="head">
-              <div class="small">Trợ lý</div>
+    <div class="chat-container">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <button class="new-chat-btn" onclick="window.location.reload()">
+                    <i class="fas fa-plus"></i>
+                    <span>Cuộc trò chuyện mới</span>
+                </button>
             </div>
-            <p>Chào bạn 👋 Mình là giao diện mẫu. Hãy nhập câu hỏi phía dưới, code đã sẵn sàng để bạn gắn API!</p>
-            <p class="small">Mẹo: Nhấn <span class="kbd">Shift</span> + <span class="kbd">Enter</span> để xuống dòng • <span class="kbd">Enter</span> để gửi.</p>
-          </div>
+            <nav class="history">
+                <h3>
+                    Lịch sử
+                    <span id="history-actions" style="font-size:12px;"></span>
+                </h3>
+                <ul id="history-list"></ul>
+            </nav>
+            <div class="sidebar-footer">Made with ❤️ by 717483 & Ant.</div>
+        </aside>
+
+        <div class="resizer" id="resizer"></div>
+
+        <main class="chat-area" id="chat-area">
+            <!-- Auth controls (top-right) -->
+            <div class="auth-controls" id="auth-controls">
+                <!-- Will be populated by JS -->
+            </div>
+
+            <div class="chat-messages" id="chat-messages">
+                <div class="chat-bubble bot-bubble">
+                    <strong>Chào bạn 👋 Mình là JAREMIS.</strong>
+                    <p style="margin-top:8px; color:var(--text-secondary-color);">
+                        Hãy nhập các dấu hiệu, hỏi chuyện, hoặc bật chế độ <strong>Diagnose</strong> để yêu cầu chẩn đoán y khoa.
+                    </p>
+                </div>
+            </div>
+
+            <div class="chat-input-area">
+                <div id="image-preview-container"></div>
+                <div class="input-wrapper">
+                    <textarea id="chat-input" placeholder="Nhập tin nhắn hoặc tải lên hình ảnh..." rows="1" oninput="autoResize(this)"></textarea>
+
+                    <div class="input-actions">
+                        <button class="action-btn" onclick="document.getElementById('images').click()" title="Đính kèm ảnh">
+                            <i class="fas fa-paperclip"></i>
+                        </button>
+
+                        <!-- Mode toggle: Chat / Diagnose -->
+                        <button id="mode-btn" class="action-btn" title="Chế độ: Chat (mặc định)" onclick="toggleMode(event)">
+                            <i class="fas fa-comments"></i>
+                        </button>
+
+                        <!-- Mic button -->
+                        <button id="mic-btn" class="action-btn" title="Ghi giọng nói (Vietnamese). Nhấn để bắt đầu/dừng" onclick="toggleMic(event)">
+                            <i class="fas fa-microphone"></i>
+                            <span id="mic-indicator"></span>
+                        </button>
+
+                        <!-- Think toggle button -->
+                        <button id="think-btn" class="action-btn" title="Bật Think (dùng Gemini Pro)" onclick="toggleThink(event)">
+                            <i class="fas fa-brain"></i>
+                        </button>
+
+                        <button id="send-btn" class="action-btn" onclick="submitData()" title="Gửi">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+
+                        <input type="file" id="images" multiple hidden onchange="handleImageUpload(event)">
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div id="model-status">Model: JAREMIS 1.0</div>
+                    <div style="font-size:12px; color:var(--text-secondary-color);">Trạng thái: Rảnh</div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Auth modal -->
+    <div class="modal-backdrop" id="auth-backdrop">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+            <h3 id="auth-title">Đăng nhập / Đăng ký</h3>
+
+            <div class="tabs">
+                <div class="tab active" id="tab-login" onclick="showTab('login')">Đăng nhập</div>
+                <div class="tab" id="tab-register" onclick="showTab('register')">Đăng ký</div>
+            </div>
+
+            <!-- Login form -->
+            <div id="form-login">
+                <div class="form-row">
+                    <label>Username hoặc Email</label>
+                    <input id="login-username" placeholder="Tên đăng nhập hoặc email">
+                </div>
+                <div class="form-row">
+                    <label>Mật khẩu</label>
+                    <input id="login-password" type="password" placeholder="Mật khẩu">
+                </div>
+
+                <div class="form-actions">
+                    <button class="btn-primary" onclick="submitLogin()">Đăng nhập</button>
+                    <button class="btn-ghost" onclick="closeAuthModal()">Hủy</button>
+                </div>
+                <div class="small-muted">Bạn chưa có tài khoản? Chuyển sang tab "Đăng ký".</div>
+            </div>
+
+            <!-- Register form -->
+            <div id="form-register" style="display:none">
+                <div class="form-row">
+                    <label>Tên đăng nhập</label>
+                    <input id="reg-username" placeholder="Tên đăng nhập">
+                </div>
+                <div class="form-row">
+                    <label>Email</label>
+                    <input id="reg-email" placeholder="email@example.com" type="email">
+                </div>
+                <div class="form-row">
+                    <label>Mật khẩu</label>
+                    <input id="reg-password" type="password" placeholder="Mật khẩu (ít nhất 6 ký tự)">
+                </div>
+
+                <div class="form-actions">
+                    <button class="btn-primary" onclick="submitRegister()">Đăng ký</button>
+                    <button class="btn-ghost" onclick="closeAuthModal()">Hủy</button>
+                </div>
+                <div class="small-muted">Bằng cách đăng ký, bạn đồng ý thử nghiệm tính năng.</div>
+            </div>
         </div>
-      </section>
+    </div>
 
-      <footer class="composer">
-        <form class="inner" id="composerForm">
-          <div class="row">
-            <textarea id="input" placeholder="Nhập tin nhắn..." autocomplete="off"></textarea>
+    <script>
+        // ------------------------------
+        // UI elements & state
+        // ------------------------------
+        const chatInput = document.getElementById('chat-input');
+        const sendBtn = document.getElementById('send-btn');
+        const imageInput = document.getElementById('images');
+        const imagePreviewContainer = document.getElementById('image-preview-container');
+        const chatMessages = document.getElementById('chat-messages');
+        const thinkBtn = document.getElementById('think-btn');
+        const modelStatusEl = document.getElementById('model-status');
+        const micBtn = document.getElementById('mic-btn');
+        const micIndicator = document.getElementById('mic-indicator');
+        const modeBtn = document.getElementById('mode-btn');
 
-            <!-- Nút gửi ảnh -->
-            <input type="file" id="imageInput" accept="image/*" style="display:none">
-            <button type="button" class="btn secondary" id="imageBtn" title="Gửi ảnh">📷</button>
+        const historyListEl = document.getElementById('history-list');
+        const historyActionsEl = document.getElementById('history-actions');
 
-            <button type="submit" class="btn" id="sendBtn">Gửi</button>
-          </div>
-          <div class="hint">
-            Model: <span id="modelName">JAREMIS beta</span> • Trạng thái: <span id="status">Rảnh</span>
-          </div>
-        </form>
-      </footer>
-    </main>
-  </div>
+        const authBackdrop = document.getElementById('auth-backdrop');
+        const authControls = document.getElementById('auth-controls');
 
-  <script>
-    // ======= State =======
-    const chatEl = document.getElementById('chat');
-    const inputEl = document.getElementById('input');
-    const formEl = document.getElementById('composerForm');
-    const statusEl = document.getElementById('status');
-    const modelEl = document.getElementById('model');
-    const modelNameEl = document.getElementById('modelName');
-    const themeToggle = document.getElementById('themeToggle');
-    const newChatBtn = document.getElementById('newChat');
-    const exportBtn = document.getElementById('exportBtn');
-    const historyList = document.getElementById('historyList');
+        let useProModel = false;
+        let diagnosticMode = false; // Chat mode default
+        let recognition = null;
+        let isRecording = false;
+        let textBeforeRecording = '';
+        let historyCache = [];
 
-    // === Biến cho nút gửi ảnh ===
-    const imageBtn = document.getElementById('imageBtn');
-    const imageInput = document.getElementById('imageInput');
-
-    let messages = JSON.parse(localStorage.getItem('messages') || '[]');
-    let threads = JSON.parse(localStorage.getItem('threads') || '[]');
-    let currentThreadId = localStorage.getItem('currentThreadId') || null;
-
-    // ======= Helpers =======
-    function uid(){ return Math.random().toString(36).slice(2, 10) }
-
-    function save(){
-      localStorage.setItem('messages', JSON.stringify(messages));
-      localStorage.setItem('threads', JSON.stringify(threads));
-      localStorage.setItem('currentThreadId', currentThreadId || '');
-    }
-
-    function ensureThread(){
-      if(!currentThreadId){
-        currentThreadId = uid();
-        threads.unshift({ id: currentThreadId, title: 'Cuộc trò chuyện mới', createdAt: Date.now() });
-        save();
-      }
-    }
-
-    function renderHistory(){
-      historyList.innerHTML = '';
-      for(const t of threads){
-        const li = document.createElement('li');
-        li.textContent = t.title;
-        li.onclick = () => { currentThreadId = t.id; save(); renderAll() };
-        historyList.appendChild(li);
-      }
-    }
-
-    function renderAll(){
-      renderHistory();
-      renderMessages();
-      modelNameEl.textContent = modelEl.value;
-    }
-
-    function messageTemplate(role, html){
-      const isUser = role === 'user';
-      const wrapper = document.createElement('div');
-      wrapper.className = `bubble ${isUser ? 'user' : 'assistant'}`;
-      wrapper.innerHTML = `
-        <div class="avatar">${isUser ? '🧑‍💻' : '🤖'}</div>
-        <div class="content">
-          <div class="head">
-            <div class="small">${isUser ? 'Bạn' : 'Trợ lý'}</div>
-            <button class="copy" title="Sao chép">Sao chép</button>
-          </div>
-          <div class="md">${html}</div>
-        </div>
-      `;
-      wrapper.querySelector('.copy').onclick = () => {
-        const text = wrapper.querySelector('.md').innerText;
-        navigator.clipboard.writeText(text);
-      };
-      return wrapper;
-    }
-
-    function mdEscape(s){
-      return s
-        .replace(/&/g,'&amp;')
-        .replace(/</g,'&lt;')
-        .replace(/>/g,'&gt;')
-        .replace(/\n/g,'<br>');
-    }
-
-    function scrollToBottom(){ chatEl.scrollTop = chatEl.scrollHeight }
-
-    function typingIndicator(){
-      const el = document.createElement('div');
-      el.className = 'bubble assistant';
-      el.innerHTML = `
-        <div class="avatar">🤖</div>
-        <div class="content"><span class="typing"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span></div>`;
-      chatEl.appendChild(el);
-      scrollToBottom();
-      return { remove(){ el.remove() } };
-    }
-
-      // ======= Core flow =======
-      async function sendMessage(text, isHtml = false, imageFile = null){
-        ensureThread();
-        const id = uid();
-        const userMsg = { id, threadId: currentThreadId, role: 'user', content: text, ts: Date.now() };
-        messages.push(userMsg); save();
-
-        chatEl.appendChild(messageTemplate('user', isHtml ? text : mdEscape(text)));
-        scrollToBottom();
-
-        const typing = typingIndicator();
-        statusEl.textContent = 'Đang trả lời...';
-
-        try{
-          let res;
-          if (imageFile) {
-            // 🔹 gửi ảnh + text
-            const formData = new FormData();
-            formData.append("labResults", text);
-            formData.append("images", imageFile);
-
-            res = await fetch("https://api-jaremis-pro.onrender.com/api/diagnose", {
-              method: "POST",
-              body: formData
-            });
-          } else {
-            // 🔹 chỉ gửi text
-            res = await fetch("https://api-jaremis-pro.onrender.com/api/diagnose", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ labResults: text })
-            });
-          }
-
-          const data = await res.json();
-          const answer = data.diagnosis || data.warning || "Không có phản hồi";
-
-          typing.remove();
-          chatEl.appendChild(messageTemplate('assistant', mdEscape(answer)));
-          scrollToBottom();
-
-          const asMsg = { id: uid(), threadId: currentThreadId, role: 'assistant', content: answer, ts: Date.now() };
-          messages.push(asMsg); save();
-          updateThreadTitle();
-
-        }catch(err){
-          typing.remove();
-          statusEl.textContent = 'Lỗi';
-          chatEl.appendChild(messageTemplate('assistant', mdEscape('❌ Lỗi gửi tin nhắn: ' + (err.message || err))));
-        }finally{
-          statusEl.textContent = 'Rảnh';
+        // ------------------------------
+        // Helper: Escape HTML
+        // ------------------------------
+        function escapeHtml(unsafe) {
+            if (unsafe === null || unsafe === undefined) return '';
+            return String(unsafe)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
         }
-      }
 
-      // ======= Events =======
-      imageBtn.addEventListener('click', () => {
-        imageInput.click();
-      });
-
-      imageInput.addEventListener('change', () => {
-        const file = imageInput.files[0];
-        if (file) {
-          const reader = new FileReader();
-          reader.onload = () => {
-            const imgHtml = `<img src="${reader.result}" alt="Hình ảnh" style="max-width:100%; border-radius:8px">`;
-            // gửi ảnh thật tới API
-            sendMessage(imgHtml, true, file);
-          };
-          reader.readAsDataURL(file);
+        // ------------------------------
+        // Auto-resize textarea
+        // ------------------------------
+        function autoResize(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = textarea.scrollHeight + 'px';
         }
-      });
 
+        // ------------------------------
+        // Mode & Think toggles
+        // ------------------------------
+        function toggleMode(e) {
+            e?.preventDefault();
+            diagnosticMode = !diagnosticMode;
+            if (diagnosticMode) {
+                modeBtn.classList.add('active');
+                modeBtn.title = 'Chế độ: Diagnose (chẩn đoán y khoa)';
+                modeBtn.innerHTML = '<i class="fas fa-stethoscope"></i>';
+            } else {
+                modeBtn.classList.remove('active');
+                modeBtn.title = 'Chế độ: Chat';
+                modeBtn.innerHTML = '<i class="fas fa-comments"></i>';
+            }
+        }
 
-    formEl.addEventListener('submit', e => {
-      e.preventDefault();
-      const text = inputEl.value.trim();
-      if(!text) return;
-      inputEl.value = '';
-      sendMessage(text);
-    });
+        function toggleThink(e) {
+            e?.preventDefault();
+            useProModel = !useProModel;
+            if (useProModel) {
+                thinkBtn.classList.add('active');
+                modelStatusEl.textContent = 'Model: JAREMIS PRO';
+            } else {
+                thinkBtn.classList.remove('active');
+                modelStatusEl.textContent = 'Model: JAREMIS 1.0';
+            }
+        }
 
-    inputEl.addEventListener('keydown', e => {
-      if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); formEl.requestSubmit() }
-    });
+        // ------------------------------
+        // Authentication & user state (client session stored in localStorage)
+        // ------------------------------
+        document.addEventListener('DOMContentLoaded', () => {
+            renderAuthControls();
+            const u = getLocalUser();
+            if (u) fetchAndRenderHistory(u.username);
+        });
 
-    modelEl.addEventListener('change', () => { modelNameEl.textContent = modelEl.value });
+        function getLocalUser() {
+            try {
+                const raw = localStorage.getItem('jaremis_user');
+                if (!raw) return null;
+                return JSON.parse(raw);
+            } catch (e) {
+                return null;
+            }
+        }
 
-    themeToggle.addEventListener('click', () => {
-      document.documentElement.classList.toggle('light');
-      localStorage.setItem('theme', document.documentElement.classList.contains('light') ? 'light' : 'dark');
-    });
+        function renderAuthControls() {
+            authControls.innerHTML = '';
+            const user = getLocalUser();
+            if (user) {
+                const nameEl = document.createElement('div');
+                nameEl.style.color = 'var(--text-color)';
+                nameEl.style.fontSize = '13px';
+                nameEl.textContent = user.username;
 
-    newChatBtn.addEventListener('click', () => {
-      currentThreadId = null; ensureThread(); renderAll();
-      // thêm bong bóng chào mừng
-      chatEl.innerHTML = '';
-      chatEl.appendChild(messageTemplate('assistant', 'Bắt đầu cuộc trò chuyện mới ✨'));
-      save();
-    });
+                const btnHistoryClear = document.createElement('button');
+                btnHistoryClear.className = 'auth-btn';
+                btnHistoryClear.textContent = 'Xóa lịch sử';
+                btnHistoryClear.title = 'Xóa toàn bộ lịch sử chat';
+                btnHistoryClear.onclick = async () => {
+                    if (!confirm('Xóa toàn bộ lịch sử chat của bạn?')) return;
+                    try {
+                        const res = await fetch(`/api/history?username=${encodeURIComponent(user.username)}`, { method: 'DELETE' });
+                        const json = await res.json();
+                        if (!res.ok) {
+                            alert(json.error || 'Không xóa được lịch sử');
+                            return;
+                        }
+                        historyCache = [];
+                        renderHistoryList([]);
+                        flashNotice('Đã xóa lịch sử');
+                    } catch (e) {
+                        console.error(e);
+                        flashNotice('Lỗi khi xóa lịch sử');
+                    }
+                };
 
-    exportBtn.addEventListener('click', () => {
-      const data = { threads, messages };
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = 'chat-history.json'; a.click(); URL.revokeObjectURL(url);
-    });
+                const logoutBtn = document.createElement('button');
+                logoutBtn.className = 'auth-btn';
+                logoutBtn.textContent = 'Đăng xuất';
+                logoutBtn.onclick = () => {
+                    localStorage.removeItem('jaremis_user');
+                    renderAuthControls();
+                    historyCache = [];
+                    renderHistoryList([]);
+                };
 
-    // ======= Init =======
-    (function init(){
-      // theme
-      const savedTheme = localStorage.getItem('theme');
-      if(savedTheme === 'light') document.documentElement.classList.add('light');
-      ensureThread();
-      renderAll();
-    })();
-  </script>
+                authControls.appendChild(nameEl);
+                authControls.appendChild(btnHistoryClear);
+                authControls.appendChild(logoutBtn);
+            } else {
+                const loginBtn = document.createElement('button');
+                loginBtn.className = 'auth-btn';
+                loginBtn.textContent = 'Đăng nhập';
+                loginBtn.onclick = openAuthModal;
+
+                const registerBtn = document.createElement('button');
+                registerBtn.className = 'auth-btn';
+                registerBtn.textContent = 'Đăng ký';
+                registerBtn.onclick = () => { openAuthModal(); showTab('register'); };
+
+                authControls.appendChild(loginBtn);
+                authControls.appendChild(registerBtn);
+            }
+        }
+
+        function openAuthModal() {
+            authBackdrop.style.display = 'flex';
+            showTab('login');
+        }
+        function closeAuthModal() {
+            authBackdrop.style.display = 'none';
+        }
+        function showTab(tab) {
+            document.getElementById('tab-login').classList.toggle('active', tab === 'login');
+            document.getElementById('tab-register').classList.toggle('active', tab === 'register');
+            document.getElementById('form-login').style.display = tab === 'login' ? 'block' : 'none';
+            document.getElementById('form-register').style.display = tab === 'register' ? 'block' : 'none';
+        }
+
+        async function submitRegister() {
+            const username = document.getElementById('reg-username').value.trim();
+            const email = document.getElementById('reg-email').value.trim();
+            const password = document.getElementById('reg-password').value;
+
+            if (!username || !email || !password) {
+                flashNotice('Vui lòng nhập đầy đủ thông tin đăng ký');
+                return;
+            }
+            if (password.length < 6) {
+                flashNotice('Mật khẩu ít nhất 6 ký tự');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, email, password })
+                });
+                const json = await res.json();
+                if (!res.ok) {
+                    flashNotice(json.error || 'Đăng ký thất bại');
+                    return;
+                }
+                localStorage.setItem('jaremis_user', JSON.stringify(json.user));
+                flashNotice('Đăng ký thành công! Bạn đã đăng nhập tạm thời.', 2000);
+                closeAuthModal();
+                renderAuthControls();
+                fetchAndRenderHistory(json.user.username);
+            } catch (e) {
+                console.error('Register error', e);
+                flashNotice('Lỗi kết nối khi đăng ký');
+            }
+        }
+
+        async function submitLogin() {
+            const usernameOrEmail = document.getElementById('login-username').value.trim();
+            const password = document.getElementById('login-password').value;
+            if (!usernameOrEmail || !password) {
+                flashNotice('Vui lòng nhập username/email và mật khẩu');
+                return;
+            }
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ usernameOrEmail, password })
+                });
+                const json = await res.json();
+                if (!res.ok) {
+                    flashNotice(json.error || 'Đăng nhập thất bại');
+                    return;
+                }
+                localStorage.setItem('jaremis_user', JSON.stringify(json.user));
+                flashNotice('Đăng nhập thành công', 1200);
+                closeAuthModal();
+                renderAuthControls();
+                fetchAndRenderHistory(json.user.username);
+            } catch (e) {
+                console.error('Login error', e);
+                flashNotice('Lỗi kết nối khi đăng nhập');
+            }
+        }
+
+        function flashNotice(msg, duration = 2000) {
+            const bubble = document.createElement('div');
+            bubble.className = 'chat-bubble bot-bubble';
+            bubble.innerHTML = `<em style="color:var(--text-secondary-color)">${escapeHtml(msg)}</em>`;
+            chatMessages.appendChild(bubble);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            setTimeout(() => bubble.remove(), duration);
+        }
+
+        // ------------------------------
+        // History: fetch, render, open
+        // ------------------------------
+        async function fetchAndRenderHistory(username) {
+            if (!username) return;
+            try {
+                const res = await fetch(`/api/history?username=${encodeURIComponent(username)}`);
+                const json = await res.json();
+                if (!res.ok) {
+                    console.warn('Không lấy được lịch sử', json);
+                    renderHistoryList([]);
+                    return;
+                }
+                historyCache = json.history || [];
+                renderHistoryList(historyCache);
+            } catch (e) {
+                console.error('fetch history error', e);
+            }
+        }
+
+        function renderHistoryList(list) {
+            historyListEl.innerHTML = '';
+            if (!list || list.length === 0) {
+                historyListEl.innerHTML = `<li style="color:var(--text-secondary-color); font-size:13px;">Chưa có lịch sử</li>`;
+                historyActionsEl.innerHTML = '';
+                return;
+            }
+            list.forEach(item => {
+                const li = document.createElement('li');
+                li.dataset.id = item.id;
+                const time = new Date(item.timestamp).toLocaleString();
+                const titleText = (item.input && item.input.length > 60) ? item.input.slice(0, 60) + '...' : (item.input || 'Không có nội dung');
+                li.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;">
+                                    <div style="flex:1; padding-right:8px;">
+                                      <div style="font-size:13px; color:var(--text-color);">${escapeHtml(titleText)}</div>
+                                      <div style="font-size:11px; color:var(--text-secondary-color); margin-top:4px">${escapeHtml(time)} • ${escapeHtml(item.modelUsed || '')} • ${escapeHtml(item.type || '')}</div>
+                                    </div>
+                                    <div style="margin-left:8px; font-size:12px; color:var(--text-secondary-color)"><i class="fas fa-chevron-right"></i></div>
+                                </div>`;
+                li.onclick = () => openHistoryItem(item.id);
+                historyListEl.appendChild(li);
+            });
+            historyActionsEl.innerHTML = `<button class="auth-btn" onclick="clearLocalHistory()">Xóa</button>`;
+        }
+
+        async function clearLocalHistory() {
+            const user = getLocalUser();
+            if (!user) return;
+            if (!confirm('Bạn có muốn xóa toàn bộ lịch sử?')) return;
+            try {
+                const res = await fetch(`/api/history?username=${encodeURIComponent(user.username)}`, { method: 'DELETE' });
+                const json = await res.json();
+                if (!res.ok) {
+                    alert(json.error || 'Không xóa được lịch sử');
+                    return;
+                }
+                historyCache = [];
+                renderHistoryList([]);
+                flashNotice('Đã xóa lịch sử');
+            } catch (e) {
+                console.error(e);
+                flashNotice('Lỗi khi xóa lịch sử');
+            }
+        }
+
+        function openHistoryItem(id) {
+            const item = historyCache.find(h => String(h.id) === String(id));
+            if (!item) return;
+            chatMessages.innerHTML = '';
+            const userHtml = `<div class="chat-bubble user-bubble"><div class="user-bubble-content"><p>${escapeHtml(item.input || '')}</p></div></div>`;
+            chatMessages.innerHTML += userHtml;
+            const replyContent = escapeHtml(item.reply || item.diagnosis || '');
+            const botHtml = `<div class="chat-bubble bot-bubble">
+                                <div class="diagnosis-details">
+                                    <h3>Kết quả trước đó</h3>
+                                    <div style="font-size:13px; color:var(--text-secondary-color); margin-bottom:8px;">${new Date(item.timestamp).toLocaleString()} • ${escapeHtml(item.modelUsed || '')} • ${escapeHtml(item.type || '')}</div>
+                                    <div style="white-space:pre-wrap; font-size:14px; color:var(--text-color);">${replyContent}</div>
+                                </div>
+                             </div>`;
+            chatMessages.innerHTML += botHtml;
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // ------------------------------
+        // Mic / SpeechRecognition
+        // ------------------------------
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.lang = 'vi-VN';
+            recognition.interimResults = true;
+            recognition.maxAlternatives = 1;
+            recognition.continuous = false;
+
+            recognition.onstart = () => {
+                isRecording = true;
+                micBtn.classList.add('recording');
+                micBtn.title = 'Đang ghi âm — nhấn để dừng';
+                textBeforeRecording = chatInput.value || '';
+                chatInput.focus();
+            };
+
+            recognition.onerror = (event) => {
+                console.warn('Speech recognition error', event.error);
+                stopRecognition();
+                flashNotice('Lỗi ghi âm: ' + (event.error || 'Không xác định'));
+            };
+
+            recognition.onend = () => {
+                stopRecognition(false);
+            };
+
+            recognition.onresult = (event) => {
+                let interimTranscript = '';
+                let finalTranscript = '';
+                for (let i = 0; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += transcript + ' ';
+                    } else {
+                        interimTranscript += transcript;
+                    }
+                }
+                chatInput.value = (textBeforeRecording + ' ' + finalTranscript + interimTranscript).trim();
+                autoResize(chatInput);
+            };
+        } else {
+            micBtn.title = 'Trình duyệt của bạn không hỗ trợ ghi âm chuyển văn bản (Web Speech API). Dùng Chrome/Microsoft Edge mới nhất để có chức năng này.';
+            micBtn.style.opacity = '0.6';
+            micBtn.style.pointerEvents = 'none';
+        }
+
+        function toggleMic(e) {
+            e?.preventDefault();
+            if (!SpeechRecognition) return;
+            if (!isRecording) startRecognition();
+            else stopRecognition();
+        }
+
+        function startRecognition() {
+            if (!recognition) return;
+            try {
+                textBeforeRecording = chatInput.value || '';
+                recognition.start();
+            } catch (err) {
+                console.warn('Không thể bắt đầu ghi âm:', err);
+                flashNotice('Không thể bắt đầu ghi âm: ' + (err.message || err));
+            }
+        }
+
+        function stopRecognition(clearInterim = false) {
+            if (!recognition) return;
+            try { recognition.stop(); } catch (e) {}
+            isRecording = false;
+            micBtn.classList.remove('recording');
+            micBtn.title = 'Ghi giọng nói (Vietnamese). Nhấn để bắt đầu/dừng';
+            if (clearInterim) {
+                chatInput.value = textBeforeRecording || '';
+                autoResize(chatInput);
+            }
+        }
+
+        // ------------------------------
+        // Image preview
+        // ------------------------------
+        function handleImageUpload(event) {
+            imagePreviewContainer.innerHTML = '';
+            Array.from(event.target.files).forEach((file, index) => {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    const div = document.createElement('div');
+                    div.className = 'preview-item';
+                    div.innerHTML = `
+                        <img src="${e.target.result}" alt="Preview">
+                        <button class="remove-btn" onclick="removeImage(${index})">&times;</button>
+                    `;
+                    imagePreviewContainer.appendChild(div);
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function removeImage(index) {
+            const dt = new DataTransfer();
+            const files = Array.from(imageInput.files);
+            files.splice(index, 1);
+            files.forEach(file => dt.items.add(file));
+            imageInput.files = dt.files;
+            handleImageUpload({ target: imageInput });
+        }
+
+        // ------------------------------
+        // Animate analysis steps (UX)
+        // ------------------------------
+        async function animateAnalysisSteps(bubbleElement) {
+            const steps = [
+                'Đang khởi tạo và gửi dữ liệu...',
+                'Tìm kiếm tài liệu tham khảo (PubMed, ClinicalTrials)...',
+                'AI đang phân tích và chẩn đoán hình ảnh...',
+                'Tổng hợp và định dạng kết quả chẩn đoán...'
+            ];
+
+            let html = '<div class="analysis-steps">';
+            steps.forEach((step, index) => {
+                html += `<div id="step-${index}" class="step-item pending">
+                            <span class="icon"><i class="fas fa-hourglass-half"></i></span>
+                            <span>${step}</span>
+                         </div>`;
+            });
+            html += '</div>';
+            bubbleElement.innerHTML = html;
+
+            for (let i = 0; i < steps.length; i++) {
+                const stepEl = bubbleElement.querySelector(`#step-${i}`);
+                const iconEl = stepEl.querySelector('.icon');
+
+                stepEl.classList.remove('pending');
+                stepEl.classList.add('active');
+                iconEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+                await new Promise(resolve => setTimeout(resolve, 600 + Math.random() * 600));
+
+                stepEl.classList.remove('active');
+                stepEl.classList.add('completed');
+                iconEl.innerHTML = '<i class="fas fa-check"></i>';
+            }
+        }
+
+        // ------------------------------
+        // Submit: chooses /api/chat or /api/diagnose
+        // ------------------------------
+        async function submitData() {
+            const labResults = chatInput.value.trim();
+            const images = imageInput.files;
+
+            if (!labResults && images.length === 0) return;
+
+            if (isRecording && recognition) {
+                stopRecognition();
+            }
+
+            sendBtn.disabled = true;
+            const currentUser = getLocalUser();
+
+            // 1. Display user bubble
+            let userHtml = `<div class="chat-bubble user-bubble"><div class="user-bubble-content">`;
+            if (labResults) userHtml += `<p>${escapeHtml(labResults)}</p>`;
+            if (images.length > 0) {
+                let imagePreviews = '<div class="user-images-preview">';
+                for (let i = 0; i < images.length; i++) {
+                    imagePreviews += `<img src="${URL.createObjectURL(images[i])}" alt="user image">`;
+                }
+                imagePreviews += '</div>';
+                userHtml += imagePreviews;
+            }
+            if (currentUser) {
+                userHtml += `<div style="margin-top:8px; font-size:12px; color:var(--text-secondary-color)">Đã gửi bởi: ${escapeHtml(currentUser.username)}</div>`;
+            }
+            userHtml += `</div></div>`;
+            chatMessages.innerHTML += userHtml;
+
+            // 2. Clear input + previews
+            chatInput.value = '';
+            autoResize(chatInput);
+            imagePreviewContainer.innerHTML = '';
+
+            // 3. Create loading bubble
+            const loadingBubble = document.createElement('div');
+            loadingBubble.className = 'chat-bubble bot-bubble';
+            chatMessages.appendChild(loadingBubble);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            try {
+                if (diagnosticMode) {
+                    // Diagnose flow
+                    const formData = new FormData();
+                    if (labResults) formData.append('labResults', labResults);
+                    Array.from(images).forEach(img => formData.append('images', img));
+                    formData.append('model', useProModel ? 'pro' : 'flash');
+                    if (currentUser) formData.append('submittedBy', currentUser.username);
+
+                    const analysisPromise = animateAnalysisSteps(loadingBubble);
+                    const fetchPromise = fetch('/api/diagnose', { method: 'POST', body: formData });
+
+                    const [_, response] = await Promise.all([analysisPromise, fetchPromise]);
+
+                    if (!response.ok) {
+                        const error = await response.json().catch(() => ({ error: 'Lỗi không xác định từ máy chủ' }));
+                        throw new Error(error.error || 'Lỗi không xác định từ máy chủ');
+                    }
+                    const data = await response.json();
+                    displayResults(data, loadingBubble);
+                    if (currentUser) fetchAndRenderHistory(currentUser.username);
+                } else {
+                    // Chat flow
+                    const body = { message: labResults, model: useProModel ? 'pro' : 'flash' };
+                    if (currentUser) body.submittedBy = currentUser.username;
+                    if (images.length > 0) body.imagesCount = images.length;
+
+                    const resp = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+                    if (!resp.ok) {
+                        const err = await resp.json().catch(() => ({ error: 'Lỗi từ server' }));
+                        throw new Error(err.error || 'Lỗi khi gọi /api/chat');
+                    }
+                    const data = await resp.json();
+                    // Render reply (simple)
+                    const replyHtml = `<div class="diagnosis-details">${convertMarkdown(data.reply || data.replyText || '')}</div>`;
+                    loadingBubble.innerHTML = replyHtml;
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                    if (currentUser) fetchAndRenderHistory(currentUser.username);
+                }
+            } catch (error) {
+                showError(error.message, loadingBubble);
+            } finally {
+                sendBtn.disabled = false;
+                imageInput.value = '';
+            }
+        }
+
+        // ------------------------------
+        // displayResults for diagnose flows
+        // ------------------------------
+        function displayResults(data, targetBubble) {
+            // if it's a chat-style reply
+            if (data.reply) {
+                targetBubble.innerHTML = `<div class="diagnosis-details">${convertMarkdown(data.reply)}</div>`;
+                return;
+            }
+
+            let html = '';
+
+            if (data.confidence !== undefined) {
+                html += `
+                    <div class="confidence-meter">
+                        <div class="confidence-bar" style="width:${Math.max(0, Math.min(100, data.confidence))}%">Độ tin cậy: ${data.confidence}%</div>
+                    </div>
+                `;
+            }
+
+            if (Array.isArray(data.diseases) && data.diseases.length) {
+                html += '<h3><i class="fas fa-notes-medical"></i> Khả năng chẩn đoán</h3><div class="disease-list">';
+                data.diseases.forEach(d => {
+                    const pct = Math.min(d.probability || 0, 100);
+                    html += `
+                        <div class="disease-item">
+                            <strong>${escapeHtml(d.name || '')}</strong>
+                            <div class="probability-bar">
+                                <div class="probability-fill" style="width:${pct}%"></div>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+
+            if (data.diagnosis) {
+                html += `<div class="diagnosis-details">
+                    ${convertMarkdown(data.diagnosis)}
+                    ${displayReferences(data.references)}
+                    <div class="warning">${data.warning || ''}</div>
+                </div>`;
+            } else if (data.icdDescriptions && data.icdDescriptions.length) {
+                html += `<div class="diagnosis-details"><h3>Chẩn đoán phân biệt (ICD)</h3>`;
+                data.icdDescriptions.forEach(item => {
+                    html += `<div class="disease-item"><strong>${escapeHtml(item.label)}</strong><div>${escapeHtml(item.icdCode || '')} - ${escapeHtml(item.description || '')}</div></div>`;
+                });
+                html += `</div>`;
+            }
+
+            if (data.modelUsed) {
+                html += `<div style="margin-top:10px; font-size:12px; color:var(--text-secondary-color)">Đã dùng model: ${escapeHtml(data.modelUsed)}</div>`;
+            }
+
+            targetBubble.innerHTML = html;
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function displayReferences(references) {
+            if (!references || !references.length) return '';
+            return `
+                <div class="references-section">
+                    <h3><i class="fas fa-book-medical"></i> Tài liệu tham khảo</h3>
+                    ${references.map(ref => `
+                        <div class="reference-item">
+                            <a href="${escapeHtml(ref.url || '#')}" target="_blank" rel="noopener noreferrer">${escapeHtml(ref.title || 'Tài liệu tham khảo')}</a>
+                            ${ref.source ? `<div class="reference-source">Nguồn: ${escapeHtml(ref.source)}</div>` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function showError(message, targetBubble) {
+            targetBubble.innerHTML = `
+                <div class="error-message">
+                    <i class="fas fa-exclamation-triangle"></i> <strong>Lỗi:</strong> ${escapeHtml(message)}
+                </div>
+            `;
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function convertMarkdown(text) {
+            if (!text) return '';
+            let out = text
+                .replace(/^## (.*$)/gim, '<h3>$1</h3>')
+                .replace(/^### (.*$)/gim, '<h4>$1</h4>')
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/^- (.*)/gm, '<li>$1</li>')
+                .replace(/•\s*(.*)/g, '<li>$1</li>')
+                .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
+                .replace(/\n/g, '<br>');
+            return out;
+        }
+
+        // ------------------------------
+        // Keyboard send
+        // ------------------------------
+        chatInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (!sendBtn.disabled) submitData();
+            }
+        });
+
+        // ------------------------------
+        // Sidebar resize logic
+        // ------------------------------
+        const sidebar = document.getElementById('sidebar');
+        const resizer = document.getElementById('resizer');
+
+        const mouseMoveHandler = function (e) {
+            const dx = e.clientX - sidebar.getBoundingClientRect().right;
+            const newWidth = sidebar.offsetWidth + dx;
+            document.documentElement.style.setProperty('--sidebar-width', `${newWidth}px`);
+        };
+
+        const mouseUpHandler = function () {
+            document.removeEventListener('mousemove', mouseMoveHandler);
+            document.removeEventListener('mouseup', mouseUpHandler);
+            document.body.style.cursor = 'default';
+            document.body.style.userSelect = 'auto';
+        };
+
+        resizer.addEventListener('mousedown', function (e) {
+            e.preventDefault();
+            document.addEventListener('mousemove', mouseMoveHandler);
+            document.addEventListener('mouseup', mouseUpHandler);
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+        });
+    </script>
 </body>
 </html>
