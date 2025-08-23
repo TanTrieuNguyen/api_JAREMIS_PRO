@@ -206,6 +206,43 @@
             .resizer { display:none; }
             .auth-controls { right: 8px; top: 8px; }
         }
+        /* ✅ Responsive cho điện thoại */
+        /* === Thêm ở đây === */
+        @media (max-width: 768px) {
+            .chat-messages {
+                font-size: 1rem;   /* chữ to hơn */
+                padding: 12px;
+            }
+
+            .chat-bubble {
+                font-size: 0.95rem;
+                padding: 12px;
+                border-radius: 14px;
+                max-width: 95%;   /* chiếm gần hết màn hình mobile */
+            }
+
+            #chat-input {
+                font-size: 1rem;  /* input to hơn */
+                padding: 12px;
+            }
+
+            .input-wrapper {
+                padding: 10px;
+            }
+
+            .action-btn {
+                width: 40px;
+                height: 40px;
+                font-size: 18px;
+            }
+
+            #send-btn {
+                width: 45px;
+                height: 40px;
+            }
+        }
+        /* === Hết phần thêm === */
+
     </style>
 </head>
 <body>
@@ -224,7 +261,7 @@
                 </h3>
                 <ul id="history-list"></ul>
             </nav>
-            <div class="sidebar-footer">Made with ❤️ by TT1403 & Ant.</div>
+            <div class="sidebar-footer">Made with ❤️ by 717483 & Ant.</div>
         </aside>
 
         <div class="resizer" id="resizer"></div>
