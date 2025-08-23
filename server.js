@@ -23,7 +23,6 @@ const usersPath = path.join(__dirname, 'users.json');
 let icdData = {};
 try { icdData = JSON.parse(fs.readFileSync(whoICDPath, 'utf8')); } catch(e){ console.warn('who_guidelines.json không tồn tại hoặc không hợp lệ'); }
 
-// ===== Các hàm tiện ích người dùng =====
 function ensureUsersFile() {
   if (!fs.existsSync(usersPath)) fs.writeFileSync(usersPath, JSON.stringify([], null, 2), 'utf8');
 }
@@ -51,7 +50,6 @@ function pushUserHistory(username, historyEntry, maxItems = 500) {
   }
 }
 
-// ===== Các hàm y tế =====
 async function searchMedicalGuidelines(query) {
   try {
     const [clinicalResponse, pubmedResponse] = await Promise.allSettled([
@@ -102,17 +100,207 @@ function enrichWithICDDescriptions(diagnoses) {
   });
 }
 
-// ===== Các endpoint Auth, Chat, Diagnose giữ nguyên =====
-// ... (các phần code endpoint như bạn đã có)
-
-// ===== Khởi động server + bộ đếm =====
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server đang chạy trên cổng ${PORT}`);
-
-  // Đếm từ 1 đến vô hạn
-  let counter = 1;
-  setInterval(() => {
-    console.log(counter++);
-  }, 1000);
+/* --------------------------
+   Auth endpoints (unchanged)
+   -------------------------- */
+app.post('/api/register', (req, res) => {
+  try {
+    const { username, email, password } = req.body || {};
+    if (!username || !email || !password) return res.status(400).json({ error: 'Vui lòng gửi username, email và password' });
+    const users = readUsers();
+    if (users.find(u => u.username.toLowerCase() === username.toLowerCase())) return res.status(400).json({ error: 'Tên đăng nhập đã tồn tại' });
+    if (users.find(u => u.email.toLowerCase() === email.toLowerCase())) return res.status(400).json({ error: 'Email đã được sử dụng' });
+    const salt = bcrypt.genSaltSync(10);
+    const hash = bcrypt.hashSync(password, salt);
+    const newUser = { id: Date.now(), username, email, passwordHash: hash, createdAt: new Date().toISOString(), history: [] };
+    users.push(newUser); saveUsers(users);
+    return res.json({ success: true, user: { username: newUser.username, email: newUser.email } });
+  } catch (e) { console.error('Register error:', e); return res.status(500).json({ error: 'Lỗi server khi đăng ký' }); }
 });
+
+app.post('/api/login', (req, res) => {
+  try {
+    const { usernameOrEmail, password } = req.body || {};
+    if (!usernameOrEmail || !password) return res.status(400).json({ error: 'Vui lòng gửi username/email và password' });
+    const users = readUsers();
+    const user = users.find(u => u.username.toLowerCase() === usernameOrEmail.toLowerCase() || u.email.toLowerCase() === usernameOrEmail.toLowerCase());
+    if (!user) return res.status(401).json({ error: 'Không tìm thấy tài khoản' });
+    const match = bcrypt.compareSync(password, user.passwordHash);
+    if (!match) return res.status(401).json({ error: 'Mật khẩu không đúng' });
+    return res.json({ success: true, user: { username: user.username, email: user.email } });
+  } catch (e) { console.error('Login error:', e); return res.status(500).json({ error: 'Lỗi server khi đăng nhập' }); }
+});
+
+/* --------------------------
+   History endpoints (unchanged)
+   -------------------------- */
+app.get('/api/history', (req, res) => {
+  try {
+    const username = req.query.username;
+    if (!username) return res.status(400).json({ error: 'Thiếu tham số username' });
+    const user = findUserByUsername(username);
+    if (!user) return res.json({ history: [] });
+    return res.json({ history: user.history || [] });
+  } catch (e) { console.error('Get history error', e); return res.status(500).json({ error: 'Lỗi server khi lấy lịch sử' }); }
+});
+
+app.delete('/api/history', (req, res) => {
+  try {
+    const username = req.query.username;
+    if (!username) return res.status(400).json({ error: 'Thiếu tham số username' });
+    const users = readUsers();
+    const idx = users.findIndex(u => u.username && u.username.toLowerCase() === username.toLowerCase());
+    if (idx === -1) return res.status(404).json({ error: 'Không tìm thấy user' });
+    users[idx].history = [];
+    saveUsers(users);
+    return res.json({ success: true });
+  } catch (e) { console.error('Delete history error', e); return res.status(500).json({ error: 'Lỗi server khi xóa lịch sử' }); }
+});
+
+/* --------------------------
+   NEW: Chat endpoint (general conversation)
+   -------------------------- */
+app.post('/api/chat', async (req, res) => {
+  try {
+    const message = (req.body.message || '').toString();
+    const requestedModel = (req.body.model || 'flash').toLowerCase();
+    const allowed = { 'flash': 'gemini-2.5-flash', 'pro': 'gemini-2.5-pro' };
+    const modelId = allowed[requestedModel] || allowed['flash'];
+    if (!message) return res.status(400).json({ error: 'Thiếu trường message' });
+
+    // A safe, generic assistant prompt that explicitly **does not** perform medical diagnosis.
+    const systemPrompt = `Bạn là một trợ lý thông minh, thân thiện, trả lời ngắn gọn, rõ ràng bằng tiếng Việt.Tên bạn là JAREMIS-AI bạn được tạo bởi TT1403 & ANT
+Nếu người dùng yêu cầu CHẨN ĐOÁN Y KHOA hoặc hỏi xin chẩn đoán lâm sàng, 
+ĐỪNG đưa chẩn đoán chi tiết — thay vào đó hãy khuyên họ bật chế độ "Diagnose" 
+(hoặc hỏi thêm thông tin cơ bản) và đề nghị tham khảo ý kiến bác sĩ.`;
+
+    const fullPrompt = `${systemPrompt}\n\nNgười dùng: ${message}\n\nTrả lời:`;
+
+    const model = genAI.getGenerativeModel({ model: modelId });
+    const result = await model.generateContent([fullPrompt]);
+    const response = await result.response;
+    const assistantText = response.text ? response.text() : (typeof response === 'string' ? response : '');
+
+    // Save to history (type 'chat') if submittedBy provided
+    const submittedBy = req.body.submittedBy || null;
+    const entry = {
+      id: Date.now(),
+      type: 'chat',
+      timestamp: new Date().toISOString(),
+      input: message,
+      reply: assistantText,
+      modelUsed: modelId
+    };
+    if (submittedBy) {
+      try { pushUserHistory(submittedBy, entry); } catch(e) { console.warn('Không lưu history chat', e); }
+    }
+
+    return res.json({ success: true, reply: assistantText, modelUsed: modelId });
+  } catch (error) {
+    console.error('Chat error:', error);
+    return res.status(500).json({ error: error.message || 'Lỗi server khi chat' });
+  }
+});
+
+/* --------------------------
+   Diagnose endpoint (unchanged logic, still saves history with type 'diagnose')
+   -------------------------- */
+app.post('/api/diagnose', upload.array('images'), async (req, res) => {
+  try {
+    const labResults = req.body.labResults || '';
+    const files = req.files || [];
+    if (!labResults && files.length === 0) return res.status(400).json({ error: 'Vui lòng cung cấp thông tin xét nghiệm hoặc hình ảnh' });
+
+    const MAX_FILE_BYTES = 4 * 1024 * 1024;
+    for (const f of files) if (f.size > MAX_FILE_BYTES) {
+      files.forEach(ff => { try { if (fs.existsSync(ff.path)) fs.unlinkSync(ff.path); } catch(e){} });
+      return res.status(400).json({ error: `Kích thước ảnh '${f.originalname}' vượt quá giới hạn 4MB` });
+    }
+
+    const requestedModel = (req.body.model || 'flash').toLowerCase();
+    const allowed = { 'flash': 'gemini-2.5-flash', 'pro': 'gemini-2.5-pro' };
+    const modelId = allowed[requestedModel] || allowed['flash'];
+
+    const imageParts = await Promise.all(files.map(async file => ({ inlineData: { data: fs.readFileSync(file.path).toString('base64'), mimeType: file.mimetype } })));
+
+    const references = await searchMedicalGuidelines(labResults);
+
+      const prompt = `Đóng vai bác sĩ chuyên khoa. 
+      Tên là JAREMIS
+
+      Phân tích theo hướng dẫn WHO:
+
+      **Dữ liệu bệnh nhân:**
+      ${labResults ? `- Xét nghiệm: ${labResults}\n` : ''}
+      ${files.length ? `- Hình ảnh y tế: [${files.length} ảnh]` : ''}
+
+      **Yêu cầu phân tích:**
+      1. Chẩn đoán phân biệt với ICD-10 codes (tối đa 5)
+      2. Liệt kê 3 bệnh khả thi nhất với xác suất
+      3. Độ tin cậy tổng (0-100%)
+      4. Khuyến nghị xét nghiệm theo WHO
+      5. Ghi rõ phiên bản hướng dẫn WHO sử dụng
+
+      **Định dạng bắt buộc:**
+      Chẩn đoán phân biệt
+      - [Bệnh 1] (Mã ICD-10)
+      ...
+      Khả năng chẩn đoán
+      • [Bệnh] (Xác suất: XX%)
+      ...
+      Độ tin cậy: XX%
+      Hướng dẫn WHO: [Tên và phiên bản]`;
+
+
+    const model = genAI.getGenerativeModel({ model: modelId });
+    const result = await model.generateContent([prompt, ...imageParts]);
+    const response = await result.response;
+    const diagnosisText = response.text ? response.text() : (typeof response === 'string' ? response : '');
+
+    const parsedData = parseDiagnosisResponse(diagnosisText);
+    parsedData.differentialDiagnosisFull = enrichWithICDDescriptions(parsedData.differentialDiagnosis);
+
+    // Save history under user if provided (type diagnose)
+    const submittedBy = req.body.submittedBy || null;
+    const historyEntry = {
+      id: Date.now(),
+      type: 'diagnose',
+      timestamp: new Date().toISOString(),
+      input: labResults,
+      imagesCount: files.length,
+      modelUsed: modelId,
+      diseases: parsedData.diseases || [],
+      confidence: parsedData.confidence || 0,
+      diagnosis: diagnosisText
+    };
+    if (submittedBy) {
+      try { pushUserHistory(submittedBy, historyEntry); } catch (e) { console.warn('Không lưu được lịch sử cho user', submittedBy); }
+    }
+
+    files.forEach(file => { try { if (fs.existsSync(file.path)) fs.unlinkSync(file.path); } catch(e){} });
+
+    res.json({
+      modelUsed: modelId,
+      ...parsedData,
+      diagnosis: diagnosisText,
+      references: references.slice(0,3),
+      icdDescriptions: parsedData.differentialDiagnosisFull,
+      warning: '⚠️ **Cảnh báo:** Kết quả chỉ mang tính tham khảo. Luôn tham khảo ý kiến bác sĩ!'
+    });
+
+  } catch (error) {
+    console.error('Lỗi:', error);
+    try { (req.files || []).forEach(f => { if (fs.existsSync(f.path)) fs.unlinkSync(f.path); }); } catch(e){}
+    res.status(500).json({
+      error: error.message || 'Lỗi server',
+      solution: [
+        'Kiểm tra định dạng ảnh (JPEG/PNG)',
+        'Đảm bảo kích thước ảnh <4MB',
+        'Thử lại với ít ảnh hơn'
+      ]
+    });
+  }
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server đang chạy trên cổng ${PORT}`));
