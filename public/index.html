@@ -206,48 +206,6 @@
             .resizer { display:none; }
             .auth-controls { right: 8px; top: 8px; }
         }
-        /* ✅ Responsive cho điện thoại */
-        @media (max-width: 768px) {
-            .chat-messages {
-                font-size: 1rem;
-                padding: 10px;
-            }
-
-            .chat-bubble {
-                font-size: 1rem;
-                padding: 12px 14px;
-                border-radius: 12px;
-                max-width: 100%;   /* full chiều rộng hơn */
-                box-sizing: border-box;
-            }
-
-            #chat-input {
-                font-size: 1rem;
-                padding: 14px;
-                width: 100%;
-                box-sizing: border-box;
-            }
-
-            .input-wrapper {
-                padding: 8px;
-                gap: 8px;
-            }
-
-            .action-btn {
-                width: 42px;
-                height: 42px;
-                font-size: 18px;
-                flex-shrink: 0;
-            }
-
-            #send-btn {
-                width: 46px;
-                height: 42px;
-            }
-        }
-
-        /* === Hết phần thêm === */
-
     </style>
 </head>
 <body>
@@ -308,7 +266,7 @@
                         </button>
 
                         <!-- Think toggle button -->
-                        <button id="think-btn" class="action-btn" title="Bật Think (dùng Gemini Pro)" onclick="toggleThink(event)">
+                        <button id="think-btn" class="action-btn" title="Bật Think (dùng Jaremis Pro)" onclick="toggleThink(event)">
                             <i class="fas fa-brain"></i>
                         </button>
 

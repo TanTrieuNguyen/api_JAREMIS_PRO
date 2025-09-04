@@ -50,6 +50,26 @@ function pushUserHistory(username, historyEntry, maxItems = 500) {
   }
 }
 
+// NEW: Lấy tối đa N lượt chat gần nhất (user -> assistant), trả về theo thứ tự cũ -> mới
+function getRecentChatHistory(username, limit = 10, maxChars = 6000) {
+  const user = findUserByUsername(username);
+  if (!user || !Array.isArray(user.history)) return [];
+  // Lấy các entry type 'chat'
+  const chats = user.history.filter(h => h.type === 'chat');
+  // Đảo lại để chronological (cũ -> mới)
+  const recent = chats.slice(0, limit).reverse();
+  // Cắt nếu vượt maxChars
+  const result = [];
+  let total = 0;
+  for (const c of recent) {
+    const block = `Người dùng: ${c.input}\nTrợ lý: ${c.reply}`;
+    total += block.length;
+    if (total > maxChars) break;
+    result.push(block);
+  }
+  return result;
+}
+
 async function searchMedicalGuidelines(query) {
   try {
     const [clinicalResponse, pubmedResponse] = await Promise.allSettled([
@@ -99,6 +119,12 @@ function enrichWithICDDescriptions(diagnoses) {
     return { label: entry, icdCode, description: description || 'Không tìm thấy trong dữ liệu ICD' };
   });
 }
+
+// (Không bắt buộc) Bạn có thể đặt chung map tên hiển thị ở đầu file:
+const DISPLAY_NAME_MAP = {
+  'gemini-2.5-flash': 'Jaremis-1.0-flash',
+  'gemini-2.5-pro': 'Jaremis-Pro'
+};
 
 /* --------------------------
    Auth endpoints (unchanged)
@@ -166,36 +192,76 @@ app.post('/api/chat', async (req, res) => {
     const requestedModel = (req.body.model || 'flash').toLowerCase();
     const allowed = { 'flash': 'gemini-2.5-flash', 'pro': 'gemini-2.5-pro' };
     const modelId = allowed[requestedModel] || allowed['flash'];
+    const displayModel = DISPLAY_NAME_MAP[modelId] || modelId;
     if (!message) return res.status(400).json({ error: 'Thiếu trường message' });
 
-    // A safe, generic assistant prompt that explicitly **does not** perform medical diagnosis.
-    const systemPrompt = `Bạn là một trợ lý thông minh, thân thiện, trả lời ngắn gọn, rõ ràng bằng tiếng Việt.Tên bạn là JAREMIS-AI bạn được tạo bởi TT1403 & ANT
-Nếu người dùng yêu cầu CHẨN ĐOÁN Y KHOA hoặc hỏi xin chẩn đoán lâm sàng, 
-ĐỪNG đưa chẩn đoán chi tiết — thay vào đó hãy khuyên họ bật chế độ "Diagnose" 
-(hoặc hỏi thêm thông tin cơ bản) và đề nghị tham khảo ý kiến bác sĩ.`;
+    const submittedBy = req.body.submittedBy || null;
+    const includeHistory = req.body.includeHistory !== false;
 
-    const fullPrompt = `${systemPrompt}\n\nNgười dùng: ${message}\n\nTrả lời:`;
+    // Lấy lịch sử hội thoại gần đây (giữ nguyên logic cũ)
+    let historyBlocks = [];
+    if (submittedBy && includeHistory) {
+      historyBlocks = getRecentChatHistory(submittedBy, 10, 6000);
+    }
+
+    // >>> Thêm đoạn này để định nghĩa isSensitive và reassuranceBlock <<<
+    const sensitiveRegex = /(ung thư|khối u|u ác|đau ngực|khó thở|xuất huyết|tự sát|tự tử|trầm cảm|đột quỵ|nhồi máu|co giật|hôn mê)/i;
+    const isSensitive = sensitiveRegex.test(message);
+    const reassuranceBlock = isSensitive
+      ? `\n[HƯỚNG DẪN GIỌNG ĐIỆU]\n- Chủ đề nhạy cảm: trấn an, tránh gây hoang mang.\n- Nêu dấu hiệu cần đi khám khẩn nếu có.\n- Nhắc không chẩn đoán chính thức trong chế độ Chat.\n`
+      : '';
+    // <<< Hết phần thêm >>>
+
+    const systemPrompt = `Bạn là một trợ lý thông minh, thân thiện, trả lời ngắn gọn, rõ ràng bằng tiếng Việt. Tên bạn là JAREMIS-AI được tạo bởi TT1403 & ANT.
+Nếu người dùng yêu cầu CHẨN ĐOÁN Y KHOA hoặc xin chẩn đoán lâm sàng,
+KHÔNG cung cấp chẩn đoán chi tiết — hãy gợi ý họ dùng chế độ "Diagnose"
+và luôn nhắc tham khảo ý kiến bác sĩ. Giữ ngữ cảnh phù hợp, không lặp lại nguyên văn dài dòng từ lịch sử.
+MỤC TIÊU:
+1. Trả lời có cấu trúc: Tổng quan ngắn -> Các điểm chính -> Giải thích dễ hiểu -> Gợi ý bước an toàn -> Khích lệ (nếu phù hợp).
+2. Giải thích thuật ngữ y khoa bằng lời Việt đơn giản.
+3. Không đưa chẩn đoán y khoa trực tiếp; nếu người dùng muốn chẩn đoán: gợi ý dùng chế độ "Diagnose".
+4. Với nội dung nhạy cảm: trấn an, không phóng đại rủi ro.
+5. Không bịa đặt. Nếu thiếu dữ kiện: yêu cầu cung cấp thêm.
+6. Không đưa phác đồ điều trị, liều thuốc chi tiết.
+7. Không lặp lại nguyên văn dài từ lịch sử – chỉ tham chiếu ngắn gọn.
+8. Khích lệ tích cực vừa phải, không sáo rỗng.
+Luôn nhắc: Thông tin chỉ tham khảo, không thay thế bác sĩ.`;
+
+    const historySection = historyBlocks.length
+      ? `Lịch sử gần đây (tóm tắt, đừng lặp lại nguyên văn):\n${historyBlocks.join('\n')}\n\n`
+      : '';
+
+    const fullPrompt = `${systemPrompt}${reassuranceBlock}
+
+${historySection}Người dùng hỏi: ${message}
+
+Trả lời đúng phong cách, rõ ràng, không chẩn đoán trực tiếp:`;
 
     const model = genAI.getGenerativeModel({ model: modelId });
     const result = await model.generateContent([fullPrompt]);
     const response = await result.response;
     const assistantText = response.text ? response.text() : (typeof response === 'string' ? response : '');
 
-    // Save to history (type 'chat') if submittedBy provided
-    const submittedBy = req.body.submittedBy || null;
-    const entry = {
-      id: Date.now(),
-      type: 'chat',
-      timestamp: new Date().toISOString(),
-      input: message,
-      reply: assistantText,
-      modelUsed: modelId
-    };
+    // Lưu history (đổi modelUsed sang tên hiển thị)
     if (submittedBy) {
+      const entry = {
+        id: Date.now(),
+        type: 'chat',
+        timestamp: new Date().toISOString(),
+        input: message,
+        reply: assistantText,
+        modelUsed: displayModel
+      };
       try { pushUserHistory(submittedBy, entry); } catch(e) { console.warn('Không lưu history chat', e); }
     }
 
-    return res.json({ success: true, reply: assistantText, modelUsed: modelId });
+    return res.json({
+      success: true,
+      reply: assistantText,
+      modelUsed: displayModel,
+      usedHistory: historyBlocks.length,
+      sensitive: isSensitive
+    });
   } catch (error) {
     console.error('Chat error:', error);
     return res.status(500).json({ error: error.message || 'Lỗi server khi chat' });
@@ -203,7 +269,7 @@ Nếu người dùng yêu cầu CHẨN ĐOÁN Y KHOA hoặc hỏi xin chẩn đo
 });
 
 /* --------------------------
-   Diagnose endpoint (unchanged logic, still saves history with type 'diagnose')
+   Diagnose endpoint (giữ nguyên, chỉ đổi modelUsed hiển thị)
    -------------------------- */
 app.post('/api/diagnose', upload.array('images'), async (req, res) => {
   try {
@@ -220,12 +286,13 @@ app.post('/api/diagnose', upload.array('images'), async (req, res) => {
     const requestedModel = (req.body.model || 'flash').toLowerCase();
     const allowed = { 'flash': 'gemini-2.5-flash', 'pro': 'gemini-2.5-pro' };
     const modelId = allowed[requestedModel] || allowed['flash'];
+    const displayModel = DISPLAY_NAME_MAP[modelId] || modelId;
 
     const imageParts = await Promise.all(files.map(async file => ({ inlineData: { data: fs.readFileSync(file.path).toString('base64'), mimeType: file.mimetype } })));
 
     const references = await searchMedicalGuidelines(labResults);
 
-      const prompt = `Đóng vai bác sĩ chuyên khoa. 
+    const prompt = `Đóng vai bác sĩ chuyên khoa. 
       Tên là JAREMIS
 
       Phân tích theo hướng dẫn WHO:
@@ -251,7 +318,6 @@ app.post('/api/diagnose', upload.array('images'), async (req, res) => {
       Độ tin cậy: XX%
       Hướng dẫn WHO: [Tên và phiên bản]`;
 
-
     const model = genAI.getGenerativeModel({ model: modelId });
     const result = await model.generateContent([prompt, ...imageParts]);
     const response = await result.response;
@@ -260,7 +326,6 @@ app.post('/api/diagnose', upload.array('images'), async (req, res) => {
     const parsedData = parseDiagnosisResponse(diagnosisText);
     parsedData.differentialDiagnosisFull = enrichWithICDDescriptions(parsedData.differentialDiagnosis);
 
-    // Save history under user if provided (type diagnose)
     const submittedBy = req.body.submittedBy || null;
     const historyEntry = {
       id: Date.now(),
@@ -268,7 +333,7 @@ app.post('/api/diagnose', upload.array('images'), async (req, res) => {
       timestamp: new Date().toISOString(),
       input: labResults,
       imagesCount: files.length,
-      modelUsed: modelId,
+      modelUsed: displayModel,
       diseases: parsedData.diseases || [],
       confidence: parsedData.confidence || 0,
       diagnosis: diagnosisText
@@ -280,7 +345,7 @@ app.post('/api/diagnose', upload.array('images'), async (req, res) => {
     files.forEach(file => { try { if (fs.existsSync(file.path)) fs.unlinkSync(file.path); } catch(e){} });
 
     res.json({
-      modelUsed: modelId,
+      modelUsed: displayModel,
       ...parsedData,
       diagnosis: diagnosisText,
       references: references.slice(0,3),
