@@ -22,6 +22,10 @@
             --success-color: #238636;
             --who-bg: #212013;
             --mic-red: #ff4d4d;
+
+            --auth-offset-top: 12px;
+            --auth-offset-height: 48px; /* chiều cao ước lượng vùng auth (để chừa khoảng trống) */
+            --mobile-header-height: 56px; /* chiều cao header mobile (nếu hiện) */
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -149,24 +153,19 @@
 
         /* Auth UI (top-right) */
         .auth-controls {
-            position: absolute;
-            top: 12px;
-            right: 18px;
-            display:flex;
-            gap:8px;
-            align-items:center;
-            z-index: 40;
+            position: fixed !important;
+            top: var(--auth-offset-top) !important;
+            right: 18px !important;
+            bottom: auto !important;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            z-index: 120; /* cao hơn header & bong bóng */
+            flex-direction: row !important;
         }
-        .auth-btn {
-            background: transparent;
-            color: var(--text-secondary-color);
-            border: 1px solid var(--border-color);
-            padding: 6px 10px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 13px;
+        @media (max-width:600px) {
+            .auth-controls { right: 10px; }
         }
-        .auth-btn:hover { background: #1f272e; color: var(--text-color); }
 
         /* Modal */
         .modal-backdrop {
@@ -200,16 +199,387 @@
 
         .small-muted { font-size:12px; color:var(--text-secondary-color); margin-top:8px; }
 
+        /* Base (desktop) – giữ hàng ngang cho tool buttons */
+        .tool-buttons {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .toggle-tools-btn {
+            display: none; /* Chỉ hiện trên mobile */
+        }
+
+        /* Auth buttons styling */
+        .auth-controls .auth-btn {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 6px 10px;
+            font-size: 13px;
+            border-radius: 6px;
+            cursor: pointer;
+            line-height: 1.2;
+            backdrop-filter: blur(4px);
+            transition: background .18s, border-color .18s, color .18s;
+        }
+        .auth-controls .auth-btn:hover {
+            background: rgba(47,129,247,0.16);
+            border-color: var(--accent-color);
+            color: #fff;
+        }
+        .auth-controls .auth-btn:active {
+            background: rgba(47,129,247,0.28);
+        }
+
         /* small responsive */
         @media (max-width: 900px) {
             .sidebar { display:none; }
             .resizer { display:none; }
             .auth-controls { right: 8px; top: 8px; }
         }
+
+        /* Mobile-specific overrides */
+        @media (max-width: 600px) {
+            /* layout becomes column for small screens */
+            .chat-container { flex-direction:column; }
+            .mobile-header { display:flex; align-items:center; gap:10px; padding:8px 10px; border-bottom:1px solid var(--border-color); background:var(--chat-bg); position:sticky; top:0; z-index:70; }
+            .mobile-header .title { color:var(--text-color); font-weight:600; font-size:16px; flex:1; text-align:center; }
+            .hamburger { background:transparent; border:1px solid var(--border-color); color:var(--text-secondary-color); width:44px; height:44px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; }
+            /* Sidebar becomes overlay (hidden by default) */
+            .sidebar { display:flex; position:fixed; top:0; left:0; bottom:0; width:78%; max-width:360px; transform:translateX(-120%); transition: transform 0.22s ease; z-index:80; box-shadow:6px 0 30px rgba(0,0,0,0.6); }
+            .sidebar.mobile-open { transform:translateX(0); }
+            .sidebar-backdrop { position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:75; display:none; }
+            .sidebar-backdrop.show { display:block; }
+            /* hide resizer (not needed) */
+            .resizer { display:none; }
+            /* Chat area sizing */
+            .chat-area { flex:1 1 auto; min-height: calc(100vh - 56px); }
+            .chat-messages { padding: 12px; padding-bottom:160px; overflow-y:auto; }
+            /* Fix input to bottom and respect safe-area */
+            .chat-input-area { position:fixed; left:0; right:0; bottom:env(safe-area-inset-bottom, 0); padding:8px 10px; background:linear-gradient(180deg, rgba(1,4,9,0.98), rgba(1,4,9,1)); z-index:70; border-top:1px solid var(--border-color); }
+            .input-wrapper { padding:6px; gap:6px; }
+            #chat-input { font-size:15px; padding:8px; max-height:120px; }
+            .input-actions .action-btn { width:40px; height:40px; font-size:16px; }
+            #send-btn { width:44px; height:40px; border-radius:8px; }
+            /* Adjust auth controls so they don't overlap mobile input */
+            .auth-controls { position:fixed; right:10px; bottom:110px; top:auto; z-index:69; display:flex; flex-direction:column; gap:8px; }
+            /* Slightly reduce bubble max-width for narrow screens */
+            .chat-bubble { max-width:94%; }
+        }
+
+        /* Even smaller devices: compact spacing & font sizes */
+        @media (max-width: 420px) {
+            .mobile-header { padding:6px 8px; }
+            .mobile-header .title { font-size:14px; }
+            .new-chat-btn span { display:none; } /* icon only to save space */
+            .sidebar { width:84%; max-width:300px; }
+            .chat-messages { padding:10px; padding-bottom:150px; gap:12px; }
+            .input-actions .action-btn { width:38px; height:38px; font-size:15px; }
+            #chat-input { font-size:14px; }
+        }
+
+        @media (max-width: 360px) {
+            .mobile-header .title { font-size:13px; }
+            .hamburger { width:40px; height:40px; }
+            .auth-controls { right:8px; bottom:120px; }
+            .chat-input-area { padding:8px; }
+            .chat-messages { padding-bottom:140px; }
+        }
+
+        /* Compact tools (mobile) */
+        @media (max-width:600px) {
+            .input-wrapper {
+                position: relative;
+            }
+            .toggle-tools-btn {
+                display:flex !important;
+            }
+            .tool-buttons {
+                display:flex;
+                align-items:center;
+                gap:6px;
+                transition:opacity .18s ease, transform .18s ease;
+            }
+            .tool-buttons.collapsed {
+                opacity:0;
+                pointer-events:none;
+                transform:translateY(4px);
+                position:absolute;
+                left:8px;
+                right:60px;
+                bottom:100%;
+                /* hidden */
+            }
+            .mobile-tools-active .tool-buttons {
+                opacity:1;
+                transform:translateY(0);
+                position:absolute;
+                left:8px;
+                right:60px;
+                bottom:100%;
+                background:rgba(22,27,34,0.95);
+                padding:6px 8px;
+                border:1px solid var(--border-color);
+                border-radius:10px;
+                box-shadow:0 4px 18px rgba(0,0,0,0.55);
+                z-index:90;
+            }
+            .tool-buttons .action-btn {
+                width:38px;
+                height:38px;
+                font-size:16px;
+            }
+            .toggle-tools-btn {
+                display:flex;
+                background:none;
+                border:1px solid var(--border-color);
+                width:40px;
+                height:40px;
+                border-radius:8px;
+                align-items:center;
+                justify-content:center;
+                color:var(--text-secondary-color);
+                cursor:pointer;
+            }
+            .toggle-tools-btn.active {
+                background:rgba(47,129,247,0.15);
+                color:var(--text-color);
+                border-color:var(--accent-color);
+            }
+            /* Khi bàn phím mở (class keyboard-open gắn vào body) -> ép thu gọn */
+            body.keyboard-open .tool-buttons:not(.force-open) {
+                opacity:0;
+                pointer-events:none;
+                transform:translateY(4px);
+            }
+        }
+
+        /* Nút toggle lịch sử trên mobile */
+        #history-toggle-btn {
+            display:none;
+            background:transparent;
+            border:1px solid var(--border-color);
+            color:var(--text-secondary-color);
+            padding:6px 10px;
+            border-radius:8px;
+            font-size:13px;
+            cursor:pointer;
+        }
+        #history-toggle-btn.active {
+            background:rgba(47,129,247,0.15);
+            color:var(--text-color);
+            border-color:var(--accent-color);
+        }
+        @media (max-width:600px) {
+          #history-toggle-btn { display:inline-flex; align-items:center; gap:6px; }
+        }
+
+        /* Dual pane (landscape + đủ rộng) */
+        @media (max-width:900px) and (orientation:landscape) and (min-width:640px) {
+          body.dual-pane .sidebar {
+              position:relative;
+              transform:translateX(0) !important;
+              width:230px;
+              box-shadow:none;
+          }
+          body.dual-pane .sidebar-backdrop { display:none !important; }
+          body.dual-pane .chat-area { min-height:100vh; }
+          body.dual-pane #mobile-header { padding-right:0; }
+          body.dual-pane #history-toggle-btn { display:none; }
+        }
+        /* Hiệu ứng vuốt (gợi ý) – chỉ chiều ngang */
+        .sidebar {
+           touch-action: pan-y;
+        }
+
+        @media (max-width:600px) {
+          .history-drawer-toggle {
+              position:fixed;
+              top:50%;
+              left:4px;
+              transform:translateY(-50%);
+              z-index:90;
+              width:34px;
+              height:52px;
+              background:rgba(22,27,34,0.88);
+              border:1px solid var(--border-color);
+              border-left:none;
+              border-radius:0 10px 10px 0;
+              display:flex;
+              align-items:center;
+              justify-content:center;
+              color:var(--text-secondary-color);
+              cursor:pointer;
+              backdrop-filter:blur(4px);
+              transition:background .18s, color .18s;
+          }
+          .history-drawer-toggle:hover { background:rgba(47,129,247,0.15); color:var(--text-color); }
+          .history-drawer-toggle.open { left: calc(78% - 18px); border-left:1px solid var(--border-color); border-radius:10px 0 0 10px; }
+        }
+
+        /* Phóng to nút history ≡ */
+.history-top-toggle .history-icon,
+.history-drawer-toggle .history-icon {
+    font-size: 26px; /* tăng gấp ~2 lần so với font-awesome mặc định 14–16px */
+    line-height: 1;
+    display:inline-block;
+    transform: translateY(-1px);
+    letter-spacing:2px;
+    font-weight:600;
+}
+.history-top-toggle,
+.history-drawer-toggle {
+    width:46px !important;
+    height:46px !important;
+}
+
+/* Compact white triple bars button */
+.history-top-toggle,
+.history-drawer-toggle {
+    background: var(--chat-bg) !important; /* trùng nền chính */
+    border: 1px solid var(--border-color);
+    box-shadow: 0 0 0 0 transparent;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:0;
+}
+.history-top-toggle:hover,
+.history-drawer-toggle:hover {
+    border-color: var(--accent-color);
+    background: var(--chat-bg);
+}
+.history-top-toggle .bars,
+.history-drawer-toggle .bars {
+    display:flex;
+    flex-direction:column;
+    gap:5px;
+    width:26px;
+    height:22px;
+    align-items:flex-start;
+    justify-content:center;
+}
+.history-top-toggle .bar,
+.history-drawer-toggle .bar {
+    display:block;
+    height:2px;              /* thon hơn */
+    width:22px;
+    background:#fff;          /* màu trắng */
+    border-radius:2px;
+    transition:width .25s ease, background .25s;
+}
+.history-top-toggle .bar:nth-child(2),
+.history-drawer-toggle .bar:nth-child(2){
+    width:18px;               /* giữa ngắn hơn nhẹ */
+}
+.history-top-toggle .bar:nth-child(3),
+.history-drawer-toggle .bar:nth-child(3){
+    width:14px;               /* dưới ngắn hơn nữa */
+}
+.history-top-toggle.open .bar,
+.history-drawer-toggle.open .bar {
+    background: var(--accent-color);
+    width:22px;               /* khi mở đồng nhất chiều dài */
+}
+.history-top-toggle.open .bar:nth-child(2){
+    width:22px;
+}
+.history-top-toggle.open .bar:nth-child(3){
+    width:22px;
+}
+/* Ẩn style cũ của .history-icon nếu còn */
+.history-icon { display:none !important; }
+
+/* Override: loại viền trắng mờ nút history */
+.history-top-toggle,
+.history-drawer-toggle {
+    border: 1px solid var(--chat-bg) !important; /* trùng nền -> coi như mất viền */
+}
+
+.history-top-toggle:hover,
+.history-drawer-toggle:hover,
+.history-top-toggle.open,
+.history-drawer-toggle.open {
+    border: 1px solid var(--border-color) !important; /* chỉ hiện viền khi hover / mở */
+}
+
+/* (Tuỳ chọn) nếu muốn bỏ hẳn viền luôn:
+.history-top-toggle,
+.history-drawer-toggle { border:0 !important; }
+.history-top-toggle:hover,
+.history-drawer-toggle:hover { border:0 !important; }
+*/
+    </style>
+    <style>
+      @media (max-width:600px) {
+        /* Popup tool panel */
+        #tool-buttons {
+          position:absolute;
+          bottom:100%;           /* nằm trên input */
+          right:0;
+          left:auto;
+          display:flex;
+          flex-direction:column; /* xếp dọc */
+          gap:10px;
+          padding:10px 12px;
+          background:rgba(13,17,23,0.95);
+          border:1px solid var(--border-color);
+          border-radius:14px;
+          box-shadow:0 8px 28px -4px rgba(0,0,0,0.55);
+          backdrop-filter:blur(6px);
+          transform-origin: bottom right;
+          transition: opacity .18s ease, transform .18s ease;
+          z-index:120;
+          width:66px; /* đủ cho icon vuông */
+        }
+        /* Nếu muốn dạng 2 cột (bỏ comment):
+        #tool-buttons {
+           width:134px;
+           flex-wrap:wrap;
+           flex-direction:row;
+        }
+        #tool-buttons .action-btn { flex:0 0 calc(50% - 6px); }
+        */
+
+        #tool-buttons .action-btn {
+          width:52px;
+          height:52px;
+          font-size:20px;
+          border:1px solid var(--border-color);
+          border-radius:12px;
+          background:#161b22;
+          transition:background .18s, border-color .18s, color .18s;
+        }
+        #tool-buttons .action-btn:hover {
+          background:#1f2731;
+          border-color:var(--accent-color);
+          color:var(--text-color);
+        }
+
+        #tool-buttons.collapsed {
+          opacity:0;
+          transform:translateY(10px) scale(.92);
+          pointer-events:none;
+        }
+        #tool-buttons:not(.collapsed) {
+          opacity:1;
+          transform:translateY(0) scale(1);
+        }
+
+        /* Căn nút + sát bên phải để panel mở lên ngay trên */
+        .input-actions {
+          position:relative;
+        }
+        #toggle-tools-btn {
+          position:relative;
+          z-index:121; /* nằm trên panel */
+        }
+      }
     </style>
 </head>
 <body>
     <div class="chat-container">
+        <!-- (XÓA nút cũ ở đây nếu còn) -->
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <button class="new-chat-btn" onclick="window.location.reload()">
@@ -228,14 +598,32 @@
         </aside>
 
         <div class="resizer" id="resizer"></div>
-
-        <main class="chat-area" id="chat-area">
-            <!-- Auth controls (top-right) -->
-            <div class="auth-controls" id="auth-controls">
-                <!-- Will be populated by JS -->
+        <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+ 
+         <main class="chat-area" id="chat-area">
+            <!-- Nút toggle lịch sử mới (mobile) -->
+            <button id="history-drawer-toggle" class="history-top-toggle" aria-label="Mở lịch sử">
+                <span class="bars" aria-hidden="true">
+                    <span class="bar"></span>
+                    <span class="bar"></span>
+                    <span class="bar"></span>
+                </span>
+            </button>
+            <!-- Mobile header (shown on small screens) -->
+            <div class="mobile-header" id="mobile-header" style="display:none;">
+                <button class="hamburger" id="mobile-menu-btn" aria-label="Mở menu"><i class="fas fa-bars"></i></button>
+                <div class="title">JAREMIS</div>
+                <button id="history-toggle-btn" aria-label="Xem lịch sử" onclick="toggleHistoryMode()">
+                    <i class="fas fa-clock-rotate-left"></i><span style="margin-left:4px;">Lịch sử</span>
+                </button>
             </div>
-
+             <!-- Auth controls (top-right) -->
+             <div class="auth-controls" id="auth-controls">
+                 <!-- Will be populated by JS -->
+             </div>
+ 
             <div class="chat-messages" id="chat-messages">
+                <div style="height:12px;"></div> <!-- spacer tránh trùng nút auth -->
                 <div class="chat-bubble bot-bubble">
                     <strong>Chào bạn 👋 Mình là JAREMIS.</strong>
                     <p style="margin-top:8px; color:var(--text-secondary-color);">
@@ -250,25 +638,25 @@
                     <textarea id="chat-input" placeholder="Nhập tin nhắn hoặc tải lên hình ảnh..." rows="1" oninput="autoResize(this)"></textarea>
 
                     <div class="input-actions">
-                        <button class="action-btn" onclick="document.getElementById('images').click()" title="Đính kèm ảnh">
-                            <i class="fas fa-paperclip"></i>
+                        <button id="toggle-tools-btn" class="toggle-tools-btn" title="Mở công cụ" onclick="toggleToolTray(event)">
+                            <i class="fas fa-plus"></i>
                         </button>
 
-                        <!-- Mode toggle: Chat / Diagnose -->
-                        <button id="mode-btn" class="action-btn" title="Chế độ: Chat (mặc định)" onclick="toggleMode(event)">
-                            <i class="fas fa-comments"></i>
-                        </button>
-
-                        <!-- Mic button -->
-                        <button id="mic-btn" class="action-btn" title="Ghi giọng nói (Vietnamese). Nhấn để bắt đầu/dừng" onclick="toggleMic(event)">
-                            <i class="fas fa-microphone"></i>
-                            <span id="mic-indicator"></span>
-                        </button>
-
-                        <!-- Think toggle button -->
-                        <button id="think-btn" class="action-btn" title="Bật Think (dùng Jaremis Pro)" onclick="toggleThink(event)">
-                            <i class="fas fa-brain"></i>
-                        </button>
+                        <div id="tool-buttons" class="tool-buttons collapsed">
+                            <button class="action-btn" onclick="document.getElementById('images').click()" title="Đính kèm ảnh">
+                                <i class="fas fa-paperclip"></i>
+                            </button>
+                            <button id="mode-btn" class="action-btn" title="Chế độ: Chat (mặc định)" onclick="toggleMode(event)">
+                                <i class="fas fa-comments"></i>
+                            </button>
+                            <button id="mic-btn" class="action-btn" title="Ghi giọng nói (Vietnamese). Nhấn để bắt đầu/dừng" onclick="toggleMic(event)">
+                                <i class="fas fa-microphone"></i>
+                                <span id="mic-indicator"></span>
+                            </button>
+                            <button id="think-btn" class="action-btn" title="Bật Think (dùng Jaremis Pro)" onclick="toggleThink(event)">
+                                <i class="fas fa-brain"></i>
+                            </button>
+                        </div>
 
                         <button id="send-btn" class="action-btn" onclick="submitData()" title="Gửi">
                             <i class="fas fa-paper-plane"></i>
@@ -616,17 +1004,19 @@
                 const time = new Date(item.timestamp).toLocaleString();
                 const titleText = (item.input && item.input.length > 60) ? item.input.slice(0, 60) + '...' : (item.input || 'Không có nội dung');
                 li.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;">
-                                    <div style="flex:1; padding-right:8px;">
-                                      <div style="font-size:13px; color:var(--text-color);">${escapeHtml(titleText)}</div>
-                                      <div style="font-size:11px; color:var(--text-secondary-color); margin-top:4px">${escapeHtml(time)} • ${escapeHtml(item.modelUsed || '')} • ${escapeHtml(item.type || '')}</div>
-                                    </div>
-                                    <div style="margin-left:8px; font-size:12px; color:var(--text-secondary-color)"><i class="fas fa-chevron-right"></i></div>
-                                </div>`;
-                li.onclick = () => openHistoryItem(item.id);
-                historyListEl.appendChild(li);
-            });
-            historyActionsEl.innerHTML = `<button class="auth-btn" onclick="clearLocalHistory()">Xóa</button>`;
-        }
+                            <div style="flex:1; padding-right:8px;">
+                              <div style="font-size:13px; color:var(--text-color);">${escapeHtml(titleText)}</div>
+                              <div style="font-size:11px; color:var(--text-secondary-color); margin-top:4px">${escapeHtml(time)} • ${escapeHtml(item.modelUsed || '')} • ${escapeHtml(item.type || '')}</div>
+                            </div>
+                            <div style="margin-left:8px; font-size:12px; color:var(--text-secondary-color)"><i class="fas fa-chevron-right"></i></div>
+                        </div>`;
+        li.onclick = () => openHistoryItem(item.id);
+        historyListEl.appendChild(li);
+    });
+
+    // BỎ nút Xóa ở sidebar (giữ trống)
+    historyActionsEl.innerHTML = ''; // (trước đây có nút Xóa)
+}
 
         async function clearLocalHistory() {
             const user = getLocalUser();
@@ -1035,6 +1425,82 @@
             document.body.style.cursor = 'col-resize';
             document.body.style.userSelect = 'none';
         });
-    </script>
-</body>
-</html>
+
+        const sidebarEl = document.getElementById('sidebar');
+        const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+        const historyDrawerToggle = document.getElementById('history-drawer-toggle');
+
+        function isMobileView() { return window.innerWidth <= 600; }
+
+        function openSidebarMobile() {
+          sidebarEl.classList.add('mobile-open');
+          sidebarBackdrop.classList.add('show');
+          syncHistoryArrow();
+        }
+        function closeSidebarMobile() {
+          sidebarEl.classList.remove('mobile-open');
+          sidebarBackdrop.classList.remove('show');
+          syncHistoryArrow();
+        }
+        function syncHistoryArrow() {
+          if (!isMobileView()) { historyDrawerToggle.style.display='none'; return; }
+          historyDrawerToggle.style.display='flex';
+          if (!historyDrawerToggle.querySelector('.bars')) {
+             historyDrawerToggle.innerHTML =
+               '<span class="bars" aria-hidden="true"><span class="bar"></span><span class="bar"></span><span class="bar"></span></span>';
+          }
+          if (sidebarEl.classList.contains('mobile-open')) {
+             historyDrawerToggle.classList.add('open');
+          } else {
+             historyDrawerToggle.classList.remove('open');
+          }
+        }
+
+        historyDrawerToggle.addEventListener('click', () => {
+          if (sidebarEl.classList.contains('mobile-open')) closeSidebarMobile();
+          else openSidebarMobile();
+        });
+        sidebarBackdrop.addEventListener('click', closeSidebarMobile);
+
+        // Đồng bộ khi resize
+        window.addEventListener('resize', syncHistoryArrow);
+        document.addEventListener('DOMContentLoaded', syncHistoryArrow);
+        // End of mobile additions
+
+        function toggleToolTray(e){
+          e?.preventDefault();
+          const tray = document.getElementById('tool-buttons');
+          const btn = document.getElementById('toggle-tools-btn');
+          if (!tray || !btn) return;
+          const opening = tray.classList.contains('collapsed');
+          tray.classList.toggle('collapsed', !opening);
+          btn.classList.toggle('active', opening);
+          btn.setAttribute('aria-expanded', opening ? 'true' : 'false');
+
+          if (opening) {
+            const closeHandler = (ev)=>{
+              if (!tray.contains(ev.target) && ev.target !== btn) {
+                tray.classList.add('collapsed');
+                btn.classList.remove('active');
+                btn.setAttribute('aria-expanded','false');
+                document.removeEventListener('click', closeHandler);
+              }
+            };
+            setTimeout(()=>document.addEventListener('click', closeHandler),0);
+          }
+        }
+
+        // Nếu muốn auto đóng sau khi gửi tin nhắn:
+        const originalSubmitData = submitData;
+        submitData = async function(){
+          const tray = document.getElementById('tool-buttons');
+          const btn = document.getElementById('toggle-tools-btn');
+          if (tray && !tray.classList.contains('collapsed')) {
+            tray.classList.add('collapsed');
+            btn.classList.remove('active');
+          }
+          return originalSubmitData();
+        };
+     </script>
+ </body>
+ </html>
