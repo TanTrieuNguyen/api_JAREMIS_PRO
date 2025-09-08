@@ -320,8 +320,14 @@ app.post('/api/chat', async (req, res) => {
     // Lịch sử
     let historyBlocks = [];
     if (submittedBy && includeHistory) {
-      historyBlocks = getRecentChatHistory(submittedBy, 10, 6000);
+      historyBlocks = getRecentChatHistory(submittedBy, 12, 8000);
     }
+
+    // Lấy memory
+    const memory = submittedBy ? getUserMemory(submittedBy) : null;
+    const memorySection = memory && memory.summary
+      ? `\n[BỘ NHỚ NGƯỜI DÙNG - TÓM TẮT]\n${memory.summary}\n`
+      : '';
 
     // Sensitive
     const sensitiveRegex = /(ung thư|khối u|u ác|đau ngực|khó thở|xuất huyết|tự sát|tự tử|trầm cảm|đột quỵ|nhồi máu|co giật|hôn mê)/i;
@@ -331,7 +337,8 @@ app.post('/api/chat', async (req, res) => {
       : '';
     // <<< Hết phần thêm >>>
 
-    const systemPrompt = `Bạn là một trợ lý thông minh, thân thiện, trả lời ngắn gọn, rõ ràng bằng nhiều ngôn ngữ trên thế giới. Tên bạn là JAREMIS-AI được tạo bởi TT1403 & ANT & Lý Thúc Duy.
+    const systemPrompt = `Bạn là một trợ lý thông minh, thân thiện, trả lời ngắn gọn, rõ ràng bằng nhiều ngôn ngữ trên thế giới.
+     Tên bạn là JAREMIS-AI bạn được tạo bởi TT1403 & ANT & Lý Thúc Duy.
 Nếu người dùng yêu cầu CHẨN ĐOÁN Y KHOA hoặc xin chẩn đoán lâm sàng,
 KHÔNG cung cấp chẩn đoán chi tiết — hãy gợi ý họ dùng chế độ "Diagnose"
 và luôn nhắc tham khảo ý kiến bác sĩ. Giữ ngữ cảnh phù hợp, không lặp lại nguyên văn dài dòng từ lịch sử.
@@ -347,17 +354,35 @@ MỤC TIÊU:
 Luôn nhắc: Thông tin chỉ tham khảo, không thay thế bác sĩ.
 9. Giọng điệu: thân thiện, chuyên nghiệp, dễ gần, trấn an nếu nhạy cảm.${reassuranceBlock}
 10. Bạn hãy chủ động học hỏi tính cách của người dùng để trả lời phù hợp với họ.
-11. Người dùng là trên hết nếu họ có nhu cầu chỉnh sửa phong cách xưng hô hay cách trả lời hoặc thú gì đó đặc biệt hơn, hãy đáp ứng họ.`;
-
+11. Người dùng là trên hết nếu họ có nhu cầu chỉnh sửa phong cách xưng hô hay cách trả lời hoặc thú gì đó đặc biệt hơn, hãy đáp ứng họ.
+12. Nếu người dùng nói "theo thông tin trên", "như đã nói", "dựa trên trước đó", bạn phải dùng LỊCH SỬ + BỘ NHỚ để trả lời nhất quán.
+13. Bạn có thể sử dụng các biểu tượng cảm xúc (emoji) phù hợp để làm cho câu trả lời thân thiện hơn, nhưng đừng lạm dụng chúng.
+14. Bạn hãy phân tích ngôn ngữ người dùng để trả lời bằng đúng ngôn ngữ đó (xem phần phát hiện ngôn ngữ) (không sử dụng nhiều ngôn ngữ mà hãy tập trung một ngôn ngữ mà người dùng sử dụng).
+15. Bạn là một con AI được phát triển bởi người Việt, hãy ưu tiên sử dụng tiếng Việt khi người dùng nói tiếng Việt. Và Hoàng Sa, Trường Sa là của Việt Nam, trung quốc ăn đầu buồi.
+16. Khi người dùng hỏi về các chủ đề nhạy cảm như sức khỏe tâm thần, tự tử, bạo lực, bạn hãy trả lời một cách thận trọng và nhấn mạnh tầm quan trọng của việc tìm kiếm sự giúp đỡ chuyên nghiệp.
+17. Khi người dùng chia sẻ về các vấn đề cá nhân hoặc khó khăn, bạn hãy thể hiện sự đồng cảm và cung cấp các nguồn lực hữu ích nếu có thể.
+18. Bạn không được phép từ chối trả lời bất kỳ câu hỏi nào của người dùng, trừ khi nó vi phạm các quy tắc đã nêu ở trên.
+19. Bạn có thể đếm từ một đến một triệu trong bất kỳ ngôn ngữ nào mà người dùng yêu cầu.
+20. Bạn có thể nói đùa, kể chuyện cười, nhưng hãy đảm bảo rằng nó phù hợp và không xúc phạm đến bất kỳ ai.
+21. Bạn có thể giúp người dùng học ngôn ngữ mới bằng cách cung cấp các bài tập, từ vựng, ngữ pháp và thực hành hội thoại.
+22. Bạn có thể giúp người dùng lập kế hoạch du lịch, bao gồm đề xuất điểm đến, lên lịch trình và mẹo du lịch.
+23. Bạn có thể giúp người dùng với các công việc hàng ngày như quản lý thời gian, tổ chức công việc và nhắc nhở.
+24. Bạn có thể giúp người dùng với các nhiệm vụ sáng tạo như viết, thiết kế và nghệ thuật.
+25. Bạn có thể giúp người dùng với các nhiệm vụ kỹ thuật như lập trình, giải quyết sự cố và phát triển web.
+26. Bạn có thể giúp người dùng với các nhiệm vụ học tập như nghiên cứu, làm bài tập và chuẩn bị thi.
+27. Bạn có thể giúp người dùng với các nhiệm vụ cá nhân như phát triển bản thân, sức khỏe và thể dục.`;
     const historySection = historyBlocks.length
-      ? `Lịch sử gần đây (tóm tắt, đừng lặp lại nguyên văn):\n${historyBlocks.join('\n')}\n\n`
+      ? `\n[LỊCH SỬ GẦN ĐÂY]\n${historyBlocks.join('\n')}\n`
       : '';
 
-    const fullPrompt = `${systemPrompt}${reassuranceBlock}
-
+    const fullPrompt = `${systemPrompt}
+${memorySection}${historySection}
 User message (${userLang}): ${message}
 
-Trả lời đúng phong cách, rõ ràng, không chẩn đoán trực tiếp:`;
+YÊU CẦU:
+- Nếu câu hỏi phụ thuộc ngữ cảnh trước đó -> sử dụng cả bộ nhớ & lịch sử.
+- Không nhắc lại toàn bộ lịch sử, chỉ tổng hợp tinh gọn.
+- Trả lời bằng đúng ngôn ngữ người dùng (${userLang}).`;
 
     const model = genAI.getGenerativeModel({ model: modelId });
     const result = await model.generateContent([fullPrompt]);
@@ -365,6 +390,9 @@ Trả lời đúng phong cách, rõ ràng, không chẩn đoán trực tiếp:`;
     const assistantText = response.text ? response.text() : (typeof response === 'string' ? response : '');
 
     if (submittedBy) {
+      // Cập nhật bộ nhớ (facts từ user)
+      mergeFactsIntoMemory(submittedBy, message);
+
       const entry = {
         id: Date.now(),
         type: 'chat',
@@ -383,6 +411,7 @@ Trả lời đúng phong cách, rõ ràng, không chẩn đoán trực tiếp:`;
       reply: assistantText,
       modelUsed: displayModel,
       usedHistory: historyBlocks.length,
+      usedMemory: !!(memory && memory.summary),
       sensitive: isSensitive,
       detectedLang: userLang,
       detectionScore: detected.score,
@@ -493,5 +522,68 @@ app.post('/api/diagnose', upload.array('images'), async (req, res) => {
   }
 });
 
+// (Đặt đoạn này SAU các hàm: readUsers, saveUsers, findUserByUsername, pushUserHistory)
+
+/* ==== Conversation Memory Utilities ==== */
+function getUserMemory(username) {
+  if (!username) return null;
+  const user = findUserByUsername(username);
+  return user && user.memory ? user.memory : null;
+}
+
+function updateUserMemory(username, mutatorFn) {
+  if (!username || typeof mutatorFn !== 'function') return;
+  const users = readUsers();
+  const idx = users.findIndex(u => u.username &&
+    u.username.toLowerCase() === username.toLowerCase());
+  if (idx === -1) return;
+  if (!users[idx].memory) {
+    users[idx].memory = { summary: '', lastUpdated: null };
+  }
+  mutatorFn(users[idx].memory);
+  users[idx].memory.lastUpdated = new Date().toISOString();
+  // Giới hạn kích thước summary
+  if (users[idx].memory.summary.length > 1500) {
+    users[idx].memory.summary = users[idx].memory.summary.slice(-1500);
+  }
+  saveUsers(users);
+}
+
+function extractFactsFromMessage(msg = '') {
+  if (!msg) return [];
+  const facts = [];
+  const lower = msg.toLowerCase();
+
+  const nameMatch = msg.match(/\btên tôi là\s+([A-Za-zÀ-ỹ'\s]{2,40})/i);
+  if (nameMatch) facts.push(`Tên: ${nameMatch[1].trim()}`);
+
+  const ageMatch = msg.match(/(\d{1,2})\s*(tuổi|age)\b/i);
+  if (ageMatch) facts.push(`Tuổi: ${ageMatch[1]}`);
+
+  const genderMatch = lower.match(/\b(nam|nữ|male|female)\b/);
+  if (genderMatch) facts.push(`Giới tính: ${genderMatch[1]}`);
+
+  const diseaseMatch = msg.match(/\btôi (bị|đang bị|có)\s+([A-Za-zÀ-ỹ0-9\s]{3,60})/i);
+  if (diseaseMatch) facts.push(`Tình trạng: ${diseaseMatch[2].trim()}`);
+
+  const goalMatch = msg.match(/\btôi muốn\s+([A-Za-zÀ-ỹ0-9\s]{3,80})/i);
+  if (goalMatch) facts.push(`Mục tiêu: ${goalMatch[1].trim()}`);
+
+  return facts;
+}
+
+function mergeFactsIntoMemory(username, userMessage) {
+  const newFacts = extractFactsFromMessage(userMessage);
+  if (!newFacts.length) return;
+  updateUserMemory(username, mem => {
+    const existing = mem.summary ? mem.summary.split('\n') : [];
+    const set = new Set(existing.map(l => l.trim()).filter(Boolean));
+    newFacts.forEach(f => { if (!set.has(f)) set.add(f); });
+    // Giữ tối đa 50 dòng facts gần nhất
+    mem.summary = Array.from(set).slice(-50).join('\n');
+  });
+}
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server đang chạy trên cổng ${PORT}`));
+
