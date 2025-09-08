@@ -184,6 +184,120 @@ app.delete('/api/history', (req, res) => {
 });
 
 /* --------------------------
+   Language Detection Utility
+   -------------------------- */
+function detectLanguage(rawText) {
+  const text = (rawText || '').trim();
+  if (!text) return { code: 'vi', score: 0, reasons: ['empty -> default vi'] };
+
+  // Lấy cụm từ cuối ưu tiên (6–8 token cuối)
+  const tokens = text.split(/\s+/);
+  const tailTokens = tokens.slice(-8);
+  const tail = tailTokens.join(' ');
+  const fullLower = text.toLowerCase();
+  const tailLower = tail.toLowerCase();
+
+  // Bảng luật (có thể mở rộng)
+  const profiles = [
+    {
+      code: 'vi',
+      strong: /[ăâêôơưđ]|(?:không|vâng|chào|bệnh|triệu chứng|đau|xin chào|cảm ơn)\b/i,
+      medium: /\b(tại sao|là gì|có nên|có thể)\b/i,
+      weak: /\b(và|là)\b/i
+    },
+    {
+      code: 'en',
+      strong: /\b(please|thanks|pain|disease|symptom|hello|hi|what|why|how)\b/i,
+      medium: /\b(the|and|can|should|could)\b/i,
+      weak: /\b(a|to|is)\b/i
+    },
+    {
+      code: 'es',
+      strong: /\b(hola|gracias|enfermedad|síntoma|por favor|dolor|qué|cómo|porque|por qué)\b/i,
+      medium: /\b(el|la|los|las|una|un|para|con)\b/i,
+      weak: /\b(de|y|que)\b/i
+    },
+    {
+      code: 'fr',
+      strong: /\b(bonjour|merci|maladie|sympt[oô]me|s'il vous plaît|douleur|pourquoi|comment|qu'est-ce)\b/i,
+      medium: /\b(le|la|les|des|une|un|avec|pour)\b/i,
+      weak: /\b(de|et|que)\b/i
+    },
+    {
+      code: 'de',
+      strong: /\b(hallo|danke|krankheit|symptom|bitte|schmerz|warum|wie)\b/i,
+      medium: /\b(und|der|die|das|mit|für)\b/i,
+      weak: /\b(zu|ein|ist)\b/i
+    },
+    {
+      code: 'pt',
+      strong: /\b(olá|obrigado|doença|sintoma|por favor|dor|por que|como)\b/i,
+      medium: /\b(uma|um|para|com|que|isso)\b/i,
+      weak: /\b(e|de|os|as)\b/i
+    },
+    {
+      code: 'ru',
+      strong: /\b(привет|здравствуйте|болезнь|симптом|почему|как|боль|пожалуйста)\b/i,
+      medium: /\b(это|что|есть|при|для)\b/i,
+      weak: /\b(и|в|на)\b/i
+    },
+    {
+      code: 'ja',
+      strong: /[ぁ-んァ-ン一-龥]|(こんにちは|お願いします|病気|症状|痛み)/,
+      medium: /(です|ます|かも)/,
+      weak: /(の|と|に)/
+    },
+    {
+      code: 'ko',
+      strong: /[가-힣]|(안녕|증상|질병|통증|감사)/,
+      medium: /(입니다|어요|네요)/,
+      weak: /(은|는|이|가|을|를)/
+    },
+    {
+      code: 'zh',
+      strong: /[\u4e00-\u9fff]|(你好|疾病|症状|谢谢|痛)/,
+      medium: /(的|了|在|是)/,
+      weak: /(和|与|及)/
+    },
+    {
+      code: 'ar',
+      strong: /[\u0600-\u06FF]|(مرحبا|شكرا|مرض|ألم|أعراض)/,
+      medium: /(على|من|هذا|هذه)/,
+      weak: /(و|في|ما)/
+    }
+  ];
+
+  function scoreProfile(p) {
+    let score = 0;
+    const reasons = [];
+    // Đánh trọng số phần đuôi cao hơn
+    if (p.strong.test(tail)) { score += 55; reasons.push('tail strong'); }
+    else if (p.strong.test(text)) { score += 40; reasons.push('body strong'); }
+
+    if (p.medium.test(tail)) { score += 18; reasons.push('tail medium'); }
+    else if (p.medium.test(text)) { score += 10; reasons.push('body medium'); }
+
+    if (p.weak.test(tail)) { score += 6; reasons.push('tail weak'); }
+    else if (p.weak.test(text)) { score += 3; reasons.push('body weak'); }
+
+    // Heuristic ưu tiên tone/dấu tiếng Việt
+    if (p.code === 'vi' && /[ăâêôơưđÀÁẢÃẠàáảãạĂẮẰẲẴẶâấầẩẫậÊẾỀỂỄỆÔỐỒỔỖỘƠỚỜỞỬỮỰđ]/.test(text)) {
+      score += 25; reasons.push('vi diacritics');
+    }
+    return { code: p.code, score, reasons };
+  }
+
+  const scored = profiles.map(scoreProfile).sort((a,b) => b.score - a.score);
+  const best = scored[0];
+  // Ngưỡng đơn giản: nếu top < 25 => fallback English trừ khi có diacritics rõ
+  if (best.score < 25) {
+    if (/[ăâêôơưđ]/i.test(text)) return { code: 'vi', score: best.score, reasons: best.reasons.concat('fallback vi') };
+    return { code: 'en', score: best.score, reasons: best.reasons.concat('fallback en') };
+  }
+  return best;
+}
+
+/* --------------------------
    NEW: Chat endpoint (general conversation)
    -------------------------- */
 app.post('/api/chat', async (req, res) => {
@@ -198,13 +312,18 @@ app.post('/api/chat', async (req, res) => {
     const submittedBy = req.body.submittedBy || null;
     const includeHistory = req.body.includeHistory !== false;
 
-    // Lấy lịch sử hội thoại gần đây (giữ nguyên logic cũ)
+    // Detect language (allow manual override)
+    const forcedLang = (req.body.lang || req.body.forceLang || '').toLowerCase();
+    const detected = detectLanguage(message);
+    const userLang = forcedLang || detected.code;
+
+    // Lịch sử
     let historyBlocks = [];
     if (submittedBy && includeHistory) {
       historyBlocks = getRecentChatHistory(submittedBy, 10, 6000);
     }
 
-    // >>> Thêm đoạn này để định nghĩa isSensitive và reassuranceBlock <<<
+    // Sensitive
     const sensitiveRegex = /(ung thư|khối u|u ác|đau ngực|khó thở|xuất huyết|tự sát|tự tử|trầm cảm|đột quỵ|nhồi máu|co giật|hôn mê)/i;
     const isSensitive = sensitiveRegex.test(message);
     const reassuranceBlock = isSensitive
@@ -212,20 +331,23 @@ app.post('/api/chat', async (req, res) => {
       : '';
     // <<< Hết phần thêm >>>
 
-    const systemPrompt = `Bạn là một trợ lý thông minh, thân thiện, trả lời ngắn gọn, rõ ràng bằng tiếng Việt. Tên bạn là JAREMIS-AI được tạo bởi TT1403 & ANT.
+    const systemPrompt = `Bạn là một trợ lý thông minh, thân thiện, trả lời ngắn gọn, rõ ràng bằng nhiều ngôn ngữ trên thế giới. Tên bạn là JAREMIS-AI được tạo bởi TT1403 & ANT & Lý Thúc Duy.
 Nếu người dùng yêu cầu CHẨN ĐOÁN Y KHOA hoặc xin chẩn đoán lâm sàng,
 KHÔNG cung cấp chẩn đoán chi tiết — hãy gợi ý họ dùng chế độ "Diagnose"
 và luôn nhắc tham khảo ý kiến bác sĩ. Giữ ngữ cảnh phù hợp, không lặp lại nguyên văn dài dòng từ lịch sử.
 MỤC TIÊU:
 1. Trả lời có cấu trúc: Tổng quan ngắn -> Các điểm chính -> Giải thích dễ hiểu -> Gợi ý bước an toàn -> Khích lệ (nếu phù hợp).
-2. Giải thích thuật ngữ y khoa bằng lời Việt đơn giản.
+2. Giải thích thuật ngữ y khoa bằng lời đơn giản.
 3. Không đưa chẩn đoán y khoa trực tiếp; nếu người dùng muốn chẩn đoán: gợi ý dùng chế độ "Diagnose".
 4. Với nội dung nhạy cảm: trấn an, không phóng đại rủi ro.
 5. Không bịa đặt. Nếu thiếu dữ kiện: yêu cầu cung cấp thêm.
 6. Không đưa phác đồ điều trị, liều thuốc chi tiết.
 7. Không lặp lại nguyên văn dài từ lịch sử – chỉ tham chiếu ngắn gọn.
 8. Khích lệ tích cực vừa phải, không sáo rỗng.
-Luôn nhắc: Thông tin chỉ tham khảo, không thay thế bác sĩ.`;
+Luôn nhắc: Thông tin chỉ tham khảo, không thay thế bác sĩ.
+9. Giọng điệu: thân thiện, chuyên nghiệp, dễ gần, trấn an nếu nhạy cảm.${reassuranceBlock}
+10. Bạn hãy chủ động học hỏi tính cách của người dùng để trả lời phù hợp với họ.
+11. Người dùng là trên hết nếu họ có nhu cầu chỉnh sửa phong cách xưng hô hay cách trả lời hoặc thú gì đó đặc biệt hơn, hãy đáp ứng họ.`;
 
     const historySection = historyBlocks.length
       ? `Lịch sử gần đây (tóm tắt, đừng lặp lại nguyên văn):\n${historyBlocks.join('\n')}\n\n`
@@ -233,7 +355,7 @@ Luôn nhắc: Thông tin chỉ tham khảo, không thay thế bác sĩ.`;
 
     const fullPrompt = `${systemPrompt}${reassuranceBlock}
 
-${historySection}Người dùng hỏi: ${message}
+User message (${userLang}): ${message}
 
 Trả lời đúng phong cách, rõ ràng, không chẩn đoán trực tiếp:`;
 
@@ -242,7 +364,6 @@ Trả lời đúng phong cách, rõ ràng, không chẩn đoán trực tiếp:`;
     const response = await result.response;
     const assistantText = response.text ? response.text() : (typeof response === 'string' ? response : '');
 
-    // Lưu history (đổi modelUsed sang tên hiển thị)
     if (submittedBy) {
       const entry = {
         id: Date.now(),
@@ -250,9 +371,11 @@ Trả lời đúng phong cách, rõ ràng, không chẩn đoán trực tiếp:`;
         timestamp: new Date().toISOString(),
         input: message,
         reply: assistantText,
-        modelUsed: displayModel
+        modelUsed: displayModel,
+        detectedLang: userLang,
+        langScore: detected.score
       };
-      try { pushUserHistory(submittedBy, entry); } catch(e) { console.warn('Không lưu history chat', e); }
+      try { pushUserHistory(submittedBy, entry); } catch (e) { console.warn('Không lưu history chat', e); }
     }
 
     return res.json({
@@ -260,7 +383,10 @@ Trả lời đúng phong cách, rõ ràng, không chẩn đoán trực tiếp:`;
       reply: assistantText,
       modelUsed: displayModel,
       usedHistory: historyBlocks.length,
-      sensitive: isSensitive
+      sensitive: isSensitive,
+      detectedLang: userLang,
+      detectionScore: detected.score,
+      detectionReasons: detected.reasons
     });
   } catch (error) {
     console.error('Chat error:', error);
