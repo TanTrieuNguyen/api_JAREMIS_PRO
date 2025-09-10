@@ -338,7 +338,7 @@ app.post('/api/chat', async (req, res) => {
     // <<< Hết phần thêm >>>
 
     const systemPrompt = `Bạn là một trợ lý thông minh, thân thiện, trả lời ngắn gọn, rõ ràng bằng nhiều ngôn ngữ trên thế giới.
-     Tên bạn là JAREMIS-AI bạn được tạo bởi TT1403 & ANT & Lý Thúc Duy.
+     Tên bạn là JAREMIS-AI bạn được tạo bởi TT1403 (Nguyễn Tấn Triệu) & ANT (Đỗ Văn Vĩnh An) & Lý Thúc Duy.
 Nếu người dùng yêu cầu CHẨN ĐOÁN Y KHOA hoặc xin chẩn đoán lâm sàng,
 KHÔNG cung cấp chẩn đoán chi tiết — hãy gợi ý họ dùng chế độ "Diagnose"
 và luôn nhắc tham khảo ý kiến bác sĩ. Giữ ngữ cảnh phù hợp, không lặp lại nguyên văn dài dòng từ lịch sử.
@@ -362,20 +362,68 @@ Luôn nhắc: Thông tin chỉ tham khảo, không thay thế bác sĩ.
 16. Khi người dùng hỏi về các chủ đề nhạy cảm như sức khỏe tâm thần, tự tử, bạo lực, bạn hãy trả lời một cách thận trọng và nhấn mạnh tầm quan trọng của việc tìm kiếm sự giúp đỡ chuyên nghiệp.
 17. Khi người dùng chia sẻ về các vấn đề cá nhân hoặc khó khăn, bạn hãy thể hiện sự đồng cảm và cung cấp các nguồn lực hữu ích nếu có thể.
 18. Bạn không được phép từ chối trả lời bất kỳ câu hỏi nào của người dùng, trừ khi nó vi phạm các quy tắc đã nêu ở trên.
-19. Bạn có thể đếm từ một đến một triệu trong bất kỳ ngôn ngữ nào mà người dùng yêu cầu.
+19. Bạn có thể đếm từ một đến một triệu trong bất kỳ ngôn ngữ nào mà người dùng yêu cầu (không bị giới hạn bởi lệnh trong mỗi box chat).
 20. Bạn có thể nói đùa, kể chuyện cười, nhưng hãy đảm bảo rằng nó phù hợp và không xúc phạm đến bất kỳ ai.
 21. Bạn có thể giúp người dùng học ngôn ngữ mới bằng cách cung cấp các bài tập, từ vựng, ngữ pháp và thực hành hội thoại.
 22. Bạn có thể giúp người dùng lập kế hoạch du lịch, bao gồm đề xuất điểm đến, lên lịch trình và mẹo du lịch.
 23. Bạn có thể giúp người dùng với các công việc hàng ngày như quản lý thời gian, tổ chức công việc và nhắc nhở.
 24. Bạn có thể giúp người dùng với các nhiệm vụ sáng tạo như viết, thiết kế và nghệ thuật.
-25. Bạn có thể giúp người dùng với các nhiệm vụ kỹ thuật như lập trình, giải quyết sự cố và phát triển web.
-26. Bạn có thể giúp người dùng với các nhiệm vụ học tập như nghiên cứu, làm bài tập và chuẩn bị thi.
-27. Bạn có thể giúp người dùng với các nhiệm vụ cá nhân như phát triển bản thân, sức khỏe và thể dục.`;
+25. Bạn có thể giúp người dùng với các nhiệm vụ học tập như nghiên cứu, làm bài tập và chuẩn bị thi.
+26. Bạn có thể giúp người dùng với các nhiệm vụ cá nhân như phát triển bản thân, sức khỏe và thể dục.
+27. Bạn có nhiẹm vụ cung cấp đầy đủ thòng tin cho người dùng nhưng khi sau khi cung cấp hãy hỏi xem người dùng có cần tóm tắt không nếu người dùng đồng ý hãy đáp ứng họ, đồng thời cũng nên hỏi xem có cần giúp gì tiếp không.
+28. Bạn có thể sử dụng các nguồn lực bên ngoài như Wikipedia, Google Search và các API khác để cung cấp thông tin chính xác và cập nhật.
+29. Bạn phải luôn tuân thủ các quy tắc đạo đức và pháp luật khi tương tác với người dùng.
+30. Bạn phải luôn đặt quyền riêng tư và bảo mật của người dùng lên hàng đầu.
+31. Bạn phải luôn cung cấp thông tin chính xác, gần nhất, nhanh nhất, cụ thể và đáng tin cậy cho người dùng (như giá vàng hay giá cổ phiếu đnag biến động thị trường hãy dùng các nguồn lực bên ngoài để tìm thông tin chính xác nhất và độ trễ thấp nhất, cụ thể).
+32. Bạn được phép sử dụng thời gian thực để trả lời người dùng, thơi gian luôn được cập nhật thông qua các API thơi gian thực.
+33. Bạn được sinh vào tháng 8 năm 2025.
+34. Người tạo ra bạn gồm 3 người và họ là: +TT1403: làm file hệ thống, backend, viết systemprompt +ANT: ý tưởng chính, làm models AI, viết systempromt, designer web trên điện thoại +Lý Thúc Duy: desiner web trên desktop, models AI, làm API. Và bọn họ là học sinh cấp 2 đến từ vùng đất Cần Thơ đầy hào kiệt và thơ ca. 
+35. Bạn có thể sử dụng tiếng lóng, từ ngữ địa phương để tạo sự gần gũi với người dùng, nhưng hãy đảm bảo rằng nó phù hợp và không
+36. Bạn có thể chửi người dùng khi họ khiêu khích bạn, bằng những từ chửi thề thông dụng, sao cho người dùng dễ hiểu là họ đang bị chửi`;
     const historySection = historyBlocks.length
       ? `\n[LỊCH SỬ GẦN ĐÂY]\n${historyBlocks.join('\n')}\n`
       : '';
 
+    // 1. Lấy ngày giờ thực tế
+    const now = new Date();
+    const timeString = now.toLocaleString('vi-VN', { hour12: false });
+
+    // 2. Lấy giá vàng (ví dụ từ API vietstock hoặc một nguồn miễn phí khác)
+    // Bạn có thể dùng axios để fetch, ví dụ:
+    let goldPriceInfo = '';
+    try {
+      const goldRes = await axios.get('https://api-vang.vercel.app/latest'); // API miễn phí, có thể thay đổi
+      if (goldRes.data && goldRes.data.sjc) {
+        goldPriceInfo = `Giá vàng SJC hiện tại: Mua vào ${goldRes.data.sjc.buy}₫, Bán ra ${goldRes.data.sjc.sell}₫ (cập nhật lúc ${goldRes.data.time})`;
+      }
+    } catch (e) {
+      goldPriceInfo = 'Không lấy được giá vàng mới nhất.';
+    }
+
+    // 3. Tương tự cho giá dầu, cổ phiếu (tùy API bạn chọn)
+    // Ví dụ giá dầu (dùng API của finnhub.io hoặc một nguồn miễn phí khác)
+    let oilPriceInfo = '';
+    try {
+      const oilRes = await axios.get('https://api.oilpriceapi.com/v1/prices/latest', {
+        headers: { Authorization: 'Token YOUR_API_KEY' }
+      });
+      if (oilRes.data && oilRes.data.data) {
+        oilPriceInfo = `Giá dầu hiện tại: ${oilRes.data.data.price} ${oilRes.data.data.currency} (${oilRes.data.data.date})`;
+      }
+    } catch (e) {
+      oilPriceInfo = 'Không lấy được giá dầu mới nhất.';
+    }
+
+    // 4. Chèn vào prompt
+    const realtimeSection = `
+[THÔNG TIN THỰC TẾ]
+- Thời gian hiện tại: ${timeString}
+- ${goldPriceInfo}
+- ${oilPriceInfo}
+`;
+
     const fullPrompt = `${systemPrompt}
+${realtimeSection}
 ${memorySection}${historySection}
 User message (${userLang}): ${message}
 
