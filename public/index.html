@@ -71,7 +71,10 @@
         .sidebar-footer { font-size:12px; color:var(--text-secondary-color); text-align:center; margin-top:10px; }
 
         /* Chat area */
-        .chat-area { flex-grow:1; display:flex; flex-direction:column; background-color:var(--chat-bg); border-left:1px solid var(--border-color); position:relative; }
+        .chat-area {
+            position: relative; /* Đảm bảo lớp nền phủ đúng */
+            flex-grow:1; display:flex; flex-direction:column; background-color:var(--chat-bg); border-left:1px solid var(--border-color); /* position:relative; */
+        }
         .chat-messages { flex-grow:1; padding:24px; overflow-y:auto; display:flex; flex-direction:column; gap:20px; }
         .chat-bubble { max-width:80%; padding:16px; border-radius:12px; line-height:1.6; word-wrap:break-word; }
         .bot-bubble { background-color:var(--bot-bubble-bg); align-self:flex-start; border:1px solid var(--border-color); }
@@ -509,6 +512,49 @@
 .history-top-toggle:hover,
 .history-drawer-toggle:hover { border:0 !important; }
 */
+/* Thêm ngay sau <body> */
+.bg-animation {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 0; /* nằm dưới các chat bubble */
+}
+.particle {
+    position: absolute;
+    width: 4px; height: 4px;
+    background: #8b5cf6;
+    border-radius: 50%;
+    animation: float 20s infinite linear;
+    box-shadow: 0 0 10px #8b5cf6;
+}
+.particle:nth-child(1) { left: 20%; animation-delay: 0s; animation-duration: 15s; }
+.particle:nth-child(2) { left: 40%; animation-delay: 5s; animation-duration: 20s; background: #7c3aed; box-shadow: 0 0 10px #7c3aed; }
+.particle:nth-child(3) { left: 60%; animation-delay: 10s; animation-duration: 25s; background: #a78bfa; box-shadow: 0 0 10px #a78bfa; }
+.particle:nth-child(4) { left: 80%; animation-delay: 15s; animation-duration: 18s; }
+.particle:nth-child(5) { left: 10%; animation-delay: 8s; animation-duration: 22s; background: #7c3aed; box-shadow: 0 0 10px #7c3aed; }
+@keyframes float {
+    0% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { transform: translateY(-100px) rotate(360deg); opacity: 0; }
+}
+
+/* Snowfall animation */
+.particle.snowflake {
+    border-radius: 50%;
+    box-shadow: 0 0 8px #fff;
+    position: absolute;
+    animation: snow-fall linear infinite;
+}
+@keyframes snow-fall {
+    0% { transform: translateY(-10vh); opacity: 0.8; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { transform: translateY(110vh); opacity: 0.2; }
+}
+#snow-canvas { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:0; }
+.chat-messages, .chat-bubble { position:relative; z-index:2; } /* đảm bảo tuyết không đè lên */
     </style>
     <style>
       @media (max-width:600px) {
@@ -576,8 +622,52 @@
         }
       }
     </style>
+    <style>
+/* === 3D Tilt Effect (buttons) === */
+.tilt-3d{
+  position:relative;
+  background:linear-gradient(145deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
+  box-shadow:0 4px 10px -2px rgba(0,0,0,0.45), 0 0 0 1px var(--border-color);
+  transform-style:preserve-3d;
+  will-change:transform;
+  transition:transform .28s cubic-bezier(.25,.8,.25,1), box-shadow .35s;
+  border-radius:8px;
+}
+.tilt-3d:hover{
+  box-shadow:
+    0 6px 18px -4px rgba(0,0,0,0.55),
+    0 0 0 1px rgba(47,129,247,0.55),
+    0 0 14px -2px rgba(47,129,247,0.55);
+}
+.tilt-3d::after{
+  content:'';
+  position:absolute;
+  inset:0;
+  background:
+    radial-gradient(circle at var(--mx,50%) var(--my,50%),
+      rgba(255,255,255,0.28),
+      rgba(255,255,255,0.05) 38%,
+      rgba(255,255,255,0) 70%);
+  opacity:var(--glow-o,0);
+  mix-blend-mode:screen;
+  pointer-events:none;
+  transition:opacity .25s;
+  border-radius:inherit;
+}
+.tilt-3d:active{
+  transition:transform .08s;
+  transform:perspective(800px) rotateX(0deg) rotateY(0deg) translateZ(0) scale(.95);
+}
+</style>
 </head>
 <body>
+    <div class="bg-animation">
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+    </div>
     <div class="chat-container">
         <!-- (XÓA nút cũ ở đây nếu còn) -->
         <aside class="sidebar" id="sidebar">
@@ -601,6 +691,7 @@
         <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
  
          <main class="chat-area" id="chat-area">
+            <canvas id="snow-canvas"></canvas>
             <!-- Nút toggle lịch sử mới (mobile) -->
             <button id="history-drawer-toggle" class="history-top-toggle" aria-label="Mở lịch sử">
                 <span class="bars" aria-hidden="true">
@@ -653,7 +744,7 @@
                                 <i class="fas fa-microphone"></i>
                                 <span id="mic-indicator"></span>
                             </button>
-                            <button id="think-btn" class="action-btn" title="Bật Think (dùng Jaremis Pro)" onclick="toggleThink(event)">
+                            <button id="think-btn" class="action-btn" title="Bật Think (dùng Jaremis Pro 1.5)" onclick="toggleThink(event)">
                                 <i class="fas fa-brain"></i>
                             </button>
                         </div>
@@ -667,7 +758,7 @@
                 </div>
 
                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <div id="model-status">Model: JAREMIS 1.0</div>
+                    <div id="model-status">Model: JAREMIS 1.5</div>
                     <div style="font-size:12px; color:var(--text-secondary-color);">Trạng thái: Rảnh</div>
                 </div>
             </div>
@@ -797,10 +888,10 @@
             useProModel = !useProModel;
             if (useProModel) {
                 thinkBtn.classList.add('active');
-                modelStatusEl.textContent = 'Model: JAREMIS PRO';
+                modelStatusEl.textContent = 'Model: JAREMIS PRO 1.5';
             } else {
                 thinkBtn.classList.remove('active');
-                modelStatusEl.textContent = 'Model: JAREMIS 1.0';
+                modelStatusEl.textContent = 'Model: JAREMIS 1.5';
             }
         }
 
@@ -1393,11 +1484,8 @@
         // Keyboard send
         // ------------------------------
         chatInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                if (!sendBtn.disabled) submitData();
             }
-        });
+        );
 
         // ------------------------------
         // Sidebar resize logic
@@ -1502,5 +1590,184 @@
           return originalSubmitData();
         };
      </script>
- </body>
- </html>
+     <script>
+/* === 3D Tilt Effect Script ===
+   Áp dụng cho: đăng nhập / đăng xuất / xóa lịch sử (auth-btn),
+   nút Diagnose (#mode-btn), Jaremis Pro (#think-btn),
+   đính kèm file (paperclip – nút action-btn đầu tiên trong #tool-buttons),
+   ghi âm (#mic-btn).
+   Muốn thêm send: thêm '#send-btn' vào SELECTORS.
+*/
+(function(){
+  const SELECTORS = [
+    '.auth-controls .auth-btn',        // đăng nhập / đăng ký / đăng xuất / xóa lịch sử
+    '#mode-btn',                       // Diagnose toggle
+    '#think-btn',                      // Jaremis Pro
+    '#mic-btn',                        // Mic
+    '#tool-buttons .action-btn:first-child', // Paperclip
+    '.new-chat-btn',                   // "Cuộc trò chuyện mới"
+    '#send-btn',                       // Gửi
+    '.btn-primary',                    // Nút Đăng nhập / Đăng ký
+    '.btn-ghost'                       // Nút Hủy
+  ];
+  const MAX_TILT = 14;
+  const PERSPECTIVE = 800;
+  function applyTilt(el){
+    if(!el || el.dataset.tiltApplied) return;
+    el.dataset.tiltApplied = '1';
+    el.classList.add('tilt-3d');
+    function move(e){
+      const rect = el.getBoundingClientRect();
+      const x = (e.clientX - rect.left)/rect.width;
+      const y = (e.clientY - rect.top)/rect.height;
+      const rotX = (0.5 - y) * (MAX_TILT * 2);
+      const rotY = (x - 0.5) * (MAX_TILT * 2);
+      el.style.setProperty('--mx', (x*100).toFixed(2)+'%');
+      el.style.setProperty('--my', (y*100).toFixed(2)+'%');
+      el.style.transform = `perspective(${PERSPECTIVE}px) rotateX(${rotX}deg) rotateY(${rotY}deg) translateZ(6px)`;
+      el.style.setProperty('--glow-o','1');
+    }
+    function leave(){
+      el.style.transform = `perspective(${PERSPECTIVE}px) rotateX(0deg) rotateY(0deg) translateZ(0)`;
+      el.style.setProperty('--glow-o','0');
+    }
+    el.addEventListener('mousemove', move);
+    el.addEventListener('mouseenter', move);
+    el.addEventListener('mouseleave', leave);
+    el.addEventListener('touchmove', (e)=>{
+      const t = e.touches[0];
+      move(t);
+    }, {passive:true});
+    el.addEventListener('touchend', leave);
+  }
+  function scan(){
+    SELECTORS.forEach(sel=>{
+      document.querySelectorAll(sel).forEach(applyTilt);
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', ()=>{
+    scan();
+    // Quan sát auth-controls vì nút được tạo động
+    const auth = document.querySelector('.auth-controls');
+    if(auth){
+      new MutationObserver(scan).observe(auth,{childList:true,subtree:true});
+    }
+  });
+})();
+</script>
+<script>
+// ================= REALISTIC SNOW v2 (restored) =================
+(function(){
+  const canvas = document.getElementById('snow-canvas');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const CONFIG = {
+    density: 0.11,
+    globalSpeed: 1.0,
+    windOscAmp: 0.55,
+    windOscSpeed: 0.06,
+    perParticleSway: 0.35,
+    maxDrift: 0.35,
+    fadeIn: true
+  };
+  const LAYERS = [
+    { name:'far',  size:[0.6,1.4], speedY:[14,24], alpha:[0.15,0.35], blur:0,   countRatio:0.40 },
+    { name:'mid',  size:[1.0,2.2], speedY:[22,38], alpha:[0.22,0.55], blur:0.5, countRatio:0.38 },
+    { name:'near', size:[1.8,3.4], speedY:[34,58], alpha:[0.30,0.75], blur:0.9, countRatio:0.22 }
+  ];
+  let W=0,H=0, particles=[];
+  let lastTime = performance.now();
+  let windBase = 0;
+  function rand(a,b){ return Math.random()*(b-a)+a; }
+  function resize(){
+    W = canvas.width  = canvas.offsetWidth  = canvas.parentElement.offsetWidth;
+    H = canvas.height = canvas.offsetHeight = canvas.parentElement.offsetHeight;
+    buildParticles();
+  }
+  window.addEventListener('resize', throttle(resize,250));
+  resize();
+  function totalCount(){ return Math.round((W*H/1000) * CONFIG.density); }
+  function buildParticles(){
+    particles.length = 0;
+    const total = totalCount();
+    LAYERS.forEach(layer=>{
+      const need = Math.round(total * layer.countRatio);
+      for(let i=0;i<need;i++){
+        particles.push(makeParticle(layer, Math.random()*W, Math.random()*H));
+      }
+    });
+  }
+  function makeParticle(layer,x,y){
+    const speedY = rand(layer.speedY[0], layer.speedY[1]) / 60 * CONFIG.globalSpeed;
+    const r = rand(layer.size[0], layer.size[1]);
+    return {
+      layer,x,y,r,
+      baseVy: speedY,
+      alpha: rand(layer.alpha[0], layer.alpha[1]),
+      swayOffset: Math.random()*Math.PI*2,
+      swaySpeed: rand(0.4,1.1),
+      driftSeed: Math.random()*1000,
+      life:0,
+      blur:layer.blur
+    };
+  }
+  function update(dt){
+    windBase += CONFIG.windOscSpeed * dt;
+    const globalWind = Math.sin(windBase) * CONFIG.windOscAmp;
+    for(let p of particles){
+      p.life += dt;
+      const sway = Math.sin(p.swayOffset + p.life * p.swaySpeed) * CONFIG.perParticleSway;
+      const drift = (Math.sin((p.driftSeed + p.life*30)*0.015)+Math.sin((p.driftSeed + p.life*55)*0.011))*0.5*CONFIG.maxDrift;
+      p.x += (globalWind + sway + drift) * (0.6 + (p.r*0.12));
+      p.y += p.baseVy * dt * 60;
+      if(p.x > W+8) p.x = -8;
+      else if(p.x < -8) p.x = W+8;
+      if(p.y > H+10){
+        p.x = Math.random()*W;
+        p.y = rand(-40,-10);
+        p.life = 0;
+        p.baseVy = rand(p.layer.speedY[0], p.layer.speedY[1]) / 60 * CONFIG.globalSpeed;
+        p.r = rand(p.layer.size[0], p.layer.size[1]);
+        p.alpha = rand(p.layer.alpha[0], p.layer.alpha[1]);
+      }
+    }
+  }
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    for(let layer of LAYERS){
+      ctx.save();
+      for(let p of particles){
+        if(p.layer !== layer) continue;
+        const a = CONFIG.fadeIn ? Math.min(p.alpha, p.alpha*(p.life*0.6)) : p.alpha;
+        ctx.globalAlpha = a;
+        if(p.blur>0){
+          ctx.shadowBlur = p.blur*8;
+          ctx.shadowColor = 'rgba(255,255,255,'+a+')';
+        } else ctx.shadowBlur = 0;
+        ctx.beginPath();
+        ctx.fillStyle = '#fff';
+        ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+  function loop(now){
+    const dt = Math.min(0.07, (now - lastTime)/1000);
+    lastTime = now;
+    update(dt);
+    draw();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+  function throttle(fn, ms){
+    let t=0;
+    return function(...args){
+      if(performance.now()-t>ms){ t=performance.now(); fn.apply(this,args); }
+    };
+  }
+})();
+</script>
+</body>
+</html>
