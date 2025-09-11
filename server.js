@@ -51,7 +51,7 @@ function pushUserHistory(username, historyEntry, maxItems = 500) {
 }
 
 // NEW: Lấy tối đa N lượt chat gần nhất (user -> assistant), trả về theo thứ tự cũ -> mới
-function getRecentChatHistory(username, limit = 10, maxChars = 6000) {
+function getRecentChatHistory(username, limit = 36, maxChars = 36000) {
   const user = findUserByUsername(username);
   if (!user || !Array.isArray(user.history)) return [];
   // Lấy các entry type 'chat'
@@ -634,4 +634,5 @@ function mergeFactsIntoMemory(username, userMessage) {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server đang chạy trên cổng ${PORT}`));
+
 
