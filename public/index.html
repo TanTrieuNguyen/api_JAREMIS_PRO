@@ -75,7 +75,42 @@
             position: relative; /* Đảm bảo lớp nền phủ đúng */
             flex-grow:1; display:flex; flex-direction:column; background-color:var(--chat-bg); border-left:1px solid var(--border-color); /* position:relative; */
         }
-        .chat-messages { flex-grow:1; padding:24px; overflow-y:auto; display:flex; flex-direction:column; gap:20px; }
+        .chat-messages {
+          flex-grow:1;
+          padding:24px;
+          overflow-y:auto;
+          display:flex;
+          flex-direction:column;
+          gap:20px;
+          background: transparent;          /* đảm bảo không che nền */
+          scrollbar-color: var(--accent-color) transparent; /* Firefox */
+          scrollbar-width: thin;
+        }
+
+        /* Scrollbar WebKit (Chrome / Edge) */
+        .chat-messages::-webkit-scrollbar {
+          width: 10px;
+        }
+        .chat-messages::-webkit-scrollbar-track {
+          background: transparent;          /* trong suốt để lộ nền & canvas tuyết */
+        }
+        .chat-messages::-webkit-scrollbar-thumb {
+          background: linear-gradient(180deg, rgba(47,129,247,0.55), rgba(47,129,247,0.25));
+          border-radius: 20px;
+          border: 2px solid rgba(0,0,0,0);  /* tạo khoảng cách thị giác */
+          min-height: 40px;
+          transition: background .25s;
+        }
+        .chat-messages::-webkit-scrollbar-thumb:hover {
+          background: linear-gradient(180deg, rgba(47,129,247,0.85), rgba(47,129,247,0.45));
+        }
+        .chat-messages::-webkit-scrollbar-corner {
+          background: transparent;
+        }
+        /* (Tuỳ chọn) Ẩn hẳn khi không hover:
+        .chat-messages::-webkit-scrollbar { width: 0; }
+        */
+
         .chat-bubble { max-width:80%; padding:16px; border-radius:12px; line-height:1.6; word-wrap:break-word; }
         .bot-bubble { background-color:var(--bot-bubble-bg); align-self:flex-start; border:1px solid var(--border-color); }
         .user-bubble { background-color:var(--user-bubble-bg); align-self:flex-end; color:#fff; }
@@ -672,7 +707,7 @@
         <!-- (XÓA nút cũ ở đây nếu còn) -->
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <button class="new-chat-btn" onclick="window.location.reload()">
+                <button class="new-chat-btn" onclick="startNewConversation()">
                     <i class="fas fa-plus"></i>
                     <span>Cuộc trò chuyện mới</span>
                 </button>
@@ -844,6 +879,32 @@
         let isRecording = false;
         let textBeforeRecording = '';
         let historyCache = [];
+
+        let currentSessionId = null;
+
+        // Khởi tạo session hiện tại
+        document.addEventListener('DOMContentLoaded', () => {
+          if (!localStorage.getItem('jaremis_session')) {
+            localStorage.setItem('jaremis_session', 'sess-' + Date.now());
+          }
+          currentSessionId = localStorage.getItem('jaremis_session');
+          // Thêm lời chào nếu trống
+          if (!chatMessages.innerHTML.trim()) {
+            chatMessages.innerHTML = `<div class="chat-bubble bot-bubble"><strong>Chào bạn 👋 Mình là JAREMIS.</strong><p style="margin-top:8px; color:var(--text-secondary-color);">Bắt đầu cuộc trò chuyện mới.</p></div>`;
+          }
+        });
+
+        // Tạo cuộc trò chuyện mới (giống ChatGPT)
+        function startNewConversation() {
+          currentSessionId = 'sess-' + Date.now();
+          localStorage.setItem('jaremis_session', currentSessionId);
+          chatMessages.innerHTML = `
+            <div class="chat-bubble bot-bubble">
+              <strong>Cuộc trò chuyện mới đã bắt đầu.</strong>
+              <p style="margin-top:8px; color:var(--text-secondary-color);">Hãy nhập câu hỏi đầu tiên của bạn.</p>
+            </div>`;
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
 
         // ------------------------------
         // Helper: Escape HTML
@@ -1082,69 +1143,76 @@
             }
         }
 
+        // Group & render history thành LIST CUỘC TRÒ CHUYỆN
         function renderHistoryList(list) {
-            historyListEl.innerHTML = '';
-            if (!list || list.length === 0) {
-                historyListEl.innerHTML = `<li style="color:var(--text-secondary-color); font-size:13px;">Chưa có lịch sử</li>`;
-                historyActionsEl.innerHTML = '';
-                return;
-            }
-            list.forEach(item => {
-                const li = document.createElement('li');
-                li.dataset.id = item.id;
-                const time = new Date(item.timestamp).toLocaleString();
-                const titleText = (item.input && item.input.length > 60) ? item.input.slice(0, 60) + '...' : (item.input || 'Không có nội dung');
-                li.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;">
-                            <div style="flex:1; padding-right:8px;">
-                              <div style="font-size:13px; color:var(--text-color);">${escapeHtml(titleText)}</div>
-                              <div style="font-size:11px; color:var(--text-secondary-color); margin-top:4px">${escapeHtml(time)} • ${escapeHtml(item.modelUsed || '')} • ${escapeHtml(item.type || '')}</div>
-                            </div>
-                            <div style="margin-left:8px; font-size:12px; color:var(--text-secondary-color)"><i class="fas fa-chevron-right"></i></div>
-                        </div>`;
-        li.onclick = () => openHistoryItem(item.id);
-        historyListEl.appendChild(li);
-    });
+          historyListEl.innerHTML = '';
+          if (!list || list.length === 0) {
+            historyListEl.innerHTML = `<li style="color:var(--text-secondary-color); font-size:13px;">Chưa có lịch sử</li>`;
+            historyActionsEl.innerHTML = '';
+            return;
+          }
+          // Gom theo sessionId
+          const sessions = {};
+          list.forEach(entry => {
+            const sid = entry.sessionId || ('legacy-' + entry.id);
+            if (!sessions[sid]) sessions[sid] = [];
+            sessions[sid].push(entry);
+          });
+          // Sắp xếp session theo newest timestamp (lớn nhất)
+          const sessionArray = Object.entries(sessions).map(([sid, entries]) => {
+            const newestTs = Math.max(...entries.map(e => new Date(e.timestamp).getTime()));
+            return { sid, entries, newestTs };
+          }).sort((a,b) => b.newestTs - a.newestTs);
 
-    // BỎ nút Xóa ở sidebar (giữ trống)
-    historyActionsEl.innerHTML = ''; // (trước đây có nút Xóa)
-}
-
-        async function clearLocalHistory() {
-            const user = getLocalUser();
-            if (!user) return;
-            if (!confirm('Bạn có muốn xóa toàn bộ lịch sử?')) return;
-            try {
-                const res = await fetch(`/api/history?username=${encodeURIComponent(user.username)}`, { method: 'DELETE' });
-                const json = await res.json();
-                if (!res.ok) {
-                    alert(json.error || 'Không xóa được lịch sử');
-                    return;
-                }
-                historyCache = [];
-                renderHistoryList([]);
-                flashNotice('Đã xóa lịch sử');
-            } catch (e) {
-                console.error(e);
-                flashNotice('Lỗi khi xóa lịch sử');
-            }
+          sessionArray.forEach(sess => {
+            // Lấy message user đầu tiên của session (cũ nhất type chat/diagnose có input)
+            const chronological = [...sess.entries].sort((a,b)=> new Date(a.timestamp)-new Date(b.timestamp));
+            const first = chronological.find(e => e.input && e.input.trim()) || chronological[chronological.length-1];
+            const title = (first.input || 'Cuộc trò chuyện').slice(0,60) + (first.input && first.input.length>60 ? '...' : '');
+            const timeLabel = new Date(sess.newestTs).toLocaleString();
+            const li = document.createElement('li');
+            li.dataset.session = sess.sid;
+            li.innerHTML = `<div style="display:flex; flex-direction:column; gap:4px;">
+                <div style="font-size:13px; color:var(--text-color); font-weight:600;">${escapeHtml(title)}</div>
+                <div style="font-size:11px; color:var(--text-secondary-color);">${escapeHtml(timeLabel)} • ${sess.entries.length} lượt</div>
+              </div>`;
+            li.onclick = () => openConversation(sess.sid);
+            historyListEl.appendChild(li);
+          });
+          historyActionsEl.innerHTML = ''; // bỏ nút cũ
         }
 
-        function openHistoryItem(id) {
-            const item = historyCache.find(h => String(h.id) === String(id));
-            if (!item) return;
-            chatMessages.innerHTML = '';
-            const userHtml = `<div class="chat-bubble user-bubble"><div class="user-bubble-content"><p>${escapeHtml(item.input || '')}</p></div></div>`;
-            chatMessages.innerHTML += userHtml;
-            const replyContent = escapeHtml(item.reply || item.diagnosis || '');
-            const botHtml = `<div class="chat-bubble bot-bubble">
-                                <div class="diagnosis-details">
-                                    <h3>Kết quả trước đó</h3>
-                                    <div style="font-size:13px; color:var(--text-secondary-color); margin-bottom:8px;">${new Date(item.timestamp).toLocaleString()} • ${escapeHtml(item.modelUsed || '')} • ${escapeHtml(item.type || '')}</div>
-                                    <div style="white-space:pre-wrap; font-size:14px; color:var(--text-color);">${replyContent}</div>
-                                </div>
-                             </div>`;
-            chatMessages.innerHTML += botHtml;
-            chatMessages.scrollTop = chatMessages.scrollHeight;
+        // Mở toàn bộ cuộc trò chuyện
+        function openConversation(sessionId) {
+          const convoEntries = historyCache.filter(e => (e.sessionId || ('legacy-'+e.id)) === sessionId)
+            .sort((a,b)=> new Date(a.timestamp)-new Date(b.timestamp));
+          if (!convoEntries.length) return;
+          chatMessages.innerHTML = '';
+          convoEntries.forEach(entry => {
+            // User bubble
+            if (entry.input) {
+              chatMessages.innerHTML += `<div class="chat-bubble user-bubble"><div class="user-bubble-content"><p>${escapeHtml(entry.input)}</p></div></div>`;
+            }
+            // Bot / kết quả
+            if (entry.type === 'diagnose') {
+              chatMessages.innerHTML += `<div class="chat-bubble bot-bubble">
+                <div class="diagnosis-details">
+                  <div style="font-size:12px; color:var(--text-secondary-color); margin-bottom:6px;">Diagnose • ${new Date(entry.timestamp).toLocaleString()}</div>
+                  ${convertMarkdown(entry.diagnosis || '')}
+                </div>
+              </div>`;
+            } else {
+              chatMessages.innerHTML += `<div class="chat-bubble bot-bubble">
+                <div class="diagnosis-details">
+                  <div style="font-size:12px; color:var(--text-secondary-color); margin-bottom:6px;">Chat • ${new Date(entry.timestamp).toLocaleString()}</div>
+                  ${convertMarkdown(entry.reply || '')}
+                </div>
+              </div>`;
+            }
+          });
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+          currentSessionId = sessionId; // tiếp tục vào phiên này nếu người dùng muốn
+          localStorage.setItem('jaremis_session', currentSessionId);
         }
 
         // ------------------------------
@@ -1299,16 +1367,11 @@
         async function submitData() {
             const labResults = chatInput.value.trim();
             const images = imageInput.files;
-
             if (!labResults && images.length === 0) return;
-
-            if (isRecording && recognition) {
-                stopRecognition();
+            if (!currentSessionId) {
+                currentSessionId = 'sess-' + Date.now();
+                localStorage.setItem('jaremis_session', currentSessionId);
             }
-
-            sendBtn.disabled = true;
-            const currentUser = getLocalUser();
-
             // 1. Display user bubble
             let userHtml = `<div class="chat-bubble user-bubble"><div class="user-bubble-content">`;
             if (labResults) userHtml += `<p>${escapeHtml(labResults)}</p>`;
@@ -1320,6 +1383,7 @@
                 imagePreviews += '</div>';
                 userHtml += imagePreviews;
             }
+            const currentUser = getLocalUser();
             if (currentUser) {
                 userHtml += `<div style="margin-top:8px; font-size:12px; color:var(--text-secondary-color)">Đã gửi bởi: ${escapeHtml(currentUser.username)}</div>`;
             }
@@ -1344,6 +1408,7 @@
                     if (labResults) formData.append('labResults', labResults);
                     Array.from(images).forEach(img => formData.append('images', img));
                     formData.append('model', useProModel ? 'pro' : 'flash');
+                    formData.append('sessionId', currentSessionId);
                     if (currentUser) formData.append('submittedBy', currentUser.username);
 
                     const analysisPromise = animateAnalysisSteps(loadingBubble);
@@ -1360,7 +1425,7 @@
                     if (currentUser) fetchAndRenderHistory(currentUser.username);
                 } else {
                     // Chat flow
-                    const body = { message: labResults, model: useProModel ? 'pro' : 'flash' };
+                    const body = { message: labResults, model: useProModel ? 'pro' : 'flash', sessionId: currentSessionId };
                     if (currentUser) body.submittedBy = currentUser.username;
                     if (images.length > 0) body.imagesCount = images.length;
 
@@ -1481,15 +1546,135 @@
         }
 
         // ------------------------------
-        // Keyboard send
+        // Keyboard & Shortcuts (Ctrl-based)
         // ------------------------------
-        chatInput.addEventListener('keydown', (e) => {
-            }
-        );
+        (function(){
+  const chatInputEl = document.getElementById('chat-input');
+  const fileInputEl = document.getElementById('images');
+  const modeBtn = document.getElementById('mode-btn');
+  const thinkBtn = document.getElementById('think-btn');
+  const micBtn = document.getElementById('mic-btn');
+  const newChatBtn = document.querySelector('.new-chat-btn');
 
-        // ------------------------------
-        // Sidebar resize logic
-        // ------------------------------
+  function safe(fn){ return e => { try{ fn(e); } catch(err){ console.warn('Shortcut error', err); } }; }
+
+  // Enter gửi / Shift+Enter xuống dòng
+  if (chatInputEl){
+    chatInputEl.addEventListener('keydown', safe(e=>{
+      if (e.isComposing) return;
+      if (e.key === 'Enter'){
+        if (e.shiftKey) return;
+        e.preventDefault();
+        submitData();
+      }
+    }));
+  }
+
+  function getLocalUser(){
+    try { return JSON.parse(localStorage.getItem('jaremis_user')||'null'); } catch(_){ return null; }
+  }
+
+  async function clearHistoryShortcut(){
+    const u = getLocalUser();
+    if (!u) { flashNotice('Chưa đăng nhập'); return; }
+    if (!confirm('Xóa toàn bộ lịch sử?')) return;
+    try {
+      const res = await fetch('/api/history?username='+encodeURIComponent(u.username), { method:'DELETE' });
+      if (!res.ok){ flashNotice('Lỗi xóa lịch sử'); return; }
+      historyCache = [];
+      renderHistoryList([]);
+      flashNotice('Đã xóa lịch sử');
+    } catch(err){ flashNotice('Lỗi mạng khi xóa'); }
+  }
+
+  function logoutShortcut(){
+    const u = getLocalUser();
+    if (!u){ flashNotice('Chưa đăng nhập'); return; }
+    localStorage.removeItem('jaremis_user');
+    historyCache = [];
+    renderHistoryList([]);
+    renderAuthControls && renderAuthControls();
+    flashNotice('Đã đăng xuất',1500);
+  }
+
+  function openLoginShortcut(){
+    const u = getLocalUser();
+    if (u){ flashNotice('Đã đăng nhập'); return; }
+    openAuthModal();
+  }
+
+  function showShortcutHelp(){
+    const listHtml = SHORTCUTS
+      .filter(s=>s.desc && s.combo !== 'Ctrl+/')
+      .map(s=>`<li><code style="background:#111;padding:2px 6px;border-radius:4px;">${s.combo}</code> - ${escapeHtml(s.desc)}</li>`)
+      .join('');
+    flashNotice('Phím tắt:<br><ul style="padding-left:18px;margin:6px 0;">'+listHtml+'</ul>', 6000);
+  }
+
+  // Danh sách phím tắt (toàn bộ dùng Ctrl)
+  const SHORTCUTS = [
+    { combo:'Ctrl+D', action: ()=>toggleMode(), desc:'Bật/tắt Diagnose' },
+    { combo:'Ctrl+T', action: ()=>toggleThink(), desc:'Bật/tắt Think / Pro' },
+    { combo:'Ctrl+M', action: ()=>toggleMic(), desc:'Ghi âm' },
+    { combo:'Ctrl+U', action: ()=>fileInputEl && fileInputEl.click(), desc:'Đính kèm ảnh' },
+    { combo:'Ctrl+N', action: ()=>startNewConversation(), desc:'Cuộc trò chuyện mới' },
+    { combo:'Ctrl+L', action: ()=>openLoginShortcut(), desc:'Mở hộp đăng nhập' },
+    { combo:'Ctrl+X', action: ()=>clearHistoryShortcut(), desc:'Xóa lịch sử' },
+    { combo:'Ctrl+Q', action: ()=>logoutShortcut(), desc:'Đăng xuất' },
+    { combo:'Ctrl+G', action: ()=>chatInputEl && chatInputEl.focus(), desc:'Focus ô nhập' },
+    { combo:'Ctrl+/', action: ()=>showShortcutHelp(), desc:'Hiện danh sách phím tắt' }
+  ];
+
+  function parseCombo(str){
+    const parts = str.toLowerCase().split('+').map(s=>s.trim());
+    return {
+      ctrl: parts.includes('ctrl'),
+      alt: parts.includes('alt'),
+      shift: parts.includes('shift'),
+      key: parts.find(p=>!['ctrl','alt','shift'].includes(p))
+    };
+  }
+  const parsedShortcuts = SHORTCUTS.map(s=>({...s, parsed: parseCombo(s.combo)}));
+
+  function matchShortcut(e, p){
+    if (p.ctrl !== e.ctrlKey) return false;
+    if (p.alt  !== e.altKey) return false;
+    if (p.shift!== e.shiftKey) return false;
+    return e.key.toLowerCase() === p.key;
+  }
+
+  document.addEventListener('keydown', safe(e=>{
+    parsedShortcuts.forEach(sc=>{
+      if (matchShortcut(e, sc.parsed)){
+        // Tránh xung đột copy/paste? (ở đây chặn tất cả vì dùng tổ hợp riêng)
+        e.preventDefault();
+        sc.action();
+      }
+    });
+  }));
+
+  // Cập nhật tooltip
+  function augmentTitles(){
+    if (modeBtn)  modeBtn.title  = (diagnosticMode ? 'Chế độ: Diagnose' : 'Chế độ: Chat') + ' (Ctrl+D)';
+    if (thinkBtn) thinkBtn.title = 'Think / Pro (Ctrl+T)';
+    if (micBtn)   micBtn.title   = 'Ghi âm (Ctrl+M)';
+    if (newChatBtn) newChatBtn.title = 'Cuộc trò chuyện mới (Ctrl+N)';
+    if (fileInputEl){
+      // Nút paperclip là action-btn đầu tiên
+      const attachBtn = document.querySelector('#tool-buttons .action-btn:first-child');
+      if (attachBtn) attachBtn.title = 'Đính kèm ảnh (Ctrl+U)';
+      fileInputEl.title = 'Đính kèm ảnh (Ctrl+U)';
+    }
+    const sendBtn = document.getElementById('send-btn');
+    if (sendBtn) sendBtn.title = 'Gửi (Enter) – Xuống dòng: Shift+Enter';
+  }
+  document.addEventListener('DOMContentLoaded', augmentTitles);
+})();
+// ------------------------------
+// End Keyboard & Shortcuts
+// ------------------------------
+
+        /* Sidebar resize logic */
         const sidebar = document.getElementById('sidebar');
         const resizer = document.getElementById('resizer');
 
