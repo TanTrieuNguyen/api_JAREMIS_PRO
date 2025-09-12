@@ -718,10 +718,10 @@
                     <i class="fas fa-plus"></i>
                     <span>Cuộc trò chuyện mới</span>
                 </button>
-                <button id="find-btn" class="new-chat-btn" onclick="openFindModal()" title="Tìm trong cuộc trò chuyện (Ctrl+F)">
+                <button id="find-btn" class="new-chat-btn" onclick="openFindModal()" title="Tìm trong cuộc trò chuyện (Ctrl+Shift+F)">
                   <i class="fas fa-search"></i>
                   <span>Tìm kiếm</span>
-                  <span style="margin-left:auto;font-size:11px;opacity:.6;">Ctrl+F</span>
+                  <span style="margin-left:auto;font-size:11px;opacity:.6;">Ctrl+Shift+F</span>
                 </button>
             </div>
             <nav class="history">
@@ -1662,7 +1662,7 @@
     { combo:'Ctrl+Q', action: ()=>logoutShortcut(), desc:'Đăng xuất' },
     { combo:'Ctrl+G', action: ()=>chatInputEl && chatInputEl.focus(), desc:'Focus ô nhập' },
     { combo:'Ctrl+/', action: ()=>showShortcutHelp(), desc:'Hiện danh sách phím tắt' },
-    { combo:'Ctrl+F', action:()=>openFindModal(), desc:'Tìm trong cuộc trò chuyện' }
+    { combo:'Ctrl+Shift+F', action:()=>openFindModal(), desc:'Tìm trong cuộc trò chuyện' }
   ];
 
   function parseCombo(str){
