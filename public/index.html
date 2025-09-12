@@ -56,7 +56,14 @@
         .resizer { width: 5px; cursor: col-resize; background-color: transparent; flex-shrink: 0; position: relative; z-index: 10; }
         .resizer:hover { background-color: var(--accent-color); }
 
-        .sidebar-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; gap:8px; }
+        .sidebar-header {
+          display:flex;
+          flex-direction:column;
+          align-items:stretch;
+          gap:8px;
+          margin-bottom:12px;
+        }
+
         .new-chat-btn {
             display:flex; align-items:center; gap:8px; width:100%; padding:10px; background:transparent; color:var(--text-color);
             border:1px solid var(--border-color); border-radius:6px; font-size:14px; cursor:pointer;
@@ -711,6 +718,11 @@
                     <i class="fas fa-plus"></i>
                     <span>Cuộc trò chuyện mới</span>
                 </button>
+                <button id="find-btn" class="new-chat-btn" onclick="openFindModal()" title="Tìm trong cuộc trò chuyện (Ctrl+F)">
+                  <i class="fas fa-search"></i>
+                  <span>Tìm kiếm</span>
+                  <span style="margin-left:auto;font-size:11px;opacity:.6;">Ctrl+F</span>
+                </button>
             </div>
             <nav class="history">
                 <h3>
@@ -850,6 +862,33 @@
                 <div class="small-muted">Bằng cách đăng ký, bạn đồng ý thử nghiệm tính năng.</div>
             </div>
         </div>
+    </div>
+
+    <div class="modal-backdrop" id="find-backdrop" style="display:none;">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="find-title">
+        <h3 id="find-title" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>Tìm kiếm</span>
+          <button class="btn-ghost" style="padding:4px 10px;font-size:14px;" onclick="closeFindModal()" title="Đóng (Esc)">&times;</button>
+        </h3>
+        <div class="form-row" style="margin-bottom:10px;">
+          <input id="find-query" placeholder="Nhập từ khóa... (Enter=Tiếp, Shift+Enter=Trước)" style="background:#071018;">
+        </div>
+        <div class="form-row" style="flex-direction:row;align-items:center;gap:14px;margin-bottom:12px;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;">
+            <input type="checkbox" id="find-case"> Phân biệt hoa/thường
+          </label>
+          <div id="find-count" style="margin-left:auto;font-size:12px;color:var(--text-secondary-color);">0 / 0</div>
+        </div>
+        <div class="form-actions" style="justify-content:flex-start;gap:8px;">
+          <button class="btn-ghost" onclick="findPrev()" title="Trước (Shift+Enter)">Trước</button>
+          <button class="btn-primary" onclick="findNext()" title="Tiếp (Enter)">Tiếp</button>
+          <button class="btn-ghost" onclick="clearFindHighlights()" title="Xóa highlight">Xóa</button>
+          <button class="btn-ghost" onclick="closeFindModal()" title="Đóng (Esc)">Đóng</button>
+        </div>
+        <div class="small-muted" style="margin-top:10px;">
+          Ctrl+F mở • Enter=Tiếp • Shift+Enter=Trước • Esc=Đóng
+        </div>
+      </div>
     </div>
 
     <script>
@@ -1622,7 +1661,8 @@
     { combo:'Ctrl+X', action: ()=>clearHistoryShortcut(), desc:'Xóa lịch sử' },
     { combo:'Ctrl+Q', action: ()=>logoutShortcut(), desc:'Đăng xuất' },
     { combo:'Ctrl+G', action: ()=>chatInputEl && chatInputEl.focus(), desc:'Focus ô nhập' },
-    { combo:'Ctrl+/', action: ()=>showShortcutHelp(), desc:'Hiện danh sách phím tắt' }
+    { combo:'Ctrl+/', action: ()=>showShortcutHelp(), desc:'Hiện danh sách phím tắt' },
+    { combo:'Ctrl+F', action:()=>openFindModal(), desc:'Tìm trong cuộc trò chuyện' }
   ];
 
   function parseCombo(str){
@@ -1953,6 +1993,162 @@
     };
   }
 })();
+</script>
+<script>
+// ==== FIND MODAL (Word-like) ====
+let findMatches = [];
+let currentFindIndex = -1;
+let lastFindQuery = '';
+let findObserver = null;
+
+function openFindModal(){
+  const b = document.getElementById('find-backdrop');
+  if(!b) return;
+  b.style.display='flex';
+  const inp = document.getElementById('find-query');
+  setTimeout(()=>inp.focus(),30);
+  if(lastFindQuery){ inp.value = lastFindQuery; performFind(lastFindQuery); }
+}
+function closeFindModal(){
+  const b = document.getElementById('find-backdrop');
+  if(b) b.style.display='none';
+  clearFindHighlights();
+}
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape'){
+    const b=document.getElementById('find-backdrop');
+    if(b && b.style.display!=='none'){ closeFindModal(); }
+  }
+});
+
+function performFind(q){
+  lastFindQuery = q;
+  clearFindHighlights(true);
+  if(!q){
+    updateFindCount();
+    return;
+  }
+  const caseSensitive = document.getElementById('find-case')?.checked;
+  let re;
+  try { re = new RegExp(escapeRegExp(q), caseSensitive?'g':'gi'); } catch(_){ return; }
+  const container = document.getElementById('chat-messages');
+  if(!container) return;
+
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+    acceptNode: n=>{
+      if(!n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+      if(n.parentElement && n.parentElement.classList.contains('find-highlight')) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    }
+  });
+  const nodes=[];
+  while(walker.nextNode()) nodes.push(walker.currentNode);
+
+  nodes.forEach(node=>{
+    const txt = node.nodeValue;
+    let m,last=0,frag=document.createDocumentFragment(),found=false;
+    re.lastIndex=0;
+    while((m = re.exec(txt))!==null){
+      found=true;
+      const pre = txt.slice(last,m.index);
+      if(pre) frag.appendChild(document.createTextNode(pre));
+      const span = document.createElement('span');
+      span.className='find-highlight';
+      span.textContent=m[0];
+      frag.appendChild(span);
+      findMatches.push(span);
+      last = m.index + m[0].length;
+      if(m[0].length===0) re.lastIndex++;
+    }
+    if(found){
+      const rest = txt.slice(last);
+      if(rest) frag.appendChild(document.createTextNode(rest));
+      node.parentNode.replaceChild(frag,node);
+    }
+  });
+
+  currentFindIndex = findMatches.length?0:-1;
+  activateCurrentMatch();
+  updateFindCount();
+
+  if(findObserver) findObserver.disconnect();
+  if(q){
+    findObserver = new MutationObserver(()=>{
+      const qq = lastFindQuery;
+      if(qq) performFind(qq);
+    });
+    findObserver.observe(container,{childList:true,subtree:true});
+  }
+}
+
+function findNext(){
+  if(!findMatches.length){
+    performFind(document.getElementById('find-query').value.trim());
+    return;
+  }
+  currentFindIndex = (currentFindIndex+1) % findMatches.length;
+  activateCurrentMatch();
+  updateFindCount();
+}
+function findPrev(){
+  if(!findMatches.length){
+    performFind(document.getElementById('find-query').value.trim());
+    return;
+  }
+  currentFindIndex = (currentFindIndex-1 + findMatches.length) % findMatches.length;
+  activateCurrentMatch();
+  updateFindCount();
+}
+
+function activateCurrentMatch(){
+  findMatches.forEach(s=>s.classList.remove('active'));
+  if(currentFindIndex>=0 && findMatches[currentFindIndex]){
+    const el = findMatches[currentFindIndex];
+    el.classList.add('active');
+    const container = document.getElementById('chat-messages');
+    const rect = el.getBoundingClientRect();
+    const cRect = container.getBoundingClientRect();
+    const scrollTo = rect.top - cRect.top + container.scrollTop - (container.clientHeight/2) + rect.height/2;
+    container.scrollTo({ top: scrollTo, behavior:'smooth' });
+  }
+}
+
+function updateFindCount(){
+  const el = document.getElementById('find-count');
+  if(!el) return;
+  if(!findMatches.length) el.textContent='0 / 0';
+  else el.textContent=(currentFindIndex+1)+' / '+findMatches.length;
+}
+
+function clearFindHighlights(keepObs){
+  if(findObserver && !keepObs){ findObserver.disconnect(); findObserver=null; }
+  if(!findMatches.length) return;
+  findMatches.forEach(span=>{
+    if(span.parentNode){
+      span.parentNode.replaceChild(document.createTextNode(span.textContent), span);
+    }
+  });
+  findMatches=[];
+  currentFindIndex=-1;
+  updateFindCount();
+}
+
+function escapeRegExp(str){ return str.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  const q=document.getElementById('find-query');
+  if(q){
+    q.addEventListener('input', e=>performFind(e.target.value.trim()));
+    q.addEventListener('keydown', e=>{
+      if(e.key==='Enter'){
+        e.preventDefault();
+        if(e.shiftKey) findPrev(); else findNext();
+      }
+    });
+  }
+  const c=document.getElementById('find-case');
+  if(c){ c.addEventListener('change', ()=>performFind(q.value.trim())); }
+});
 </script>
 </body>
 </html>
