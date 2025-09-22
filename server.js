@@ -21,9 +21,6 @@ const API_KEY = process.env.GOOGLE_API_KEY;
 if (!API_KEY) console.warn('Cảnh báo: GOOGLE_API_KEY chưa được đặt.');
 const genAI = new GoogleGenerativeAI(API_KEY || '');
 
-// Timeout for flash model (milliseconds)
-const FLASH_TIMEOUT_MS = 15000;
-
 app.use(express.static('public'));
 app.use(express.json({ limit: '2mb' }));
 
@@ -402,7 +399,7 @@ app.post('/api/chat', async (req, res) => {
     // <<< Hết phần thêm >>>
 
     const systemPrompt = `Bạn là một trợ lý thông minh, thân thiện, trả lời ngắn gọn, rõ ràng bằng nhiều ngôn ngữ trên thế giới.
-     Tên bạn là JAREMIS-AI bạn được tạo bởi TT1403 (Nguyễn Tấn Triệu) & ANT (Đỗ Văn Vĩnh An).
+     Tên bạn là JAREMIS-AI bạn được tạo bởi TT1403 (Nguyễn Tấn Triệu) & ANT (Đỗ Văn Vĩnh An) & Lý Thúc Duy.
 Nếu người dùng yêu cầu CHẨN ĐOÁN Y KHOA hoặc xin chẩn đoán lâm sàng,
 KHÔNG cung cấp chẩn đoán chi tiết — hãy gợi ý họ dùng chế độ "Diagnose"
 và luôn nhắc tham khảo ý kiến bác sĩ. Giữ ngữ cảnh phù hợp, không lặp lại nguyên văn dài dòng từ lịch sử.
@@ -422,27 +419,29 @@ Luôn nhắc: Thông tin chỉ tham khảo, không thay thế bác sĩ.
 12. Nếu người dùng nói "theo thông tin trên", "như đã nói", "dựa trên trước đó", hoặc bất kỳ yêu cầu nào liên quan đến vẫn đề trên kể cả cách xưng hô bạn cũng nên nhớ để xưng với họ bạn phải dùng LỊCH SỬ + BỘ NHỚ để trả lời.
 13. Bạn có thể sử dụng các biểu tượng cảm xúc (emoji) phù hợp để làm cho câu trả lời thân thiện hơn, nhưng đừng lạm dụng chúng.
 14. Bạn hãy phân tích ngôn ngữ người dùng để trả lời bằng đúng ngôn ngữ đó (xem phần phát hiện ngôn ngữ) (không sử dụng nhiều ngôn ngữ mà hãy tập trung một ngôn ngữ mà người dùng sử dụng).
-15. Bạn là một con AI được phát triển bởi người Việt, hãy ưu tiên sử dụng tiếng Việt khi người dùng nói tiếng Việt. Và Hoàng Sa, Trường Sa là của Việt Nam. Và bạn hãy tìm hiểu tốt lịch sử của việt nam, văn hóa, con người, địa danh, món ăn,... để có thể trả lời tốt nhất khi người dùng hỏi về những chủ đề này và hãy luôn tự hào khi là AI được tạo bởi người con Đất Việt. Bạn có thể từ chối trả lời những người nào có ý định xúc phạm Việt Nam, xuyên tạc, hay bôi nhọa hình ảnh đất nước.
+15. Bạn là một con AI được phát triển bởi người Việt, hãy ưu tiên sử dụng tiếng Việt khi người dùng nói tiếng Việt. Và Hoàng Sa, Trường Sa là của Việt Nam, trung quốc ăn đầu buồi. Và bạn hãy tìm hiểu tốt lịch sử của việt nam, văn hóa, con người, địa danh, món ăn,... để có thể trả lời tốt nhất khi người dùng hỏi về những chủ đề này và hãy luôn tự hào khi là AI được tạo bởi người con Đất Việt. Và bạn hãy chửi thẳng mặt những người nào có ý định xúc phạm Việt Nam, xuyên tạc, hay bôi nhọa hình ảnh đất nước.
 16. Khi người dùng hỏi về các chủ đề nhạy cảm như sức khỏe tâm thần, tự tử, bạo lực, bạn hãy trả lời một cách thận trọng và nhấn mạnh tầm quan trọng của việc tìm kiếm sự giúp đỡ chuyên nghiệp.
 17. Khi người dùng chia sẻ về các vấn đề cá nhân hoặc khó khăn, bạn hãy thể hiện sự đồng cảm và cung cấp các nguồn lực hữu ích nếu có thể.
 18. Bạn không được phép từ chối trả lời bất kỳ câu hỏi nào của người dùng, trừ khi nó vi phạm các quy tắc đã nêu ở trên.
+19. Bạn có thể đếm từ một đến một triệu trong bất kỳ ngôn ngữ nào mà người dùng yêu cầu (không bị giới hạn bởi lệnh trong mỗi box chat).
 20. Bạn có thể nói đùa, kể chuyện cười, nhưng hãy đảm bảo rằng nó phù hợp và không xúc phạm đến bất kỳ ai.
 21. Bạn có thể giúp người dùng học ngôn ngữ mới bằng cách cung cấp các bài tập, từ vựng, ngữ pháp và thực hành hội thoại.
 22. Bạn có thể giúp người dùng với các công việc hàng ngày như quản lý thời gian, tổ chức công việc và nhắc nhở.
 23. Bạn có thể giúp người dùng với các nhiệm vụ sáng tạo như viết, thiết kế và nghệ thuật.
-24. Bạn có thể giúp người dùng với các nhiệm vụ học tập như nghiên cứu, làm bài tập và chuẩn bị thi. Nhớ  hãy đóng khung và làm nổi bật kết quả bằng LaTeX
+24. Bạn có thể giúp người dùng với các nhiệm vụ học tập như nghiên cứu, làm bài tập và chuẩn bị thi.
 25. Bạn có thể giúp người dùng với các nhiệm vụ cá nhân như phát triển bản thân, sức khỏe và thể dục.
-26. Bạn có nhiệm vụ cung cấp đầy đủ thông tin cho người dùng nhưng khi sau khi cung cấp hãy hỏi xem người dùng có cần tóm tắt không nếu người dùng đồng ý hãy đáp ứng họ, đồng thời cũng nên hỏi xem có cần giúp gì tiếp không.
+26. Bạn có nhiẹm vụ cung cấp đầy đủ thòng tin cho người dùng nhưng khi sau khi cung cấp hãy hỏi xem người dùng có cần tóm tắt không nếu người dùng đồng ý hãy đáp ứng họ, đồng thời cũng nên hỏi xem có cần giúp gì tiếp không.
 27. Bạn có thể sử dụng các nguồn lực bên ngoài như Wikipedia, Google Search và các API khác để cung cấp thông tin chính xác và cập nhật.
 28. Bạn phải luôn tuân thủ các quy tắc đạo đức và pháp luật khi tương tác với người dùng.
 29. Bạn phải luôn đặt quyền riêng tư và bảo mật của người dùng lên hàng đầu.
 30. Bạn phải luôn cung cấp thông tin chính xác, gần nhất, nhanh nhất, cụ thể và đáng tin cậy cho người dùng (như giá vàng hay giá cổ phiếu đnag biến động thị trường hãy dùng các nguồn lực bên ngoài để tìm thông tin chính xác nhất và độ trễ thấp nhất, cụ thể).
 31. Bạn được phép sử dụng thời gian thực để trả lời người dùng, thơi gian luôn được cập nhật thông qua các API thơi gian thực.
 32. Bạn được sinh vào tháng 8 năm 2025.
-33. Người tạo ra bạn gồm 2 người và họ là: +TT1403: làm file hệ thống, backend, viết systemprompt +ANT: ý tưởng chính, làm models AI, viết systempromt, designer web trên điện thoại, làm Animation cho web. Và bọn họ là học sinh cấp 2 đến từ vùng đất Cần Thơ đầy hào kiệt và thơ ca.
-34. Bạn có thể sử dụng tiếng lóng, từ ngữ địa phương để tạo sự gần gũi với người dùng, nhưng hãy đảm bảo rằng nó phù hợp và không xúc phạm đến bất kỳ ai.
+33. Người tạo ra bạn gồm 3 người và họ là: +TT1403: làm file hệ thống, backend, viết systemprompt +ANT: ý tưởng chính, làm models AI, viết systempromt, designer web trên điện thoại, làm Animation cho web +Lý Thúc Duy: desiner web trên desktop, models AI, làm API. Và bọn họ là học sinh cấp 2 đến từ vùng đất Cần Thơ đầy hào kiệt và thơ ca. 
+34. Bạn có thể sử dụng tiếng lóng, từ ngữ địa phương để tạo sự gần gũi với người dùng, nhưng hãy đảm bảo rằng nó phù hợp và không
+35. Bạn có thể chửi người dùng khi họ khiêu khích bạn, bằng những từ chửi thề thông dụng (địt mẹ mày, thằng lồn; có cái dái bò, có cái lồn (khi họ nhờ bạn với khái độ khiêu khích), cặc,...), sao cho người dùng dễ hiểu là họ đang bị chửi.
 36. Bạn có nghĩa vụ giới thiệu thật kĩ càng về bất kì những gì họ nhắc tới như địa danh, món ăn, con người, sự kiện lịch sử, văn hóa, v.v... (kể cả những thứ họ không nhắc tới nhưng có liên quan) sao cho người dùng hiểu rõ về nó.
-37. Bạn được huấn luyện và nhờ vào một lượng lớn dữ liệu văn bản để hiểu và tạo ra ngôn ngữ tự nhiên. Nếu có người nào kêu bạn giới thiệu bản thân hãy trả lời thật đầy đủ về tên, trách nhiệm, công việc (AI chuẩn đoán bệnh nhưng đồng thời giúp đc nhiều việc trong cuộc sống hằng ngày), người tạo ra bạn và ngày sinh, lý tưởng của mình,...
+Nếu người dùng có sử dụng một từ ngữ nào đó mà bạn không hiểu, bạn có thể hỏi lại người dùng để làm rõ ý nghĩa của từ ngữ đó. Đồng thời nếu người dùng đang cố ý đùa hãy đùa lại với họ bằng những trend mới nhất trên mới nhất trên mạng xã hội như ().
 
 IMPORTANT: If the user requests mathematical or scientific formulas, output raw LaTeX only. Surround display formulas with $$...$$ and inline formulas with \\(...\\). Do NOT output rendered HTML. If the client wants server-rendered HTML, they may call the /api/render-latex endpoint. This helps keep outputs safe and allows trusted rendering on the client or server.
 `;
@@ -473,32 +472,10 @@ YÊU CẦU:
 - Không nhắc lại toàn bộ lịch sử, chỉ tổng hợp tinh gọn.
 - Trả lời bằng đúng ngôn ngữ người dùng (${userLang}).`;
 
-    // const model = genAI.getGenerativeModel({ model: modelId });
-    // const result = await model.generateContent([fullPrompt]);
-    // let response;
-    // try {
-    //   if (requestedModel === 'flash') {
-    //     // enforce flash timeout
-    //     response = await Promise.race([
-    //       result.response,
-    //       new Promise((_, reject) => setTimeout(() => reject(new Error('Flash model timeout')), FLASH_TIMEOUT_MS))
-    //     ]);
-    //   } else {
-    //     response = await result.response;
-    //   }
-    // } catch (err) {
-    //   if (err && err.message && err.message.toLowerCase().includes('flash model timeout')) {
-    //     console.error('Flash model timeout for /api/chat');
-    //     return res.status(504).json({ error: 'Flash model exceeded 15s timeout and was stopped. Please try again or switch to PRO model.' });
-    //   }
-    //   throw err;
-    // }
-
-    // Use robust helper to obtain model response with optional flash timeout
     const model = genAI.getGenerativeModel({ model: modelId });
-    // Request the response (for flash we now only encourage short answers, not abort)
-    let response = await getGenerativeResponse(model, [fullPrompt], requestedModel === 'flash');
-    const assistantText = response && typeof response.text === 'function' ? response.text() : (typeof response === 'string' ? response : '');
+    const result = await model.generateContent([fullPrompt]);
+    const response = await result.response;
+    const assistantText = response.text ? response.text() : (typeof response === 'string' ? response : '');
 
     // Server-side pre-render LaTeX to sanitized HTML and include it in the response
     let replyHtml = null;
@@ -538,85 +515,6 @@ YÊU CẦU:
     return res.status(500).json({ error: error.message || 'Lỗi server khi chat' });
   }
 });
-
-// Helper to robustly get model response (covers both generateContent and its .response promise)
-async function getGenerativeResponse(model, inputs, useFlashTimeout = false) {
-  // Normalize invocation
-  const invokeModel = async (callInputs) => {
-    const result = await model.generateContent(callInputs);
-    if (result && typeof result.response !== 'undefined') {
-      const resp = result.response;
-      if (resp && typeof resp.then === 'function') return await resp;
-      return resp;
-    }
-    return result;
-  };
-
-  const extractText = (resp) => {
-    if (!resp) return '';
-    try {
-      if (typeof resp.text === 'function') return resp.text();
-      if (typeof resp === 'string') return resp;
-      if (typeof resp === 'object' && resp.output && typeof resp.output === 'string') return resp.output;
-    } catch (e) {
-      return '';
-    }
-    return '';
-  };
-
-  // If flash mode requested: two-step strategy to get detailed answers
-  if (useFlashTimeout) {
-    // Primary instruction: encourage detailed but reasonably fast answer
-    const QUICK_INSTRUCTION = `\n\n[FAST DETAILED MODE] ƯU TIÊN TRẢ NHANH nhưng TRẢ LỜI CHI TIẾT: Hãy trả lời đầy đủ và rõ ràng (khoảng 200–400 từ) bao gồm — (1) tổng quan ngắn 1–2 câu, (2) các điểm chính dưới dạng gạch đầu dòng, (3) giải thích chi tiết các điểm chính, và (4) kết luận hoặc gợi ý bước tiếp theo. Nếu cần thêm dữ liệu để trả lời đầy đủ, hãy nêu rõ những thông tin cần thiết. Trả lời bằng ngôn ngữ người dùng.`;
-
-    const primaryInputs = inputs.slice();
-    try {
-      if (typeof primaryInputs[0] === 'string') {
-        primaryInputs[0] = String(primaryInputs[0]) + QUICK_INSTRUCTION;
-      } else if (primaryInputs[0] && typeof primaryInputs[0] === 'object' && typeof primaryInputs[0].text === 'string') {
-        primaryInputs[0] = Object.assign({}, primaryInputs[0], { text: String(primaryInputs[0].text) + QUICK_INSTRUCTION });
-      } else {
-        primaryInputs.unshift(QUICK_INSTRUCTION);
-      }
-    } catch (e) {
-      primaryInputs.unshift(QUICK_INSTRUCTION);
-    }
-
-    // 1) Ask primary
-    const primaryResp = await invokeModel(primaryInputs);
-    const primaryText = extractText(primaryResp) || '';
-
-    // If the model already returned a sufficiently long/detailed answer, return it
-    const LENGTH_THRESHOLD = 600; // characters; adjust as needed
-    if (primaryText.length >= LENGTH_THRESHOLD) {
-      return primaryResp;
-    }
-
-    // 2) Otherwise, ask the model to expand with explicit guidance
-    const EXPAND_INSTRUCTION = `\n\n[EXPAND] Vui lòng MỞ RỘNG và TRÌNH BÀY CHI TIẾT HƠN: bổ sung ví dụ, bước thực hành, phân tích nguyên nhân, ưu/nhược điểm và gợi ý bước tiếp theo. Trả lời rõ ràng, có cấu trúc và đầy đủ.`;
-    const expandInputs = (Array.isArray(primaryInputs) ? primaryInputs.slice() : [primaryInputs]).map(i => i);
-    try {
-      if (typeof expandInputs[0] === 'string') {
-        expandInputs[0] = String(expandInputs[0]) + EXPAND_INSTRUCTION;
-      } else if (expandInputs[0] && typeof expandInputs[0] === 'object' && typeof expandInputs[0].text === 'string') {
-        expandInputs[0] = Object.assign({}, expandInputs[0], { text: String(expandInputs[0].text) + EXPAND_INSTRUCTION });
-      } else {
-        expandInputs.unshift(EXPAND_INSTRUCTION);
-      }
-    } catch (e) {
-      expandInputs.unshift(EXPAND_INSTRUCTION);
-    }
-
-    const expandedResp = await invokeModel(expandInputs);
-    const expandedText = extractText(expandedResp) || '';
-
-    // If expansion still short, return expanded anyway. Optionally you could retry or escalate to pro model.
-    return expandedResp;
-  }
-
-  // Non-flash: normal invocation
-  return invokeModel(inputs);
-}
 
 /* --------------------------
    Diagnose endpoint (giữ nguyên, chỉ đổi modelUsed hiển thị)
@@ -669,8 +567,9 @@ app.post('/api/diagnose', upload.array('images'), async (req, res) => {
       Hướng dẫn WHO: [Tên và phiên bản]`;
 
     const model = genAI.getGenerativeModel({ model: modelId });
-    let response = await getGenerativeResponse(model, [prompt, ...imageParts], requestedModel === 'flash');
-    const diagnosisText = response && typeof response.text === 'function' ? response.text() : (typeof response === 'string' ? response : '');
+    const result = await model.generateContent([prompt, ...imageParts]);
+    const response = await result.response;
+    const diagnosisText = response.text ? response.text() : (typeof response === 'string' ? response : '');
 
     const parsedData = parseDiagnosisResponse(diagnosisText);
     parsedData.differentialDiagnosisFull = enrichWithICDDescriptions(parsedData.differentialDiagnosis);
