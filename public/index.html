@@ -715,7 +715,7 @@
         <!-- (XÓA nút cũ ở đây nếu còn) -->
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <button class="new-chat-btn" onclick="startNewConversation()" title="Cuộc trò chuyện mới (Ctrl+Shift+X)">
+                <button class="new-chat-btn" onclick="startNewConversation()">
                     <i class="fas fa-plus"></i>
                     <span>Cuộc trò chuyện mới</span>
                 </button>
@@ -782,22 +782,22 @@
                         </button>
 
                         <div id="tool-buttons" class="tool-buttons collapsed">
-                            <button class="action-btn" id="attach-btn" onclick="document.getElementById('images').click()" title="Đính kèm ảnh (Ctrl+Shift+U)">
+                            <button class="action-btn" onclick="document.getElementById('images').click()" title="Đính kèm ảnh">
                                 <i class="fas fa-paperclip"></i>
                             </button>
-                            <button id="mode-btn" class="action-btn" title="Chế độ: Chat (Ctrl+Shift+K)" onclick="toggleMode(event)">
+                            <button id="mode-btn" class="action-btn" title="Chế độ: Chat (mặc định)" onclick="toggleMode(event)">
                                 <i class="fas fa-comments"></i>
                             </button>
-                            <button id="mic-btn" class="action-btn" title="Ghi giọng nói (Ctrl+M). Nhấn để bắt đầu/dừng" onclick="toggleMic(event)">
+                            <button id="mic-btn" class="action-btn" title="Ghi giọng nói (Vietnamese). Nhấn để bắt đầu/dừng" onclick="toggleMic(event)">
                                 <i class="fas fa-microphone"></i>
                                 <span id="mic-indicator"></span>
                             </button>
-                            <button id="think-btn" class="action-btn" title="Bật Think (Ctrl+Shift+Y)" onclick="toggleThink(event)">
+                            <button id="think-btn" class="action-btn" title="Bật Think (dùng Jaremis Pro 1.5)" onclick="toggleThink(event)">
                                 <i class="fas fa-brain"></i>
                             </button>
                         </div>
 
-                        <button id="send-btn" class="action-btn" onclick="submitData()" title="Gửi (Enter)">
+                        <button id="send-btn" class="action-btn" onclick="submitData()" title="Gửi">
                             <i class="fas fa-paper-plane"></i>
                         </button>
 
@@ -922,63 +922,53 @@
 
         let currentSessionId = null;
 
-        // Mobile sidebar (hamburger) behavior: open/close existing sidebar overlay (no new elements)
-        (function(){
-          const mobileBtn = document.getElementById('mobile-menu-btn');
-          const sidebarEl = document.getElementById('sidebar');
-          const backdrop = document.getElementById('sidebar-backdrop');
-          if (!mobileBtn || !sidebarEl || !backdrop) return;
-
-          function openSidebar(){
-            // use CSS classes expected by stylesheet
-            sidebarEl.classList.add('mobile-open');
-            backdrop.style.display = 'block';
-            backdrop.classList.add('show');
-            document.body.classList.add('no-scroll');
-            mobileBtn.setAttribute('aria-expanded','true');
-            // ensure sidebar receives focus for accessibility
-            setTimeout(()=>{
-              try{ sidebarEl.focus(); }catch(e){}
-            },50);
+        // Khởi tạo session hiện tại
+        document.addEventListener('DOMContentLoaded', () => {
+          if (!localStorage.getItem('jaremis_session')) {
+            localStorage.setItem('jaremis_session', 'sess-' + Date.now());
           }
-
-          function closeSidebar(){
-            sidebarEl.classList.remove('mobile-open');
-            backdrop.classList.remove('show');
-            backdrop.style.display = 'none';
-            document.body.classList.remove('no-scroll');
-            mobileBtn.setAttribute('aria-expanded','false');
+          currentSessionId = localStorage.getItem('jaremis_session');
+          // Thêm lời chào nếu trống
+          if (!chatMessages.innerHTML.trim()) {
+            chatMessages.innerHTML = `<div class="chat-bubble bot-bubble"><strong>Chào bạn 👋 Mình là JAREMIS.</strong><p style="margin-top:8px; color:var(--text-secondary-color);">Bắt đầu cuộc trò chuyện mới.</p></div>`;
           }
+        });
 
-          mobileBtn.addEventListener('click', function(e){
-            e?.preventDefault();
-            if (sidebarEl.classList.contains('open')) closeSidebar();
-            else openSidebar();
-          });
+        // Tạo cuộc trò chuyện mới (giống ChatGPT)
+        function startNewConversation() {
+          currentSessionId = 'sess-' + Date.now();
+          localStorage.setItem('jaremis_session', currentSessionId);
+          chatMessages.innerHTML = `
+            <div class="chat-bubble bot-bubble">
+              <strong>Cuộc trò chuyện mới đã bắt đầu.</strong>
+              <p style="margin-top:8px; color:var(--text-secondary-color);">Hãy nhập câu hỏi đầu tiên của bạn.</p>
+            </div>`;
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
 
-          // Close when clicking backdrop
-          backdrop.addEventListener('click', function(){ closeSidebar(); });
+        // ------------------------------
+        // Helper: Escape HTML
+        // ------------------------------
+        function escapeHtml(unsafe) {
+            if (unsafe === null || unsafe === undefined) return '';
+            return String(unsafe)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
 
-          // Close on Escape (only when sidebar is open)
-          document.addEventListener('keydown', function(e){
-            if (e.key === 'Escape' && sidebarEl.classList.contains('open')) closeSidebar();
-          });
+        // ------------------------------
+        // Auto-resize textarea
+        // ------------------------------
+        function autoResize(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = textarea.scrollHeight + 'px';
+        }
 
-          // When a history item is selected, close the sidebar (history items are <li> children)
-          if (historyListEl){
-            historyListEl.addEventListener('click', function(e){
-              const li = e.target.closest && e.target.closest('li');
-              if (!li) return;
-              // give existing click handler a moment to run (openConversation) then close
-              setTimeout(closeSidebar, 120);
-            });
-          }
-
-          // Responsive cleanup: if resizing to wide view, ensure sidebar overlay is removed
-          function debounce(fn, ms){ let t; return function(){ clearTimeout(t); t = setTimeout(fn, ms); }; }
-          window.addEventListener('resize', debounce(function(){ if (window.innerWidth > 600) closeSidebar(); }, 180));
-        })();
-
+        // ------------------------------
+        // Mode & Think toggles
         // ------------------------------
         function toggleMode(e) {
             e?.preventDefault();
@@ -1415,11 +1405,6 @@
         // Submit: chooses /api/chat or /api/diagnose
         // ------------------------------
         async function submitData() {
-            // Prevent double-submit
-            if (window._currentAbortController) {
-                // If already sending, allow the send button to act as stop
-                return;
-            }
             const labResults = chatInput.value.trim();
             const images = imageInput.files;
             if (!labResults && images.length === 0) return;
@@ -1427,8 +1412,7 @@
                 currentSessionId = 'sess-' + Date.now();
                 localStorage.setItem('jaremis_session', currentSessionId);
             }
-
-            // Build user bubble
+            // 1. Display user bubble
             let userHtml = `<div class="chat-bubble user-bubble"><div class="user-bubble-content">`;
             if (labResults) userHtml += `<p>${escapeHtml(labResults)}</p>`;
             if (images.length > 0) {
@@ -1446,283 +1430,232 @@
             userHtml += `</div></div>`;
             chatMessages.innerHTML += userHtml;
 
-            // Clear input + previews
+            // 2. Clear input + previews
             chatInput.value = '';
             autoResize(chatInput);
             imagePreviewContainer.innerHTML = '';
 
-            // Create loading bubble
+            // 3. Create loading bubble
             const loadingBubble = document.createElement('div');
             loadingBubble.className = 'chat-bubble bot-bubble';
             chatMessages.appendChild(loadingBubble);
             chatMessages.scrollTop = chatMessages.scrollHeight;
 
-            // Setup AbortController so user can stop the response
-            const controller = new AbortController();
-            window._currentAbortController = controller;
-
-            // Toggle send button into stop button
             try {
-                sendBtn.dataset.prevHtml = sendBtn.innerHTML || '';
-                sendBtn.dataset.prevTitle = sendBtn.title || '';
-                sendBtn.innerHTML = '<i class="fas fa-stop"></i>';
-                sendBtn.title = 'Dừng AI (Ctrl+Enter)';
-                sendBtn.onclick = function(e){ e?.preventDefault(); if (window._currentAbortController) window._currentAbortController.abort(); };
-            } catch (e) {}
-
-            // Implement 15s timeout for flash model
-            let flashTimeoutId = null;
-            const modelName = useProModel ? 'pro' : 'flash';
-            if (modelName === 'flash') {
-                // start thinking animation early
-                flashTimeoutId = setTimeout(() => {
-                    try {
-                        if (window._currentAbortController) {
-                            window._currentAbortController.abort();
-                            flashNotice && flashNotice('Flash model exceeded 15s timeout and was stopped.');
-                        }
-                    } catch (e) { /* ignore */ }
-                }, 15000);
-            }
-
-            try {
-                // Show thinking animation while the model is responding
-                startThinking(loadingBubble);
-
                 if (diagnosticMode) {
+                    // Diagnose flow
                     const formData = new FormData();
                     if (labResults) formData.append('labResults', labResults);
                     Array.from(images).forEach(img => formData.append('images', img));
-                    formData.append('model', modelName);
+                    formData.append('model', useProModel ? 'pro' : 'flash');
                     formData.append('sessionId', currentSessionId);
                     if (currentUser) formData.append('submittedBy', currentUser.username);
 
-                    const resp = await fetch('/api/diagnose', { method: 'POST', body: formData, signal: controller.signal });
-                    if (!resp.ok) {
-                        const error = await resp.json().catch(()=>({error:'Lỗi từ server'}));
+                    const analysisPromise = animateAnalysisSteps(loadingBubble);
+                    const fetchPromise = fetch('/api/diagnose', { method: 'POST', body: formData });
+
+                    const [_, response] = await Promise.all([analysisPromise, fetchPromise]);
+
+                    if (!response.ok) {
+                        const error = await response.json().catch(() => ({ error: 'Lỗi không xác định từ máy chủ' }));
                         throw new Error(error.error || 'Lỗi không xác định từ máy chủ');
                     }
-                    const data = await resp.json();
-                    const html = data.diagnosisHtml || convertMarkdown(data.diagnosis || '');
-                    await renderBotReplyAnimated(loadingBubble, html);
+                    const data = await response.json();
+                    displayResults(data, loadingBubble);
                     if (currentUser) fetchAndRenderHistory(currentUser.username);
                 } else {
-                    const body = { message: labResults, model: modelName, sessionId: currentSessionId };
+                    // Chat flow
+                    const body = { message: labResults, model: useProModel ? 'pro' : 'flash', sessionId: currentSessionId };
                     if (currentUser) body.submittedBy = currentUser.username;
                     if (images.length > 0) body.imagesCount = images.length;
 
-                    const resp = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: controller.signal });
+                    const resp = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
                     if (!resp.ok) {
-                        const err = await resp.json().catch(()=>({ error: 'Lỗi từ server' }));
+                        const err = await resp.json().catch(() => ({ error: 'Lỗi từ server' }));
                         throw new Error(err.error || 'Lỗi khi gọi /api/chat');
                     }
                     const data = await resp.json();
-                    const html = data.replyHtml || convertMarkdown(data.reply || data.replyText || '');
-                    await renderBotReplyAnimated(loadingBubble, html);
-                    if (currentUser) fetchAndRenderHistory(currentUser.username);
-                }
-            } catch (err) {
-                if (err && err.name === 'AbortError') {
-                    flashNotice('AI response stopped');
-                    loadingBubble.remove();
-                } else {
-                    showError(err.message || String(err), loadingBubble);
-                }
-            } finally {
-                // cleanup
-                clearTimeout(flashTimeoutId);
-                window._currentAbortController = null;
-                try {
-                    sendBtn.innerHTML = sendBtn.dataset.prevHtml || '<i class="fas fa-paper-plane"></i>';
-                    sendBtn.title = sendBtn.dataset.prevTitle || 'Gửi';
-                    sendBtn.onclick = submitData;
-                    delete sendBtn.dataset.prevHtml; delete sendBtn.dataset.prevTitle;
-                } catch (e) {}
-                imageInput.value = '';
-            }
-        }
+                    // Prefer server-rendered HTML (replyHtml) when available to avoid flicker
+                    let replyHtmlContent = '';
+                    const usedServerReplyHtml = !!data.replyHtml;
+                    if (usedServerReplyHtml) replyHtmlContent = data.replyHtml;
+                    else replyHtmlContent = convertMarkdown(data.reply || data.replyText || '');
+                    loadingBubble.innerHTML = `<div class="diagnosis-details math-rendered">${replyHtmlContent}</div>`;
+                    // Only mark as rendered when server provided rendered HTML; otherwise allow client KaTeX pass
+                    if (usedServerReplyHtml) loadingBubble.dataset.katexRendered = '1';
+                     if (currentUser) fetchAndRenderHistory(currentUser.username);
+                 }
+             } catch (error) {
+                 showError(error.message, loadingBubble);
+             } finally {
+                 sendBtn.disabled = false;
+                 imageInput.value = '';
+             }
+         }
 
-        // Ensure Enter sends (unless Shift+Enter), and support Ctrl+Enter as send as well
-        (function(){
-            try {
-                const ci = document.getElementById('chat-input');
-                if (ci) {
-                    ci.addEventListener('keydown', function(ev){
-                        // don't interfere during IME composition
-                        if (ev.isComposing) return;
-                        if (ev.key === 'Enter' && !ev.shiftKey) {
-                            ev.preventDefault();
-                            submitData();
-                        }
-                        // Shift+Enter -> default (newline)
-                    });
-                }
-            } catch(e){ console.warn(e); }
-        })();
-
-        // ------------------------------
-        // Missing helpers: thinking animation, typewriter reply, error display
-        // These were referenced but not defined previously; implement robust versions
-        // ------------------------------
-        function startThinking(bubble){
-            if(!bubble) return;
-            // ensure any previous think interval cleared
-            try{ clearInterval(bubble._thinkInterval); }catch(e){}
-            bubble.dataset.katexRendered = '0';
-            bubble.innerHTML = '';
-            const wrapper = document.createElement('div');
-            wrapper.style.display = 'flex';
-            wrapper.style.flexDirection = 'column';
-            wrapper.style.gap = '8px';
-
-            const text = document.createElement('div');
-            text.className = 'thinking-text';
-            text.style.color = 'var(--text-secondary-color)';
-            text.style.fontSize = '14px';
-            text.textContent = 'đang suy nghĩ lâu hơn để giúp bạn hài lòng hơn';
-
-            const dots = document.createElement('div');
-            dots.className = 'thinking-dots';
-            dots.style.color = 'var(--text-secondary-color)';
-            dots.style.fontSize = '14px';
-
-            wrapper.appendChild(text);
-            wrapper.appendChild(dots);
-            bubble.appendChild(wrapper);
-
-            let dcount = 0;
-            bubble._thinkInterval = setInterval(()=>{
-                dcount = (dcount + 1) % 4;
-                dots.textContent = Array(dcount+1).join('.') + (dcount===0?'.':'');
-            }, 400);
-            bubble._thinking = true;
-            return bubble._thinkInterval;
-        }
-
-        function stopThinking(bubble){
-                       try{
-                if(bubble && bubble._thinkInterval) clearInterval(bubble._thinkInterval);
-            }catch(e){}
-            if(bubble){ bubble._thinking = false; }
-        }
-
-        function showError(message, targetBubble){
-            console.error('showError:', message);
-            if (targetBubble && targetBubble.parentNode) {
-                targetBubble.innerHTML = `<div style=\"color:var(--error-color); font-weight:600;\">Lỗi: ${escapeHtml(String(message))}</div>`;
-            } else {
-                const b = document.createElement('div');
-                b.className = 'chat-bubble bot-bubble';
-                b.innerHTML = `<div style=\"color:var(--error-color); font-weight:600;\">Lỗi: ${escapeHtml(String(message))}</div>`;
-                chatMessages.appendChild(b);
-                chatMessages.scrollTop = chatMessages.scrollHeight;
-            }
-        }
-
-        // Simple markdown-ish converter used as fallback when server doesn't provide HTML
-        function convertMarkdown(raw){
-            if(!raw) return '';
-            // If it already looks like HTML we pass through
-            const maybeHtml = /<[^>]+>/g.test(raw);
-            if(maybeHtml) return raw;
-            // escape, linkify, and convert double newlines to paragraphs
-            let s = escapeHtml(raw);
-            // linkify simple urls
-            s = s.replace(/(https?:\/\/[\w\-./?=&%#:~,+]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
-            // paragraphs
-            s = s.split(/\n\n+/).map(p => `<p>${p.replace(/\n/g,'<br>')}</p>`).join('');
-            return s;
-        }
-
-        // Typewriter / progressive reveal for bot replies. Works with HTML by appending node-by-node and typing text-nodes.
-        async function renderBotReplyAnimated(targetBubble, html){
-            if(!targetBubble) return;
-            // Stop thinking animation first
-            stopThinking(targetBubble);
-            // Clear previous content
-            targetBubble.innerHTML = '';
-            // Create container to receive content progressively
-            const container = document.createElement('div');
-            container.className = 'bot-reply-container';
-            targetBubble.appendChild(container);
-
-            // Parse the HTML into a temporary element
-            const tmp = document.createElement('div');
-            tmp.innerHTML = html || '';
-
-            // Helper to check abort
-            function isAborted(){ try{ return window._currentAbortController && window._currentAbortController.signal && window._currentAbortController.signal.aborted; }catch(e){ return false; } }
-
-            // Recursive append with typewriter for text nodes
-            async function appendNode(srcNode, destParent){
-                if (isAborted()) throw new DOMException('Aborted','AbortError');
-                if (srcNode.nodeType === Node.TEXT_NODE){
-                    const text = srcNode.nodeValue || '';
-                    if (!text.trim()){
-                        destParent.appendChild(document.createTextNode(text));
-                        return;
-                    }
-                    const span = document.createElement('span');
-                    destParent.appendChild(span);
-                    // type each char with small delay
-                    for (let i=0;i<text.length;i++){
-                        if (isAborted()) throw new DOMException('Aborted','AbortError');
-                        span.textContent += text[i];
-                        // small random delay
-                        await new Promise(r => setTimeout(r, 8 + Math.random()*18));
-                    }
-                } else if (srcNode.nodeType === Node.ELEMENT_NODE){
-                    const clone = document.createElement(srcNode.tagName);
-                    // copy attributes (but not event handlers)
-                    for (let i=0;i<srcNode.attributes.length;i++){
-                        const a = srcNode.attributes[i];
-                        try{ clone.setAttribute(a.name, a.value); }catch(e){}
-                    }
-                    destParent.appendChild(clone);
-                    // For certain elements that should be revealed as block (like pre, code, .katex), append immediately
-                    const immediateTags = ['PRE','IMG','TABLE','UL','OL','LI','DIV','BR','HR'];
-                    if (immediateTags.includes(srcNode.tagName) || srcNode.classList.contains && srcNode.classList.contains('katex')){
-                        clone.innerHTML = srcNode.innerHTML; // insert inner HTML at once
-                        // allow KaTeX-rendered nodes to be processed
-                        try{ window.jaremis.ensureRenderMath(clone); }catch(e){}
-                    } else {
-                        // otherwise process children sequentially
-                        for (let c of srcNode.childNodes){
-                            await appendNode(c, clone);
-                        }
-                    }
-                }
-                // after appending each top-level child, ensure math rendering for that subtree
-                try{ window.jaremis.ensureRenderMath(destParent); }catch(e){}
-            }
-
-            // iterate through tmp childNodes
-            try{
-                for (let c of Array.from(tmp.childNodes)){
-                    if (isAborted()) throw new DOMException('Aborted','AbortError');
-                    await appendNode(c, container);
-                    // small pause between blocks
-                    await new Promise(r => setTimeout(r, 80 + Math.random()*120));
-                }
-                // final KaTeX pass for entire bubble
-                try{ window.jaremis.ensureRenderMath(targetBubble); }catch(e){}
-                // mark rendered
+         // ------------------------------
+         // displayResults for diagnose flows
+         // ------------------------------
+         function displayResults(data, targetBubble) {
+             // if it's a chat-style reply
+            if (data.reply) {
+                const content = data.replyHtml ? data.replyHtml : convertMarkdown(data.reply);
+                targetBubble.innerHTML = `<div class="diagnosis-details math-rendered">${content}</div>`;
                 targetBubble.dataset.katexRendered = '1';
-                // scroll to bottom
-                chatMessages.scrollTop = chatMessages.scrollHeight;
-            } catch (err){
-                if (err && err.name === 'AbortError'){
-                    // gracefully exit, leave partial content
-                    console.warn('renderBotReplyAnimated aborted');
-                    throw err;
-                } else {
-                    console.error('renderBotReplyAnimated error', err);
-                    // fallback: insert raw HTML
-                    targetBubble.innerHTML = html;
-                    try{ window.jaremis.ensureRenderMath(targetBubble); }catch(e){}
-                }
+                return;
             }
+
+             let html = '';
+
+             if (data.confidence !== undefined) {
+                 html += `
+                     <div class="confidence-meter">
+                         <div class="confidence-bar" style="width:${Math.max(0, Math.min(100, data.confidence))}%">Độ tin cậy: ${data.confidence}%</div>
+                     </div>
+                 `;
+             }
+
+             if (Array.isArray(data.diseases) && data.diseases.length) {
+                 html += '<h3><i class="fas fa-notes-medical"></i> Khả năng chẩn đoán</h3><div class="disease-list">';
+                 data.diseases.forEach(d => {
+                     const pct = Math.min(d.probability || 0, 100);
+                     html += `
+                         <div class="disease-item">
+                             <strong>${escapeHtml(d.name || '')}</strong>
+                             <div class="probability-bar">
+                                 <div class="probability-fill" style="width:${pct}%"></div>
+                             </div>
+                         </div>
+                     `;
+                 });
+                 html += '</div>';
+             }
+
+            if (data.diagnosis) {
+                const diagContent = data.diagnosisHtml ? data.diagnosisHtml : convertMarkdown(data.diagnosis);
+                html += `<div class="diagnosis-details math-rendered">
+                    ${diagContent}
+                    ${displayReferences(data.references)}
+                    <div class="warning">${data.warning || ''}</div>
+                </div>`;
+            } else if (data.icdDescriptions && data.icdDescriptions.length) {
+                 html += `<div class="diagnosis-details"><h3>Chẩn đoán phân biệt (ICD)</h3>`;
+                 data.icdDescriptions.forEach(item => {
+                     html += `<div class="disease-item"><strong>${escapeHtml(item.label)}</strong><div>${escapeHtml(item.icdCode || '')} - ${escapeHtml(item.description || '')}</div></div>`;
+                 });
+                 html += `</div>`;
+             }
+
+             if (data.modelUsed) {
+                 html += `<div style="margin-top:10px; font-size:12px; color:var(--text-secondary-color)">Đã dùng model: ${escapeHtml(data.modelUsed)}</div>`;
+             }
+
+             targetBubble.innerHTML = html;
+            // If server provided rendered HTML for diagnosis, mark bubble to skip client KaTeX pass
+            if (data.diagnosisHtml) targetBubble.dataset.katexRendered = '1';
+             chatMessages.scrollTop = chatMessages.scrollHeight;
+         }
+
+        /* Sidebar resize logic */
+        const sidebar = document.getElementById('sidebar');
+        const resizer = document.getElementById('resizer');
+
+        const mouseMoveHandler = function (e) {
+            const dx = e.clientX - sidebar.getBoundingClientRect().right;
+            const newWidth = sidebar.offsetWidth + dx;
+            document.documentElement.style.setProperty('--sidebar-width', `${newWidth}px`);
+        };
+
+        const mouseUpHandler = function () {
+            document.removeEventListener('mousemove', mouseMoveHandler);
+            document.removeEventListener('mouseup', mouseUpHandler);
+            document.body.style.cursor = 'default';
+            document.body.style.userSelect = 'auto';
+        };
+
+        resizer.addEventListener('mousedown', function (e) {
+            e.preventDefault();
+            document.addEventListener('mousemove', mouseMoveHandler);
+            document.addEventListener('mouseup', mouseUpHandler);
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+        });
+
+        const sidebarEl = document.getElementById('sidebar');
+        const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+        const historyDrawerToggle = document.getElementById('history-drawer-toggle');
+
+        function isMobileView() { return window.innerWidth <= 600; }
+
+        function openSidebarMobile() {
+          sidebarEl.classList.add('mobile-open');
+          sidebarBackdrop.classList.add('show');
+          syncHistoryArrow();
         }
+        function closeSidebarMobile() {
+          sidebarEl.classList.remove('mobile-open');
+          sidebarBackdrop.classList.remove('show');
+          syncHistoryArrow();
+        }
+        function syncHistoryArrow() {
+          if (!isMobileView()) { historyDrawerToggle.style.display='none'; return; }
+          historyDrawerToggle.style.display='flex';
+          if (!historyDrawerToggle.querySelector('.bars')) {
+             historyDrawerToggle.innerHTML =
+               '<span class="bars" aria-hidden="true"><span class="bar"></span><span class="bar"></span><span class="bar"></span></span>';
+          }
+          if (sidebarEl.classList.contains('mobile-open')) {
+             historyDrawerToggle.classList.add('open');
+          } else {
+             historyDrawerToggle.classList.remove('open');
+          }
+        }
+
+        historyDrawerToggle.addEventListener('click', () => {
+          if (sidebarEl.classList.contains('mobile-open')) closeSidebarMobile();
+          else openSidebarMobile();
+        });
+        sidebarBackdrop.addEventListener('click', closeSidebarMobile);
+
+        // Đồng bộ khi resize
+        window.addEventListener('resize', syncHistoryArrow);
+        document.addEventListener('DOMContentLoaded', syncHistoryArrow);
+        // End of mobile additions
+
+        function toggleToolTray(e){
+          e?.preventDefault();
+          const tray = document.getElementById('tool-buttons');
+          const btn = document.getElementById('toggle-tools-btn');
+          if (!tray || !btn) return;
+          const opening = tray.classList.contains('collapsed');
+          tray.classList.toggle('collapsed', !opening);
+          btn.classList.toggle('active', opening);
+          btn.setAttribute('aria-expanded', opening ? 'true' : 'false');
+
+          if (opening) {
+            const closeHandler = (ev)=>{
+              if (!tray.contains(ev.target) && ev.target !== btn) {
+                tray.classList.add('collapsed');
+                btn.classList.remove('active');
+                btn.setAttribute('aria-expanded','false');
+                document.removeEventListener('click', closeHandler);
+              }
+            };
+            setTimeout(()=>document.addEventListener('click', closeHandler),0);
+          }
+        }
+
+        // Nếu muốn auto đóng sau khi gửi tin nhắn:
+        const originalSubmitData = submitData;
+        submitData = async function(){
+          const tray = document.getElementById('tool-buttons');
+          const btn = document.getElementById('toggle-tools-btn');
+          if (tray && !tray.classList.contains('collapsed')) {
+            tray.classList.add('collapsed');
+            btn.classList.remove('active');
+          }
+          return originalSubmitData();
+        };
      </script>
      <script>
 /* === 3D Tilt Effect Script ===
@@ -2062,63 +1995,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 <!-- KaTeX helper & auto-render (Doctor-style) -->
 <script>
-(function(){
-  if (window._jaremis_shortcuts_installed) return; window._jaremis_shortcuts_installed = true;
-
-  // Safe helper to click an element by id
-  function tryClick(id){ try{ const el = document.getElementById(id); if(el){ el.click(); return true; } }catch(e){} return false; }
-
-  // Provide lightweight global stubs (will defer to real implementations when available)
-  window.jaremis = window.jaremis || {};
-  window.jaremis.ensureRenderMath = function(el){ if (window.renderMathIn) return window.renderMathIn(el); /* no-op until katex loader runs */ };
-  // Keep existing wrapResultMath/addResultBoxStyles if present; otherwise noop
-  if (!window.wrapResultMath) window.wrapResultMath = function(b){ /* will be replaced by real implementation if defined later */ };
-  if (!window.addResultBoxStyles) window.addResultBoxStyles = function(){ };
-
-  // Keyboard shortcuts mapping (use Ctrl+letter / Ctrl+Shift+letter). Avoid overriding basic input behavior.
-  document.addEventListener('keydown', function(e){
-    const tgt = e.target || {};
-    const tag = (tgt.tagName || '').toUpperCase();
-    const isEditable = tag === 'INPUT' || tag === 'TEXTAREA' || tgt.isContentEditable;
-
-    // Ctrl+Enter -> send (works even when typing)
-    if (e.ctrlKey && !e.shiftKey && e.key === 'Enter') {
-      e.preventDefault(); tryClick('send-btn'); return;
-    }
-
-    // If typing in a text field, do not hijack other shortcuts (except send)
-    if (isEditable) return;
-
-    // Map single Ctrl+letter and Ctrl+Shift+letter combinations
-    if (e.ctrlKey && !e.altKey) {
-      const k = (e.key || '').toLowerCase();
-      const shift = e.shiftKey;
-      // Mic: Ctrl+M
-      if (!shift && k === 'm') { e.preventDefault(); tryClick('mic-btn'); flashNotice && flashNotice('Mic toggled (Ctrl+M)'); return; }
-      // Attach: Ctrl+Shift+U
-      if (shift && k === 'u') { e.preventDefault(); tryClick('attach-btn') || document.getElementById('images')?.click(); flashNotice && flashNotice('Attach file (Ctrl+Shift+U)'); return; }
-      // Diagnose: Ctrl+Shift+K
-      if (shift && k === 'k') { e.preventDefault(); tryClick('mode-btn'); flashNotice && flashNotice('Toggle Diagnose (Ctrl+Shift+K)'); return; }
-      // Model switch: Ctrl+Shift+Y
-      if (shift && k === 'y') { e.preventDefault(); tryClick('think-btn'); flashNotice && flashNotice('Switch model (Ctrl+Shift+Y)'); return; }
-      // New chat: Ctrl+Shift+X
-      if (shift && k === 'x') { e.preventDefault(); startNewConversation && startNewConversation(); flashNotice && flashNotice('New chat (Ctrl+Shift+X)'); return; }
-      // Open history/find: Ctrl+Shift+F
-      if (shift && k === 'f') { e.preventDefault(); openFindModal && openFindModal(); flashNotice && flashNotice('Find (Ctrl+Shift+F)'); return; }
-    }
-  }, true);
-
-  // Ensure chatInput Ctrl+Enter works even if focus is inside textarea
-  try { const ci = document.getElementById('chat-input'); const sb = document.getElementById('send-btn');
-    if (ci && sb) {
-      ci.addEventListener('keydown', function(ev){ if (ev.ctrlKey && ev.key === 'Enter') { ev.preventDefault(); sb.click(); } });
-    }
-  } catch(e){}
-
-})();
-</script>
-<!-- KaTeX helper & auto-render (Doctor-style) -->
-<script>
 // Define helper like Doctor's implementation and an unobtrusive observer
 if (!window._jaremis_katex_setup) {
   window._jaremis_katex_setup = true;
@@ -2197,7 +2073,7 @@ if (!window._jaremis_katex_setup) {
   function renderBubbleIfNeeded(bubble){
     if (!bubble || bubble.dataset.katexRendered) return;
     if (!bubble.classList || !bubble.classList.contains('chat-bubble')) return;
-    // Normalize delimiters first to avoid stray $ and inconsistent markers
+    // Normalize delimiters first to avoid stray $$ and inconsistent markers
     normalizeLatexInElement(bubble);
     renderMathIn(bubble);
     // Remove any leftover $ or $$ in plain text nodes outside KaTeX elements
