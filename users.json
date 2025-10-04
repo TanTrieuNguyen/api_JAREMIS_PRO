@@ -5,6 +5,10 @@
     "email": "vinhanct2023@gmail.com",
     "passwordHash": "$2b$10$qyFOvrPkz.deuyR/5yBcfeu/FTcyK/700xjlfRKNHwt1gB4vTchE.",
     "createdAt": "2025-08-21T08:28:13.973Z",
-    "history": []
+    "history": [],
+    "memory": {
+      "summary": "",
+      "lastUpdated": null
+    }
   }
 ]

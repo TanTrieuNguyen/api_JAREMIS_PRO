@@ -1606,69 +1606,44 @@ window.renderAssistantBubble = function(bubble, text) {
 </script>
 
 <script>
-(function(){
-  if (window.__UI_WIRED__) return; window.__UI_WIRED__ = true;
+// Sửa openHistoryItem để hiển thị Markdown + LaTeX (không bị dính chữ)
+function openHistoryItem(id) {
+  const item = historyCache.find(h => String(h.id) === String(id));
+  if (!item) return;
 
-  // Globals mặc định
-  if (typeof window.useProModel === 'undefined') window.useProModel = false;
-  if (typeof window.diagnosticMode === 'undefined') window.diagnosticMode = false;
+  // Xóa nội dung cũ
+  chatMessages.innerHTML = '';
 
-  const chatInput   = document.getElementById('chat-input');
-  const chatMessages= document.getElementById('chat-messages');
-  const sendBtn     = document.getElementById('send-btn');
-  const modeBtn     = document.getElementById('mode-btn') || document.getElementById('model-toggle') || document.querySelector('[data-role="model-toggle"]');
-  const diagnoseBtn = document.getElementById('diagnose-btn') || document.getElementById('think-btn') || document.querySelector('[data-role="diagnose-toggle"]');
-  const sidebar     = document.getElementById('sidebar');
-  const backdrop    = document.getElementById('sidebar-backdrop');
+  // Bubble user
+  const userHtml = `<div class="chat-bubble user-bubble">
+    <div class="user-bubble-content"><p>${escapeHtml(item.input || '')}</p></div>
+  </div>`;
+  chatMessages.innerHTML += userHtml;
 
-  // Không để overlay che trên desktop
-  function onResize(){
-    if (window.innerWidth > 600) {
-      sidebar?.classList.remove('mobile-open');
-      backdrop?.classList.remove('show');
-      document.body.classList.remove('no-scroll');
-    }
-  }
-  window.addEventListener('resize', onResize);
-  onResize();
+  // Bubble bot: render Markdown + LaTeX
+  const wrapper = document.createElement('div');
+  wrapper.className = 'chat-bubble bot-bubble';
+  const raw = item.reply || item.diagnosis || '';
+  const html = (typeof convertMarkdown === 'function')
+    ? convertMarkdown(raw)
+    : escapeHtml(raw).replace(/\n/g,'<br>');
 
-  // Gửi bằng nút
-  sendBtn?.addEventListener('click', (e)=>{ e.preventDefault(); try{ submitData(); }catch(err){ console.error('submitData error', err); }});
-  // Enter để gửi (Shift+Enter xuống dòng)
-  chatInput?.addEventListener('keydown', (e)=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendBtn?.click(); }});
+  wrapper.innerHTML = `
+    <div class="diagnosis-details">
+      <h3>Kết quả trước đó</h3>
+      <div style="font-size:13px; color:var(--text-secondary-color); margin-bottom:8px;">
+        ${new Date(item.timestamp).toLocaleString()} • ${escapeHtml(item.modelUsed || '')} • ${escapeHtml(item.type || '')}
+      </div>
+      ${html}
+    </div>`;
+  chatMessages.appendChild(wrapper);
 
-  // Toggle Model (Flash/Pro)
-  function syncModeBtn(){
-    if (!modeBtn) return;
-    modeBtn.classList.toggle('active', !!useProModel);
-    const label = useProModel ? 'JAREMIS Pro' : 'JAREMIS Flash';
-    if (modeBtn.dataset?.labelOnly !== '1') modeBtn.textContent = label;
-    modeBtn.setAttribute('aria-pressed', useProModel ? 'true' : 'false');
-    try { localStorage.setItem('jaremis_model', useProModel ? 'pro' : 'flash'); } catch {}
-  }
-  modeBtn?.addEventListener('click', ()=>{ useProModel = !useProModel; syncModeBtn(); });
-  try { const saved = localStorage.getItem('jaremis_model'); if (saved) useProModel = (saved === 'pro'); } catch {}
-  syncModeBtn();
+  // Gọi KaTeX cho bubble này
+  if (typeof renderMathIn === 'function') renderMathIn(wrapper);
 
-  // Toggle Diagnose
-  function syncDiagnoseBtn(){
-    if (!diagnoseBtn) return;
-    diagnoseBtn.classList.toggle('active', !!diagnosticMode);
-    diagnoseBtn.setAttribute('aria-pressed', diagnosticMode ? 'true' : 'false');
-  }
-  diagnoseBtn?.addEventListener('click', ()=>{ diagnosticMode = !diagnosticMode; syncDiagnoseBtn(); });
-  syncDiagnoseBtn();
-})();
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
 </script>
-<style>
-  /* Backdrop chỉ dùng cho mobile; desktop luôn tắt */
-  .sidebar-backdrop { display: none; }
-  .sidebar-backdrop.show { display: block; }
-  @media (min-width: 601px){
-    .sidebar-backdrop { display: none !important; }
-    .sidebar.mobile-open { transform: none !important; }
-    body.no-scroll { overflow: auto !important; }
-  }
-</style>
+<!-- ...existing code... -->
 </body>
 </html>
