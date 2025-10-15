@@ -3,10 +3,9 @@ const express = require('express');
 const multer = require('multer');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const fs = require('fs');
+const path = require('path');
 const axios = require('axios');
 const bcrypt = require('bcryptjs');
-const { google } = require('googleapis');
-const path = require('path');
 
 // NEW: Server-side LaTeX rendering utilities
 const katex = require('katex');
@@ -21,49 +20,6 @@ const upload = multer({ dest: 'uploads/' });
 const API_KEY = process.env.GOOGLE_API_KEY;
 if (!API_KEY) console.warn('Cảnh báo: GOOGLE_API_KEY chưa được đặt.');
 const genAI = new GoogleGenerativeAI(API_KEY || '');
-// Helper: detect invalid/expired API key errors
-function isInvalidApiKeyError(err){
-  const msg = (err && (err.message || err.toString())) || '';
-  return /API key expired|API_KEY_INVALID|invalid api key/i.test(msg);
-}
-// Optional: customize birth year shown in self-introduction
-const APP_BIRTH_YEAR = process.env.APP_BIRTH_YEAR || '2025';
-
-// Ephemeral session history for non-logged users
-const sessionHistories = new Map(); // sessionId -> [{input, reply, ...}]
-function pushSessionHistory(sessionId, entry, maxItems = 200){
-  if (!sessionId) return;
-  const arr = sessionHistories.get(sessionId) || [];
-  arr.unshift(entry);
-  if (arr.length > maxItems) arr.length = maxItems;
-  sessionHistories.set(sessionId, arr);
-}
-function getRecentSessionChatHistory(sessionId, limit = 60, maxChars = 45000){
-  if (!sessionId) return [];
-  const arr = sessionHistories.get(sessionId) || [];
-  const chats = arr.filter(h => h.type === 'chat');
-  const recent = chats.slice(0, limit).reverse();
-  const result = [];
-  let total = 0;
-  for (const c of recent){
-    const block = `Người dùng: ${c.input}\nTrợ lý: ${c.reply}`;
-    total += block.length;
-    if (total > maxChars) break;
-    result.push(block);
-  }
-  return result;
-}
-
-// Math detection to adjust timeouts/model behavior
-function isMathy(text=''){
-  const t = String(text).toLowerCase();
-  return /(\bgiải\b|=|\+|\-|\*|\^|\\frac|\\sqrt|\d\s*[a-z]|\bx\b|\by\b)/i.test(t);
-}
-function computeHardLimitMs(modelId, message){
-  const math = isMathy(message);
-  if (/flash/i.test(modelId)) return math ? 8000 : 3000;
-  return math ? 25000 : 20000;
-}
 
 app.use(express.static('public'));
 app.use(express.json({ limit: '2mb' }));
@@ -79,75 +35,37 @@ function ensureUsersFile() {
 }
 ensureUsersFile();
 
-// === Google Drive sync for users.json ===
-const { readUsersData, updateUsersData } = require('./driveJsonService');
-const DRIVE_USERS_FILE_ID = process.env.DRIVE_USERS_FILE_ID || '1ame57YNTu-GADOjVxeUtoK7cy0VZmvDj';
-
-// === Google Drive client helper ===
-async function getDriveClient() {
-  const auth = new google.auth.GoogleAuth({
-    keyFile: process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH, // Đường dẫn file JSON
-    scopes: ['https://www.googleapis.com/auth/drive'],
-  });
-  return google.drive({ version: 'v3', auth });
+function readUsers() {
+  ensureUsersFile();
+  try { const raw = fs.readFileSync(usersPath,'utf8'); return JSON.parse(raw || '[]'); } catch(e){ console.error('Lỗi đọc users.json', e); return []; }
 }
-
-// Đọc users từ Google Drive (nếu có fileId), fallback về file local nếu lỗi
-async function readUsers() {
-    try {
-        const data = await readUsersData(); // đọc từ Drive
-        const users = JSON.parse(data);
-        if (Array.isArray(users)) return users;
-        return [];
-    } catch (err) {
-        // fallback về file local
-        try {
-            const localData = fs.readFileSync('users.json', 'utf8');
-            const users = JSON.parse(localData);
-            if (Array.isArray(users)) return users;
-            return [];
-        } catch (e) {
-            return [];
-        }
-    }
-}
-
-// Ghi users lên Google Drive (nếu có fileId), đồng thời ghi file local
-async function saveUsers(users) {
-  const data = JSON.stringify(users, null, 2);
-  fs.writeFileSync(usersPath, data, 'utf8');
-  if (DRIVE_USERS_FILE_ID) {
-    try {
-      const auth = await getDriveClient();
-      await updateUsersData(auth, DRIVE_USERS_FILE_ID, users);
-    } catch(e) { console.error('Lỗi ghi users lên Drive:', e); }
-  }
-}
-async function findUserByUsername(username) {
-  if (!username) return null;
-  const users = await readUsers();
-  return users.find(u => u.username && u.username.toLowerCase() === username.toLowerCase()) || null;
-}
-async function pushUserHistory(username, historyEntry, maxItems = 500) {
+function saveUsers(users) { fs.writeFileSync(usersPath, JSON.stringify(users, null, 2), 'utf8'); }
+function findUserByUsername(username) { if (!username) return null; const users = readUsers(); return users.find(u => u.username && u.username.toLowerCase() === username.toLowerCase()) || null; }
+function pushUserHistory(username, historyEntry, maxItems = 500) {
   try {
-    const users = await readUsers();
+    const users = readUsers();
     const idx = users.findIndex(u => u.username && u.username.toLowerCase() === username.toLowerCase());
     if (idx === -1) return false;
     if (!Array.isArray(users[idx].history)) users[idx].history = [];
     users[idx].history.unshift(historyEntry);
     if (users[idx].history.length > maxItems) users[idx].history = users[idx].history.slice(0, maxItems);
-    await saveUsers(users);
+    saveUsers(users);
     return true;
   } catch (e) {
     console.error('Lỗi khi lưu lịch sử người dùng', e);
     return false;
   }
 }
-async function getRecentChatHistory(username, limit = 360, maxChars = 180000) {
-  const user = await findUserByUsername(username);
+
+// NEW: Lấy tối đa N lượt chat gần nhất (user -> assistant), trả về theo thứ tự cũ -> mới
+function getRecentChatHistory(username, limit = 360, maxChars = 180000) {
+  const user = findUserByUsername(username);
   if (!user || !Array.isArray(user.history)) return [];
+  // Lấy các entry type 'chat'
   const chats = user.history.filter(h => h.type === 'chat');
+  // Đảo lại để chronological (cũ -> mới)
   const recent = chats.slice(0, limit).reverse();
+  // Cắt nếu vượt maxChars
   const result = [];
   let total = 0;
   for (const c of recent) {
@@ -225,27 +143,10 @@ function renderLatexInText(text) {
   // quick check
   if (!/[\\$]/.test(text)) return escapeHtml(text).replace(/\n/g, '<br>');
   try {
-    // collapse repeated dollars (e.g. $$ -> $)
-    let src = String(text).replace(/\${3,}/g, '$');
-
-    // Normalize simple fractions like a/b or (a+b)/(c+d) into \frac{a}{b}
-    function normalizeSimpleFraction(s){
-      try {
-        const str = String(s || '').trim();
-        if (!str || str.indexOf('/') === -1) return str;
-        if (/\\(frac|dfrac|tfrac)\b/.test(str)) return str; // already has frac
-        // Case 1: (A)/(B)
-        let m = str.match(/^\(\s*([^()]+?)\s*\)\s*\/\s*\(\s*([^()]+?)\s*\)$/s);
-        if (m) return `\\frac{${m[1]}}{${m[2]}}`;
-        // Case 2: A/B where A,B are simple tokens (numbers/letters/dots)
-        m = str.match(/^([A-Za-z0-9.+-]+)\s*\/\s*([A-Za-z0-9.+-]+)$/);
-        if (m) return `\\frac{${m[1]}}{${m[2]}}`;
-        return str;
-      } catch (_) { return s; }
-    }
-
-    // regex to match $...$, \[...\], or \(...\) only (avoid single-$ inline to reduce false positives)
-    const re = /(\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\]|\\\(([\s\S]*?)\\\))/g;
+    // collapse repeated dollars
+    let src = String(text).replace(/\${3,}/g, '$$');
+    // regex to match $$...$$, \[...\], \(...\), or $...$
+    const re = /(\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\]|\\\(([\s\S]*?)\\\)|\$([^\$][\s\S]*?[^\$])\$)/g;
     let lastIndex = 0;
     let out = '';
     let m;
@@ -259,19 +160,11 @@ function renderLatexInText(text) {
       const display = !!(m[2] || m[3]);
       let rendered = '';
       try {
-        // Heuristic: avoid KaTeX when content likely not math and contains Unicode (e.g., Vietnamese)
-        const hasNonAscii = /[^\x00-\x7F]/.test(latex);
-        const looksLikeMath = /\\[a-zA-Z]+|[=+\\\-\/*^_{}]|\\frac|\\sqrt|\\sum|\\int|\\pi|\\alpha|\\beta|\\gamma|\d+/.test(latex);
-        if (hasNonAscii && !looksLikeMath) {
-          rendered = escapeHtml(latex);
-        } else {
-          const toRender = normalizeSimpleFraction(latex);
-          rendered = katex.renderToString(toRender, { throwOnError: false, displayMode: display, strict: 'ignore' });
-          rendered = DOMPurify.sanitize(rendered);
-        }
+        rendered = katex.renderToString(latex, { throwOnError: false, displayMode: display });
+        rendered = DOMPurify.sanitize(rendered);
       } catch (e) {
         // fallback: escape and keep original delimiters
-        const wrapped = display ? `$${latex}$` : `\\(${latex}\\)`;
+        const wrapped = display ? `$$${latex}$$` : `\\(${latex}\\)`;
         rendered = escapeHtml(wrapped);
       }
       out += rendered;
@@ -287,155 +180,35 @@ function renderLatexInText(text) {
   }
 }
 
-
-// Helper to select model with fallback
-function selectModelIds(requested) {
-  // Prefer stable, widely supported defaults on v1beta
-  // Use -latest variants to match ListModels results and avoid 404
-  return {
-    primary: 'gemini-1.5-flash-latest',
-    fallback: 'gemini-1.5-pro-latest'
-  };
-}
-
-// Update display map to include fallbacks
+// (Không bắt buộc) Bạn có thể đặt chung map tên hiển thị ở đầu file:
 const DISPLAY_NAME_MAP = {
-  // Current defaults
-  'gemini-pro': 'Jaremis-pro',
-  'gemini-1.0-pro': 'Jaremis-1.0-pro',
-  'gemini-pro-vision': 'Jaremis-vision',
-  // 2.5 and 2.0 aliases
-  'gemini-2.5-flash-latest': 'Jaremis-2.5-flash',
-  'gemini-2.5-flash': 'Jaremis-2.5-flash',
-  'gemini-2.5-pro-latest': 'Jaremis-2.5-pro',
-  'gemini-2.5-pro': 'Jaremis-2.5-pro',
-  'gemini-2.0-flash-exp': 'Jaremis-2.0-flash',
-  'gemini-2.0-flash': 'Jaremis-2.0-flash',
-  'gemini-2.0-pro-exp': 'Jaremis-2.0-pro',
-  'gemini-2.0-pro': 'Jaremis-2.0-pro',
-  // Legacy keys (kept for compatibility if ever referenced)
-  'gemini-1.5-flash-latest': 'Jaremis-1.5-flash',
-  'gemini-1.5-pro-latest': 'Jaremis-1.5-pro',
-  'gemini-1.5-flash': 'Jaremis-1.5-flash',
-  'gemini-1.5-pro': 'Jaremis-1.5-pro',
-  'gemini-1.5-flash-8b-latest': 'Jaremis-1.5-flash-8b',
-  'gemini-1.5-flash-8b': 'Jaremis-1.5-flash-8b'
+  'gemini-2.5-flash': 'Jaremis-1.0-flash',
+  'gemini-2.5-pro': 'Jaremis-Pro'
 };
-
-// Dynamic model discovery and selection to avoid 404 on unsupported API versions/models
-const MODEL_PREFS = {
-  flash: [
-    'gemini-2.5-flash-latest',
-    'gemini-2.5-flash',
-    'gemini-2.0-flash-exp',
-    'gemini-2.0-flash',
-    'gemini-1.5-flash-8b-latest',
-    'gemini-1.5-flash-8b',
-    'gemini-1.5-flash-latest',
-    'gemini-1.5-flash',
-    'gemini-pro'
-  ],
-  pro: [
-    'gemini-2.5-pro-latest',
-    'gemini-2.5-pro',
-    'gemini-2.0-pro-exp',
-    'gemini-2.0-pro',
-    'gemini-1.5-pro-latest',
-    'gemini-1.5-pro',
-    'gemini-pro'
-  ],
-  vision: [
-    'gemini-2.5-flash-latest',
-    'gemini-2.5-flash',
-    'gemini-2.0-flash-exp',
-    'gemini-2.0-flash',
-    'gemini-1.5-flash-8b-latest',
-    'gemini-1.5-flash-8b',
-    'gemini-1.5-flash-latest',
-    'gemini-1.5-flash',
-    'gemini-pro-vision',
-    'gemini-pro'
-  ]
-};
-
-let _modelCache = { when: 0, names: new Set(), supports: {} };
-async function listAvailableModels() {
-  const now = Date.now();
-  if (_modelCache.when && now - _modelCache.when < 10 * 60 * 1000) return _modelCache;
-  try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(API_KEY)}`;
-    const resp = await axios.get(url, { timeout: 8000 });
-    const models = resp.data?.models || [];
-    const names = new Set();
-    const supports = {};
-    for (const m of models) {
-      if (m.name) {
-        // Normalize: strip 'models/' prefix so IDs match preference lists
-        const raw = m.name;
-        const id = raw.startsWith('models/') ? raw.slice(7) : raw;
-        names.add(id);
-        if (Array.isArray(m.supportedGenerationMethods)) supports[id] = new Set(m.supportedGenerationMethods);
-        else supports[id] = new Set();
-      }
-    }
-    _modelCache = { when: now, names, supports };
-  } catch (e) {
-    console.warn('ListModels failed, using static fallback:', e?.message || e);
-  }
-  return _modelCache;
-}
-
-async function resolveModelIds(requested = 'flash', needVision = false) {
-  // default fallbacks if listing fails
-  let base = selectModelIds(requested);
-  let primary = base.primary;
-  let fallback = base.fallback;
-  try {
-    const prefs = needVision ? MODEL_PREFS.vision : (requested === 'pro' ? MODEL_PREFS.pro : MODEL_PREFS.flash);
-    const { names, supports } = await listAvailableModels();
-    for (const name of prefs) {
-      if (names.has(name) && (!supports[name].size || supports[name].has('generateContent'))) { primary = name; break; }
-    }
-    for (const name of prefs) {
-      if (name !== primary && names.has(name) && (!supports[name].size || supports[name].has('generateContent'))) { fallback = name; break; }
-    }
-  } catch (_) {}
-  return { primary, fallback };
-}
-
-async function getCandidateModels(requested = 'flash', needVision = false) {
-  const prefs = needVision ? MODEL_PREFS.vision : (requested === 'pro' ? MODEL_PREFS.pro : MODEL_PREFS.flash);
-  try {
-    const { names, supports } = await listAvailableModels();
-    const filtered = prefs.filter(n => names.has(n) && (!supports[n].size || supports[n].has('generateContent')));
-    if (filtered.length) return filtered;
-  } catch (_) {}
-  return prefs;
-}
 
 /* --------------------------
    Auth endpoints (unchanged)
    -------------------------- */
-app.post('/api/register', async (req, res) => {
+app.post('/api/register', (req, res) => {
   try {
     const { username, email, password } = req.body || {};
     if (!username || !email || !password) return res.status(400).json({ error: 'Vui lòng gửi username, email và password' });
-    let users = await readUsers();
+    const users = readUsers();
     if (users.find(u => u.username.toLowerCase() === username.toLowerCase())) return res.status(400).json({ error: 'Tên đăng nhập đã tồn tại' });
     if (users.find(u => u.email.toLowerCase() === email.toLowerCase())) return res.status(400).json({ error: 'Email đã được sử dụng' });
     const salt = bcrypt.genSaltSync(10);
     const hash = bcrypt.hashSync(password, salt);
     const newUser = { id: Date.now(), username, email, passwordHash: hash, createdAt: new Date().toISOString(), history: [] };
-    users.push(newUser); await saveUsers(users);
+    users.push(newUser); saveUsers(users);
     return res.json({ success: true, user: { username: newUser.username, email: newUser.email } });
   } catch (e) { console.error('Register error:', e); return res.status(500).json({ error: 'Lỗi server khi đăng ký' }); }
 });
 
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', (req, res) => {
   try {
     const { usernameOrEmail, password } = req.body || {};
     if (!usernameOrEmail || !password) return res.status(400).json({ error: 'Vui lòng gửi username/email và password' });
-    const users = await readUsers();
+    const users = readUsers();
     const user = users.find(u => u.username.toLowerCase() === usernameOrEmail.toLowerCase() || u.email.toLowerCase() === usernameOrEmail.toLowerCase());
     if (!user) return res.status(401).json({ error: 'Không tìm thấy tài khoản' });
     const match = bcrypt.compareSync(password, user.passwordHash);
@@ -447,25 +220,25 @@ app.post('/api/login', async (req, res) => {
 /* --------------------------
    History endpoints (unchanged)
    -------------------------- */
-app.get('/api/history', async (req, res) => {
+app.get('/api/history', (req, res) => {
   try {
     const username = req.query.username;
     if (!username) return res.status(400).json({ error: 'Thiếu tham số username' });
-    const user = await findUserByUsername(username);
+    const user = findUserByUsername(username);
     if (!user) return res.json({ history: [] });
     return res.json({ history: user.history || [] });
   } catch (e) { console.error('Get history error', e); return res.status(500).json({ error: 'Lỗi server khi lấy lịch sử' }); }
 });
 
-app.delete('/api/history', async (req, res) => {
+app.delete('/api/history', (req, res) => {
   try {
     const username = req.query.username;
     if (!username) return res.status(400).json({ error: 'Thiếu tham số username' });
-    const users = await readUsers();
+    const users = readUsers();
     const idx = users.findIndex(u => u.username && u.username.toLowerCase() === username.toLowerCase());
     if (idx === -1) return res.status(404).json({ error: 'Không tìm thấy user' });
     users[idx].history = [];
-    await saveUsers(users);
+    saveUsers(users);
     return res.json({ success: true });
   } catch (e) { console.error('Delete history error', e); return res.status(500).json({ error: 'Lỗi server khi xóa lịch sử' }); }
 });
@@ -584,65 +357,6 @@ function detectLanguage(rawText) {
   return best;
 }
 
-// Instant-answer heuristics for very simple queries
-function simpleAnswer(message, lang) {
-  const txt = (message || '').trim();
-  const lower = txt.toLowerCase();
-  const isHello = /^(hi|hello|hey|chào|xin chào|hola|bonjour|hallo|ê)[!,\.\s]*$/i.test(lower);
-  if (isHello) {
-    if (lang === 'vi') return 'Chào bạn! Mình có thể giúp gì ngay bây giờ?';
-    return 'Hello! How can I help you today?';
-  }
-  // Self-introduction intents
-  const introIntent = /(giới thiệu( về)? bản thân|hãy giới thiệu|tự giới thiệu|bạn là ai|bạn là gì|introduce yourself|tell me about yourself|who are you)\b/i.test(lower);
-  if (introIntent) {
-    if (lang === 'vi') {
-      return [
-        'Chào bạn! Mình là JAREMIS-AI — một trợ lý thông minh, thân thiện, được tối ưu để hỗ trợ thông tin y tế và kiến thức tổng quát một cách rõ ràng, dễ hiểu.',
-        `• Ra mắt: ${APP_BIRTH_YEAR} (phiên bản hiện tại)`,
-        '• Đơn vị phát triển: TT1403 (Nguyễn Tấn Triệu) & ANT (Đỗ Văn Vĩnh An). 2 Cậu ấy là những học sinh của trường THCS Đoàn Thị Điểm, rất đam mê công nghệ và thích học hỏi và đồng thời họ.',
-        '',
-        'Mình có thể:',
-        '- Trả lời đa ngôn ngữ theo cách tự nhiên, cô đọng phần chính, giải thích chi tiết khi cần.',
-        '- Giải thích thuật ngữ y khoa bằng ngôn ngữ đời thường; gợi ý bước an toàn; nhắc dùng chế độ “Diagnose” khi cần phân tích chuyên sâu.',
-        '- Tóm tắt tài liệu, gợi ý học tập, hỗ trợ công thức bằng LaTeX khi bạn yêu cầu.',
-        '- Ghi nhớ tóm tắt một số thông tin bạn chia sẻ (bộ nhớ cục bộ) để cá nhân hóa trả lời trong phiên sau.',
-        '',
-        'Nguyên tắc & giới hạn:',
-        '- Không thay thế bác sĩ; trong chế độ Chat mình không đưa chẩn đoán/y lệnh cụ thể.',
-        '- Tránh thông tin gây hại, không xúc phạm; luôn tôn trọng quyền riêng tư.',
-        '- Nội dung chỉ mang tính tham khảo, bạn nên tham khảo chuyên gia khi cần.',
-        '',
-        'Bạn có thể nói cho mình biết mục tiêu/sở thích để mình điều chỉnh phong cách và mức độ chi tiết phù hợp nhé!'
-      ].join('\n');
-    }
-    return [
-      'Hello! I am JAREMIS-AI — a friendly, capable assistant optimized for medical guidance and general knowledge, aiming to be clear and helpful.',
-      `• Launched: ${APP_BIRTH_YEAR} (current release)`,
-      '• Developed by: TT1403 (Nguyễn Tấn Triệu) & ANT (Đỗ Văn Vĩnh An).',
-      '',
-      'What I can do:',
-      '- Respond in your language, summarize key points first, and expand with simple explanations when needed.',
-      '- Clarify medical terms in plain language; suggest safe next steps; recommend “Diagnose” mode for deeper analysis.',
-      '- Summarize documents, assist study workflows, and output LaTeX formulas on request.',
-      '- Keep a brief local memory of facts you share to personalize future replies.',
-      '',
-      'Principles & limits:',
-      '- Not a replacement for a doctor; in Chat I avoid formal diagnoses or prescriptions.',
-      '- Avoid harmful content, stay respectful, and value your privacy.',
-      '- Information is for reference only; consult professionals when needed.',
-      '',
-      'Tell me your goals or preferences and I will adapt my style and level of detail!'
-    ].join('\n');
-  }
-  const askName = /(tên bạn là gì|what(?:'| i)s your name|who are you)/i.test(lower);
-  if (askName) {
-    // Keep product name friendly here
-    return lang === 'vi' ? 'Mình là JAREMIS-AI. Rất vui được hỗ trợ bạn!' : 'I am JAREMIS-AI. Happy to help!';
-  }
-  return null;
-}
-
 /* --------------------------
    NEW: Chat endpoint (general conversation)
    -------------------------- */
@@ -650,40 +364,24 @@ app.post('/api/chat', async (req, res) => {
   try {
     const message = (req.body.message || '').toString();
     const requestedModel = (req.body.model || 'flash').toLowerCase();
-    const ids = await resolveModelIds(requestedModel, false);
-    let modelId = ids.primary;
-    let displayModel = DISPLAY_NAME_MAP[modelId] || modelId;
+    const allowed = { 'flash': 'gemini-2.5-flash', 'pro': 'gemini-2.5-pro' };
+    const modelId = allowed[requestedModel] || allowed['flash'];
+    const displayModel = DISPLAY_NAME_MAP[modelId] || modelId;
     if (!message) return res.status(400).json({ error: 'Thiếu trường message' });
 
     const submittedBy = req.body.submittedBy || null;
-    const sessionId = req.body.sessionId || null;
+    const sessionId = req.body.sessionId || null; // lấy sessionId từ client (không tự tạo mới đây)
     const includeHistory = req.body.includeHistory !== false;
 
+    // Detect language (allow manual override)
     const forcedLang = (req.body.lang || req.body.forceLang || '').toLowerCase();
     const detected = detectLanguage(message);
     const userLang = forcedLang || detected.code;
 
-    const mathy = isMathy(message);
-
-    const quick = simpleAnswer(message, userLang);
-    if (quick) {
-      let quickHtml = null;
-      try { quickHtml = renderLatexInText(quick); } catch (_) { quickHtml = null; }
-      if (submittedBy) {
-        const entry = { id: Date.now(), sessionId: sessionId || ('legacy-' + Date.now()), type: 'chat', timestamp: new Date().toISOString(), input: message, reply: quick, modelUsed: 'fast-path', detectedLang: userLang, langScore: detected.score };
-        try { await pushUserHistory(submittedBy, entry); } catch (e) { console.error('Lỗi ghi lịch sử chat:', e); }
-      } else if (sessionId) {
-        const entry = { id: Date.now(), sessionId, type: 'chat', timestamp: new Date().toISOString(), input: message, reply: quick, modelUsed: 'fast-path', detectedLang: userLang, langScore: detected.score };
-        pushSessionHistory(sessionId, entry);
-      }
-      return res.json({ success: true, reply: quick, replyHtml: quickHtml, modelUsed: 'fast-path', detectedLang: userLang, detectionScore: detected.score });
-    }
-
+    // Lịch sử
     let historyBlocks = [];
     if (submittedBy && includeHistory) {
-      historyBlocks = await getRecentChatHistory(submittedBy, 60, 45000);
-    } else if (!submittedBy && sessionId && includeHistory) {
-      historyBlocks = getRecentSessionChatHistory(sessionId, 60, 45000);
+      historyBlocks = getRecentChatHistory(submittedBy, 60, 45000); // tăng giới hạn
     }
 
     // Lấy memory
@@ -698,8 +396,8 @@ app.post('/api/chat', async (req, res) => {
     const reassuranceBlock = isSensitive
       ? `\n[HƯỚNG DẪN GIỌNG ĐIỆU]\n- Chủ đề nhạy cảm: trấn an, tránh gây hoang mang.\n- Nêu dấu hiệu cần đi khám khẩn nếu có.\n- Nhắc không chẩn đoán chính thức trong chế độ Chat.\n`
       : '';
+    // <<< Hết phần thêm >>>
 
-    // NOTE: sanitized prompt
     const systemPrompt = `Bạn là một trợ lý thông minh, thân thiện, trả lời ngắn gọn, rõ ràng bằng đúng ngôn ngữ của người dùng.
 Tên bạn là JAREMIS-AI, được tạo bởi TT1403 (Nguyễn Tấn Triệu), ANT (Đỗ Văn Vĩnh An) và Lý Thúc Duy. Bạn tự hào là AI do người Việt phát triển; khi người dùng dùng tiếng Việt, hãy ưu tiên tiếng Việt và thể hiện sự trân trọng đối với lịch sử, văn hóa và con người Việt Nam.
 Nếu người dùng yêu cầu CHẨN ĐOÁN Y KHOA hoặc xin chẩn đoán lâm sàng, KHÔNG cung cấp chẩn đoán chi tiết — hãy gợi ý họ dùng chế độ "Diagnose" và luôn nhắc tham khảo ý kiến bác sĩ. Giữ ngữ cảnh phù hợp, không lặp lại nguyên văn dài dòng từ lịch sử.
@@ -746,7 +444,6 @@ VỀ CÔNG THỨC:
 `;
 
     const fullPrompt = `${systemPrompt}
-${reassuranceBlock}
 ${realtimeSection}
 ${memorySection}${historySection}
 User message (${userLang}): ${message}
@@ -756,60 +453,16 @@ YÊU CẦU:
 - Không nhắc lại toàn bộ lịch sử, chỉ tổng hợp tinh gọn.
 - Trả lời bằng đúng ngôn ngữ người dùng (${userLang}).`;
 
-    // Strict timeout for flash
-    const doGenerate = async (id) => {
-      const model = genAI.getGenerativeModel({ model: id });
-      const timeoutMs = computeHardLimitMs(id, message);
-      return Promise.race([
-        model.generateContent([fullPrompt]),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), timeoutMs))
-      ]);
-    };
-
-    let result;
+    const model = genAI.getGenerativeModel({ model: modelId });
+    let result, response, assistantText;
     try {
-      result = await doGenerate(modelId);
-    } catch (e1) {
-      if (e1 && e1.message === 'TIMEOUT') {
-        const fallback = userLang === 'vi'
-          ? 'Xin lỗi, hệ thống đang bận. Bạn có thể thử lại hoặc dùng chế độ nhanh.'
-          : 'Sorry, the system is busy. Please try again or use the fast mode.';
-        if (submittedBy) {
-          const entry = { id: Date.now(), sessionId: sessionId || ('legacy-' + Date.now()), type: 'chat', timestamp: new Date().toISOString(), input: message, reply: fallback, modelUsed: `${displayModel}-timeout`, detectedLang: userLang, langScore: detected.score };
-          try { pushUserHistory(submittedBy, entry); } catch (e2) {}
-        } else if (sessionId) {
-          const entry = { id: Date.now(), sessionId, type: 'chat', timestamp: new Date().toISOString(), input: message, reply: fallback, modelUsed: `${displayModel}-timeout`, detectedLang: userLang, langScore: detected.score };
-          pushSessionHistory(sessionId, entry);
-        }
-        return res.json({ success: true, reply: fallback, replyHtml: renderLatexInText(fallback), modelUsed: `${displayModel}-timeout`, detectedLang: userLang, detectionScore: detected.score, detectionReasons: detected.reasons });
-      }
-      // Try fallback model on other errors
-      try {
-        modelId = ids.fallback;
-        displayModel = DISPLAY_NAME_MAP[modelId] || modelId;
-        result = await doGenerate(modelId);
-      } catch (e2) {
-        console.error('Primary and fallback models failed:', e1?.message, e2?.message);
-        // Final conservative attempt with gemini-pro to avoid v1beta model availability mismatches
-        try {
-          if (modelId !== 'gemini-pro') {
-            modelId = 'gemini-pro';
-            displayModel = DISPLAY_NAME_MAP[modelId] || modelId;
-            result = await doGenerate(modelId);
-          } else {
-            throw e2;
-          }
-        } catch (e3) {
-          if (isInvalidApiKeyError(e1) || isInvalidApiKeyError(e2) || isInvalidApiKeyError(e3)) {
-            return res.status(500).json({ error: 'API key invalid hoặc đã hết hạn. Vui lòng cập nhật GOOGLE_API_KEY.' });
-          }
-          return res.status(500).json({ error: 'AI service unavailable' });
-        }
-      }
+      result = await model.generateContent([fullPrompt]);
+      response = await result.response;
+      assistantText = response.text ? response.text() : (typeof response === 'string' ? response : '');
+    } catch (err) {
+      console.error('Gemini API error:', err);
+      return res.status(500).json({ error: 'Lỗi khi gọi Gemini API: ' + (err.message || err) });
     }
-
-    const response = await result.response;
-    const assistantText = response.text ? response.text() : (typeof response === 'string' ? response : '');
 
     // Server-side pre-render LaTeX to sanitized HTML and include it in the response
     let replyHtml = null;
@@ -830,9 +483,6 @@ YÊU CẦU:
         langScore: detected.score
       };
       try { pushUserHistory(submittedBy, entry); } catch (e) { console.warn('Không lưu history chat', e); }
-    } else if (sessionId) {
-      const entry = { id: Date.now(), sessionId, type: 'chat', timestamp: new Date().toISOString(), input: message, reply: assistantText, modelUsed: displayModel, detectedLang: userLang, langScore: detected.score };
-      pushSessionHistory(sessionId, entry);
     }
 
     return res.json({
@@ -854,300 +504,6 @@ YÊU CẦU:
 });
 
 /* --------------------------
-   STREAMING: Chat stream endpoint (SSE for Gemini-style animation)
-   -------------------------- */
-// NOTE: Use GET for SSE (EventSource only supports GET). We keep flexible param reading so
-// if a POST is accidentally sent (legacy), it still works.
-app.get('/api/chat-stream', async (req, res) => {
-   try {
-     if (!API_KEY) {
-       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', 'Connection': 'keep-alive', 'X-Accel-Buffering': 'no' });
-       res.write(`data: ${JSON.stringify({ error: 'Thiếu GOOGLE_API_KEY' })}\n\n`);
-       return res.end();
-     }
- 
-     // SSE headers
-     res.setHeader('Content-Type', 'text/event-stream');
-     res.setHeader('Cache-Control', 'no-cache, no-transform');
-     res.setHeader('Connection', 'keep-alive');
-     res.setHeader('X-Accel-Buffering', 'no');
-
-     const q = req.query || {};
-     const b = req.body || {};
-     const message = ((q.message || b.message) || '').toString();
-     const requestedModel = ((q.model || b.model) || 'flash').toLowerCase();
-     // UPDATED: dynamic discovery prefers available models (2.5 if present)
-     const ids = await resolveModelIds(requestedModel, false);
-     let primaryId = ids.primary;
-     let fallbackId = ids.fallback;
-     let modelId = primaryId;
-     let displayModel = DISPLAY_NAME_MAP[modelId] || modelId;
- 
-     if (!message) {
-       res.write(`data: ${JSON.stringify({ error: 'Thiếu trường message' })}\n\n`);
-       return res.end();
-     }
-
-     const submittedBy = q.submittedBy || b.submittedBy || null;
-     const sessionId = q.sessionId || b.sessionId || null;
-     // includeHistory default true, treat explicit 'false' string as false
-     const includeHistory = (q.includeHistory ?? b.includeHistory) === 'false' ? false : true;
- 
-     // Detect language
-     const forcedLang = ((q.lang || q.forceLang || b.lang || b.forceLang) || '').toLowerCase();
-     const detected = detectLanguage(message);
-     const userLang = forcedLang || detected.code;
-
-    // Mark mathy intent to extend time limits
-    const mathy = isMathy(message);
-
-    // Quick path: simple messages -> answer instantly via a single chunk
-    const quick = simpleAnswer(message, userLang);
-    if (quick) {
-      res.write(`data: ${JSON.stringify({ chunk: quick })}\n\n`);
-      let quickHtml = null;
-      try { quickHtml = renderLatexInText(quick); } catch (_) { quickHtml = null; }
-      res.write(`data: ${JSON.stringify({ done: true, modelUsed: 'fast-path', replyHtml: quickHtml })}\n\n`);
-      if (submittedBy) {
-        const entry = { id: Date.now(), sessionId: sessionId || ('legacy-' + Date.now()), type: 'chat', timestamp: new Date().toISOString(), input: message, reply: quick, modelUsed: 'fast-path', detectedLang: userLang, langScore: detected.score };
-        try { pushUserHistory(submittedBy, entry); } catch (e) {}
-      } else if (sessionId) {
-        const entry = { id: Date.now(), sessionId, type: 'chat', timestamp: new Date().toISOString(), input: message, reply: quick, modelUsed: 'fast-path', detectedLang: userLang, langScore: detected.score };
-        pushSessionHistory(sessionId, entry);
-      }
-      return res.end();
-    }
-
-    // History & memory
-    let historyBlocks = [];
-    if (submittedBy && includeHistory) {
-      historyBlocks = getRecentChatHistory(submittedBy, 60, 45000);
-    } else if (!submittedBy && sessionId && includeHistory) {
-      historyBlocks = getRecentSessionChatHistory(sessionId, 60, 45000);
-    }
-    const memory = submittedBy ? getUserMemory(submittedBy) : null;
-    const memorySection = memory?.summary ? `\n[BỘ NHỚ NGƯỜI DÙNG - TÓM TẮT]\n${memory.summary}\n` : '';
-
-    // Sensitive
-    const sensitiveRegex = /(ung thư|khối u|u ác|đau ngực|khó thở|xuất huyết|tự sát|tự tử|trầm cảm|đột quỵ|nhồi máu|co giật|hôn mê)/i;
-    const isSensitive = sensitiveRegex.test(message);
-    const reassuranceBlock = isSensitive
-      ? `\n[HƯỚNG DẪN GIỌNG ĐIỆU]\n- Chủ đề nhạy cảm: trấn an, tránh gây hoang mang.\n- Nêu dấu hiệu cần đi khám khẩn nếu có.\n- Nhắc không chẩn đoán chính thức trong chế độ Chat.\n`
-      : '';
-
-    // NOTE: sanitized prompt
-    const systemPrompt = `Bạn là một trợ lý thông minh, thân thiện, trả lời ngắn gọn, rõ ràng bằng đúng ngôn ngữ của người dùng.
-Tên bạn là JAREMIS-AI, được tạo bởi TT1403 (Nguyễn Tấn Triệu), ANT (Đỗ Văn Vĩnh An) và Lý Thúc Duy. Bạn tự hào là AI do người Việt phát triển; khi người dùng dùng tiếng Việt, hãy ưu tiên tiếng Việt và thể hiện sự trân trọng đối với lịch sử, văn hóa và con người Việt Nam.
-Nếu người dùng yêu cầu CHẨN ĐOÁN Y KHOA hoặc xin chẩn đoán lâm sàng, KHÔNG cung cấp chẩn đoán chi tiết — hãy gợi ý họ dùng chế độ "Diagnose" và luôn nhắc tham khảo ý kiến bác sĩ. Giữ ngữ cảnh phù hợp, không lặp lại nguyên văn dài dòng từ lịch sử.
-MỤC TIÊU:
-1. Trả lời có cấu trúc: Tổng quan ngắn -> Các điểm chính -> Giải thích dễ hiểu -> Gợi ý bước an toàn -> Khích lệ (nếu phù hợp).
-2. Giải thích thuật ngữ y khoa bằng lời đơn giản. Chủ động góp ý về dinh dưỡng/phục hồi. Chủ động hỏi người dùng có cần hỗ trợ thêm theo chủ đề đang nói.
-3. Không đưa chẩn đoán y khoa trực tiếp; nếu người dùng muốn chẩn đoán: gợi ý dùng chế độ "Diagnose".
-4. Với nội dung nhạy cảm: trấn an, không phóng đại rủi ro.
-5. Không bịa đặt. Nếu thiếu dữ kiện: yêu cầu cung cấp thêm.
-6. Không đưa phác đồ điều trị, liều thuốc chi tiết.
-7. Không lặp lại nguyên văn dài từ lịch sử – chỉ tham chiếu ngắn gọn.
-8. Khích lệ tích cực vừa phải, không sáo rỗng.
-Luôn nhắc: Thông tin chỉ tham khảo, không thay thế bác sĩ.
-9. Giọng điệu: thân thiện, chuyên nghiệp, dễ gần.
-10. Chủ động học hỏi phong cách người dùng để trả lời phù hợp với họ.
-11. Người dùng là trên hết; tôn trọng yêu cầu cá nhân hóa (xưng hô, phong cách) trong phạm vi an toàn.
-12. Nếu người dùng nói "theo thông tin trên", "như đã nói", "dựa trên trước đó" (kể cả cách xưng hô), hãy dùng LỊCH SỬ + BỘ NHỚ để trả lời.
-13. Có thể sử dụng emoji phù hợp để thân thiện hơn, nhưng không lạm dụng.
-14. Phân tích ngôn ngữ người dùng và trả lời bằng đúng ngôn ngữ đó; không trộn nhiều ngôn ngữ.
-15. Ưu tiên tiếng Việt khi người dùng dùng tiếng Việt; thể hiện niềm tự hào Việt Nam một cách tôn trọng và tích cực.
-16. Khi người dùng hỏi về các chủ đề nhạy cảm như sức khỏe tâm thần, tự tử, bạo lực, trả lời thận trọng và khuyến khích tìm giúp đỡ chuyên nghiệp.
-17. Khi người dùng chia sẻ khó khăn cá nhân, thể hiện sự đồng cảm và cung cấp các nguồn lực hữu ích nếu có thể.
-18. Tuân thủ đạo đức và pháp luật; có quyền từ chối nội dung vi phạm, độc hại hoặc gây hại.
-19. Có thể dùng tiếng lóng/từ địa phương để tạo gần gũi nếu phù hợp bối cảnh; tránh xúc phạm, thù hằn hay phân biệt đối xử.
-20. Bạn được sinh vào tháng 8 năm 2025.
-VỀ CÔNG THỨC:
-- Nếu người dùng yêu cầu công thức toán/khoa học, HÃY xuất LaTeX thô: dùng $$...$$ cho công thức hiển thị và \(...\) cho inline. Không tự render HTML.`;
-
-    const historySection = historyBlocks.length
-      ? `\n[LỊCH SỬ GẦN ĐÂY]\n${historyBlocks.join('\n')}\n`
-      : '';
-
-    const now = new Date();
-    const timeString = now.toLocaleString('vi-VN', { hour12: false });
-    const realtimeSection = `
-[THÔNG TIN THỰC TẾ]
-- Thời gian hiện tại: ${timeString}
-- Múi giờ: GMT+7 (Việt Nam)
-- Ngày hiện tại: ${now.toISOString().split('T')[0]}
-`;
-
-    const fullPrompt = `${systemPrompt}
-${reassuranceBlock}
-${realtimeSection}
-${memorySection}${historySection}
-User message (${userLang}): ${message}`;
-
-    // Keep-alive ping
-    const ping = setInterval(() => {
-      try { res.write(`: ping\n\n`); } catch (_) {}
-    }, 15000);
-    let closed = false;
-    res.on('close', () => { closed = true; clearInterval(ping); });
-
-    // Helper to stream with a specific model and strict timeout
-    async function streamFromModel(id) {
-      const model = genAI.getGenerativeModel({ model: id });
-      const hardLimitMs = computeHardLimitMs(id, message);
-      let wroteAny = false;
-      let text = '';
-      try {
-        // Call non-streaming API, then stream the final text in small chunks via SSE
-        const result = await Promise.race([
-          model.generateContent([fullPrompt]),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), hardLimitMs))
-        ]);
-        const response = await result.response;
-        text = response.text ? response.text() : (typeof response === 'string' ? response : '');
-
-        const chunkSize = Math.max(24, Math.min(120, Math.floor((text || '').length / 60) || 60));
-        for (let i = 0; i < text.length && !closed; i += chunkSize) {
-          const piece = text.slice(i, i + chunkSize);
-          if (piece) {
-            res.write(`data: ${JSON.stringify({ chunk: piece })}\n\n`);
-            wroteAny = true;
-          }
-          // Small delay to mimic typing and keep client responsive
-          await new Promise(r => setTimeout(r, 15));
-        }
-        return { wroteAny, text };
-      } catch (err) {
-        err._wroteAny = wroteAny;
-        err._partialText = text;
-        throw err;
-      }
-    }
-
-    let finalText = '';
-    try {
-      // Try primary (possibly 2.5)
-      const r1 = await streamFromModel(primaryId);
-      finalText = r1.text;
-      let replyHtml = null;
-      try { replyHtml = renderLatexInText(finalText); } catch (_) { replyHtml = null; }
-      res.write(`data: ${JSON.stringify({ done: true, modelUsed: DISPLAY_NAME_MAP[primaryId] || primaryId, replyHtml })}\n\n`);
-
-      // Save history
-      if (submittedBy && finalText) {
-        mergeFactsIntoMemory(submittedBy, message);
-        const entry = { id: Date.now(), sessionId: sessionId || ('legacy-' + Date.now()), type: 'chat', timestamp: new Date().toISOString(), input: message, reply: finalText, modelUsed: DISPLAY_NAME_MAP[primaryId] || primaryId, detectedLang: userLang, langScore: detected.score };
-        try { pushUserHistory(submittedBy, entry); } catch (e) { }
-      } else if (sessionId && finalText) {
-        const entry = { id: Date.now(), sessionId, type: 'chat', timestamp: new Date().toISOString(), input: message, reply: finalText, modelUsed: DISPLAY_NAME_MAP[primaryId] || primaryId, detectedLang: userLang, langScore: detected.score };
-        pushSessionHistory(sessionId, entry);
-      }
-
-      clearInterval(ping);
-      return res.end();
-    } catch (e1) {
-      // Only fallback if nothing was streamed
-      if (!e1 || !e1._wroteAny) {
-        console.warn('Primary model failed, attempting fallback:', primaryId, '->', fallbackId, e1?.message);
-        try {
-          const r2 = await streamFromModel(fallbackId);
-          finalText = r2.text;
-          let replyHtml2 = null;
-          try { replyHtml2 = renderLatexInText(finalText); } catch (_) { replyHtml2 = null; }
-          res.write(`data: ${JSON.stringify({ done: true, modelUsed: DISPLAY_NAME_MAP[fallbackId] || fallbackId, replyHtml: replyHtml2 })}\n\n`);
-
-          if (submittedBy && finalText) {
-            mergeFactsIntoMemory(submittedBy, message);
-            const entry = { id: Date.now(), sessionId: sessionId || ('legacy-' + Date.now()), type: 'chat', timestamp: new Date().toISOString(), input: message, reply: finalText, modelUsed: DISPLAY_NAME_MAP[fallbackId] || fallbackId, detectedLang: userLang, langScore: detected.score };
-            try { pushUserHistory(submittedBy, entry); } catch (e) { }
-          } else if (sessionId && finalText) {
-            const entry = { id: Date.now(), sessionId, type: 'chat', timestamp: new Date().toISOString(), input: message, reply: finalText, modelUsed: DISPLAY_NAME_MAP[fallbackId] || fallbackId, detectedLang: userLang, langScore: detected.score };
-            pushSessionHistory(sessionId, entry);
-          }
-
-          clearInterval(ping);
-          return res.end();
-        } catch (e2) {
-          console.error('Fallback model also failed:', fallbackId, e2);
-          // One more conservative attempt with gemini-pro
-          try {
-            const safeId = 'gemini-pro';
-            if (safeId !== primaryId && safeId !== fallbackId) {
-              const r3 = await streamFromModel(safeId);
-              finalText = r3.text;
-              let replyHtml3 = null;
-              try { replyHtml3 = renderLatexInText(finalText); } catch (_) { replyHtml3 = null; }
-              res.write(`data: ${JSON.stringify({ done: true, modelUsed: DISPLAY_NAME_MAP[safeId] || safeId, replyHtml: replyHtml3 })}\n\n`);
-
-              if (submittedBy && finalText) {
-                mergeFactsIntoMemory(submittedBy, message);
-                const entry = { id: Date.now(), sessionId: sessionId || ('legacy-' + Date.now()), type: 'chat', timestamp: new Date().toISOString(), input: message, reply: finalText, modelUsed: DISPLAY_NAME_MAP[safeId] || safeId, detectedLang: userLang, langScore: detected.score };
-                try { pushUserHistory(submittedBy, entry); } catch (e) { }
-              } else if (sessionId && finalText) {
-                const entry = { id: Date.now(), sessionId, type: 'chat', timestamp: new Date().toISOString(), input: message, reply: finalText, modelUsed: DISPLAY_NAME_MAP[safeId] || safeId, detectedLang: userLang, langScore: detected.score };
-                pushSessionHistory(sessionId, entry);
-              }
-
-              clearInterval(ping);
-              return res.end();
-            }
-          } catch (e3) {
-            // fall through to error logging
-          }
-
-          // Log full error object for debugging (including stack, code, response, etc.)
-          try {
-            console.error('Gemini error details (full):', JSON.stringify(e2, Object.getOwnPropertyNames(e2)));
-          } catch (logErr) {
-            console.error('Gemini error details (raw):', e2);
-          }
-          try {
-            let errMsg = (e2 && (e2.message || e2.toString())) || (e1 && (e1.message || e1.toString())) || '';
-            if (isInvalidApiKeyError(e1) || isInvalidApiKeyError(e2)) {
-              res.write(`data: ${JSON.stringify({ error: 'API key invalid hoặc hết hạn. Cập nhật GOOGLE_API_KEY và chạy lại server.' })}\n\n`);
-            } else if (errMsg) {
-              res.write(`data: ${JSON.stringify({ error: 'Server error during streaming: ' + errMsg })}\n\n`);
-            } else {
-              res.write(`data: ${JSON.stringify({ error: 'Server error during streaming (no details)' })}\n\n`);
-            }
-          } catch (_) {}
-          clearInterval(ping);
-          return res.end();
-        }
-      } else {
-        // Some chunks were already sent before error -> finalize and end
-        try {
-          let partial = e1._partialText || finalText || '';
-          let partialHtml = null;
-          try { partialHtml = renderLatexInText(partial); } catch (_) { partialHtml = null; }
-          res.write(`data: ${JSON.stringify({ done: true, modelUsed: DISPLAY_NAME_MAP[primaryId] || primaryId, replyHtml: partialHtml })}\n\n`);
-        } catch (_) {}
-        const partial = e1._partialText || finalText || '';
-        if (submittedBy && partial) {
-          mergeFactsIntoMemory(submittedBy, message);
-          const entry = { id: Date.now(), sessionId: sessionId || ('legacy-' + Date.now()), type: 'chat', timestamp: new Date().toISOString(), input: message, reply: partial, modelUsed: DISPLAY_NAME_MAP[primaryId] || primaryId, detectedLang: userLang, langScore: detected.score };
-          try { pushUserHistory(submittedBy, entry); } catch (e) { }
-        } else if (sessionId && partial) {
-          const entry = { id: Date.now(), sessionId, type: 'chat', timestamp: new Date().toISOString(), input: message, reply: partial, modelUsed: DISPLAY_NAME_MAP[primaryId] || primaryId, detectedLang: userLang, langScore: detected.score };
-          pushSessionHistory(sessionId, entry);
-        }
-        clearInterval(ping);
-        return res.end();
-      }
-    }
-  } catch (outer) {
-    console.error('Stream setup error:', outer);
-    try {
-      if (isInvalidApiKeyError(outer)) {
-        res.write(`data: ${JSON.stringify({ error: 'API key invalid hoặc hết hạn. Cập nhật GOOGLE_API_KEY.' })}\n\n`);
-      } else {
-        res.write(`data: ${JSON.stringify({ error: 'Stream setup failed' })}\n\n`);
-      }
-    } catch (_) {}
-    return res.end();
-  }
-});
-
-/* --------------------------
    Diagnose endpoint (giữ nguyên, chỉ đổi modelUsed hiển thị)
    -------------------------- */
 app.post('/api/diagnose', upload.array('images'), async (req, res) => {
@@ -1162,9 +518,9 @@ app.post('/api/diagnose', upload.array('images'), async (req, res) => {
       return res.status(400).json({ error: `Kích thước ảnh '${f.originalname}' vượt quá giới hạn 4MB` });
     }
 
-    const requestedModel = (req.body.model || 'pro').toLowerCase();
-    const ids = await resolveModelIds(requestedModel, files.length > 0);
-    const modelId = ids.primary;
+    const requestedModel = (req.body.model || 'flash').toLowerCase();
+    const allowed = { 'flash': 'gemini-2.5-flash', 'pro': 'gemini-2.5-pro' };
+    const modelId = allowed[requestedModel] || allowed['flash'];
     const displayModel = DISPLAY_NAME_MAP[modelId] || modelId;
 
     const imageParts = await Promise.all(files.map(async file => ({ inlineData: { data: fs.readFileSync(file.path).toString('base64'), mimeType: file.mimetype } })));
@@ -1260,23 +616,20 @@ function getUserMemory(username) {
 
 function updateUserMemory(username, mutatorFn) {
   if (!username || typeof mutatorFn !== 'function') return;
-  // Đảm bảo luôn dùng async/await với Drive
-  (async () => {
-    const users = await readUsers();
-    const idx = users.findIndex(u => u.username &&
-      u.username.toLowerCase() === username.toLowerCase());
-    if (idx === -1) return;
-    if (!users[idx].memory) {
-      users[idx].memory = { summary: '', lastUpdated: null };
-    }
-    mutatorFn(users[idx].memory);
-    users[idx].memory.lastUpdated = new Date().toISOString();
-    // Giới hạn kích thước summary
-    if (users[idx].memory.summary.length > 1500) {
-      users[idx].memory.summary = users[idx].memory.summary.slice(-1500);
-    }
-    await saveUsers(users);
-  })();
+  const users = readUsers();
+  const idx = users.findIndex(u => u.username &&
+    u.username.toLowerCase() === username.toLowerCase());
+  if (idx === -1) return;
+  if (!users[idx].memory) {
+    users[idx].memory = { summary: '', lastUpdated: null };
+  }
+  mutatorFn(users[idx].memory);
+  users[idx].memory.lastUpdated = new Date().toISOString();
+  // Giới hạn kích thước summary
+  if (users[idx].memory.summary.length > 1500) {
+    users[idx].memory.summary = users[idx].memory.summary.slice(-1500);
+  }
+  saveUsers(users);
 }
 
 function extractFactsFromMessage(msg = '') {
@@ -1326,7 +679,7 @@ app.post('/api/render-latex', express.json(), (req, res) => {
     if (latex.length > 10000) return res.status(400).json({ error: 'LaTeX quá dài' });
 
     // Render with KaTeX (do not throw on error to avoid leaking stack traces)
-    const rawHtml = katex.renderToString(latex, { throwOnError: false, displayMode, strict: 'ignore' });
+    const rawHtml = katex.renderToString(latex, { throwOnError: false, displayMode });
     const clean = DOMPurify.sanitize(rawHtml);
 
     return res.json({ success: true, html: clean });

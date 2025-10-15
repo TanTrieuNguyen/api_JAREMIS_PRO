@@ -6,8 +6,6 @@
     <title>JAREMIS - AI Chat</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
-    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
     <style>
         :root {
             --sidebar-width: 260px;
@@ -41,10 +39,6 @@
             height: 100vh;
             overflow: hidden;
         }
-
-        /* Hide mobile-only toggles on desktop */
-        .mobile-header { display: none; }
-        #history-drawer-toggle { display: none; }
 
         .chat-container { display: flex; width: 100%; height: 100%; }
 
@@ -182,11 +176,6 @@
 
         .warning { margin-top:20px; padding:12px; background:var(--who-bg); border-left:4px solid #f1e05a; color:#d4c873; font-size:14px; border-radius:4px; }
         .warning strong { color:#f1e05a; }
-
-        /* Think button style */
-        #think-btn { background:none; border:1px solid var(--border-color); border-radius:6px; padding:6px 8px; color:var(--text-secondary-color); cursor:pointer; width:auto; height:40px; display:flex; align-items:center; justify-content:center; }
-        #think-btn.active { background: linear-gradient(90deg, rgba(47,129,247,0.12), rgba(47,129,247,0.06)); color:var(--text-color); border-color: rgba(47,129,247,0.6); }
-        #model-status { font-size:12px; color:var(--text-secondary-color); margin-left:8px; align-self:center; }
 
         /* Mic button style */
         #mic-btn { background:none; border:1px solid var(--border-color); border-radius:6px; padding:6px 8px; color:var(--text-secondary-color); cursor:pointer; width:auto; height:40px; display:flex; align-items:center; justify-content:center; }
@@ -708,13 +697,6 @@
   transform:perspective(800px) rotateX(0deg) rotateY(0deg) translateZ(0) scale(.95);
 }
 </style>
-<!-- Ensure the drawer toggle appears on mobile only -->
-<style>
-  @media (max-width:600px){
-    #history-drawer-toggle { display: inline-flex; }
-    .mobile-header { display: flex; }
-  }
-</style>
 </head>
 <body>
     <div class="bg-animation">
@@ -762,7 +744,7 @@
                 </span>
             </button>
             <!-- Mobile header (shown on small screens) -->
-            <div class="mobile-header" id="mobile-header">
+            <div class="mobile-header" id="mobile-header" style="display:none;">
                 <button class="hamburger" id="mobile-menu-btn" aria-label="Mở menu"><i class="fas fa-bars"></i></button>
                 <div class="title">JAREMIS</div>
                 <button id="history-toggle-btn" aria-label="Xem lịch sử" onclick="toggleHistoryMode()">
@@ -795,19 +777,19 @@
                         </button>
 
                         <div id="tool-buttons" class="tool-buttons collapsed">
-                            <button class="action-btn" id="attach-btn" onclick="document.getElementById('images').click()" title="Đính kèm ảnh (Ctrl+Shift+U)">
+                            <button class="action-btn" onclick="document.getElementById('images').click()" title="Đính kèm ảnh (Ctrl+I)">
                                 <i class="fas fa-paperclip"></i>
                             </button>
-                            <button id="mode-btn" class="action-btn" title="Chế độ: Chat (Ctrl+Shift+K)" onclick="toggleMode(event)">
+                            <button id="mode-btn" class="action-btn" title="Chế độ: Chat (Ctrl+M)" onclick="toggleMode(event)">
                                 <i class="fas fa-comments"></i>
                             </button>
-                            <button id="mic-btn" class="action-btn" title="Ghi giọng nói (Ctrl+M). Nhấn để bắt đầu/dừng" onclick="toggleMic(event)">
+                            <button id="mic-btn" class="action-btn" title="Ghi giọng nói (Ctrl+Shift+S)" onclick="toggleMic(event)">
                                 <i class="fas fa-microphone"></i>
                                 <span id="mic-indicator"></span>
                             </button>
-                                                    </div>
+                        </div>
 
-                        <button id="send-btn" class="action-btn" onclick="submitData()" title="Gửi (Enter)">
+                        <button id="send-btn" class="action-btn" onclick="submitData()" title="Gửi (Enter)\nXuống dòng: Shift+Enter">
                             <i class="fas fa-paper-plane"></i>
                         </button>
 
@@ -843,13 +825,9 @@
                     <label>Mật khẩu</label>
                     <input id="login-password" type="password" placeholder="Mật khẩu">
                 </div>
-                <div class="form-row">
-                    <button class="btn-primary" onclick="submitLogin()">Đăng nhập</button>
-                    <button class="btn-primary" onclick="loginWithGoogle()" style="background-color: #4285F4;"> <i class="fab fa-google"></i> Google</button>
-                    <button class="btn-primary" onclick="loginWithFacebook()" style="background-color: #3b5998;"> <i class="fab fa-facebook"></i> Facebook</button>
-                </div>
 
                 <div class="form-actions">
+                    <button class="btn-primary" onclick="submitLogin()">Đăng nhập</button>
                     <button class="btn-ghost" onclick="closeAuthModal()">Hủy</button>
                 </div>
                 <div class="small-muted">Bạn chưa có tài khoản? Chuyển sang tab "Đăng ký".</div>
@@ -906,17 +884,17 @@
       </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
         // ------------------------------
         // UI elements & state
         // ------------------------------
+        // Remove thinkBtn & useProModel
+        // const thinkBtn = document.getElementById('think-btn'); (removed)
         const chatInput = document.getElementById('chat-input');
         const sendBtn = document.getElementById('send-btn');
         const imageInput = document.getElementById('images');
         const imagePreviewContainer = document.getElementById('image-preview-container');
         const chatMessages = document.getElementById('chat-messages');
-        const thinkBtn = document.getElementById('think-btn');
         const modelStatusEl = document.getElementById('model-status');
         const micBtn = document.getElementById('mic-btn');
         const micIndicator = document.getElementById('mic-indicator');
@@ -928,7 +906,6 @@
         const authBackdrop = document.getElementById('auth-backdrop');
         const authControls = document.getElementById('auth-controls');
 
-        let useProModel = false;
         let diagnosticMode = false; // Chat mode default
         let recognition = null;
         let isRecording = false;
@@ -937,112 +914,65 @@
 
         let currentSessionId = null;
 
-        // Config: optional timeout cap for the 'flash' model. 0 disables auto-stop.
-        // Set e.g. window.FLASH_TIMEOUT_MS = 45000 to cap at 45s.
-        window.FLASH_TIMEOUT_MS = window.FLASH_TIMEOUT_MS ?? 0;
+        // Khởi tạo session hiện tại
+        document.addEventListener('DOMContentLoaded', () => {
+          if (!localStorage.getItem('jaremis_session')) {
+            localStorage.setItem('jaremis_session', 'sess-' + Date.now());
+          }
+          currentSessionId = localStorage.getItem('jaremis_session');
+          // Thêm lời chào nếu trống
+          if (!chatMessages.innerHTML.trim()) {
+            chatMessages.innerHTML = `<div class="chat-bubble bot-bubble"><strong>Chào bạn 👋 Mình là JAREMIS.</strong><p style="margin-top:8px; color:var(--text-secondary-color);">Bắt đầu cuộc trò chuyện mới.</p></div>`;
+          }
+        });
 
-        // Helpers required by inline handlers and rendering
-        function escapeHtml(str){
-          if (str === null || str === undefined) return '';
-          return String(str)
-            .replace(/&/g,'&amp;')
-            .replace(/</g,'&lt;')
-            .replace(/>/g,'&gt;')
-            .replace(/"/g,'&quot;')
-            .replace(/'/g,'&#039;');
+        // Tạo cuộc trò chuyện mới (giống ChatGPT)
+        function startNewConversation() {
+          currentSessionId = 'sess-' + Date.now();
+          localStorage.setItem('jaremis_session', currentSessionId);
+          chatMessages.innerHTML = `
+            <div class="chat-bubble bot-bubble">
+              <strong>Cuộc trò chuyện mới đã bắt đầu.</strong>
+              <p style="margin-top:8px; color:var(--text-secondary-color);">Hãy nhập câu hỏi đầu tiên của bạn.</p>
+            </div>`;
+          chatMessages.scrollTop = chatMessages.scrollHeight;
         }
-        function autoResize(el){
-          if(!el) return;
-          el.style.height = 'auto';
-          const maxH = 200;
-          el.style.height = Math.min(maxH, el.scrollHeight || 0) + 'px';
+
+        // ------------------------------
+        // Helper: Escape HTML
+        // ------------------------------
+        function escapeHtml(unsafe) {
+            if (unsafe === null || unsafe === undefined) return '';
+            return String(unsafe)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
         }
 
-        // Mobile sidebar (hamburger) behavior: open/close existing sidebar overlay (no new elements)
-        (function(){
-          const mobileBtn = document.getElementById('mobile-menu-btn');
-          const drawerToggleBtn = document.getElementById('history-drawer-toggle');
-          const sidebarEl = document.getElementById('sidebar');
-          const backdrop = document.getElementById('sidebar-backdrop');
-          if (!sidebarEl || !backdrop) return;
+        // ------------------------------
+        // Auto-resize textarea
+        // ------------------------------
+        function autoResize(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = textarea.scrollHeight + 'px';
+        }
 
-          function openSidebar(){
-            sidebarEl.classList.add('mobile-open');
-            backdrop.style.display = 'block';
-            backdrop.classList.add('show');
-            document.body.classList.add('no-scroll');
-            if (mobileBtn) mobileBtn.setAttribute('aria-expanded','true');
-            if (drawerToggleBtn) drawerToggleBtn.classList.add('open');
-            setTimeout(()=>{ try{ sidebarEl.focus(); }catch(e){} },50);
-          }
-
-          function closeSidebar(){
-            sidebarEl.classList.remove('mobile-open');
-            backdrop.classList.remove('show');
-            backdrop.style.display = 'none';
-            document.body.classList.remove('no-scroll');
-            if (mobileBtn) mobileBtn.setAttribute('aria-expanded','false');
-            if (drawerToggleBtn) drawerToggleBtn.classList.remove('open');
-          }
-
-          if (mobileBtn) {
-            mobileBtn.addEventListener('click', function(e){
-              e && e.preventDefault();
-              if (sidebarEl.classList.contains('mobile-open')) closeSidebar();
-              else openSidebar();
-            });
-          }
-
-          if (drawerToggleBtn) {
-            drawerToggleBtn.addEventListener('click', function(e){
-              e && e.preventDefault();
-              if (sidebarEl.classList.contains('mobile-open')) closeSidebar();
-              else openSidebar();
-            });
-          }
-
-          backdrop.addEventListener('click', function(){ closeSidebar(); });
-
-          document.addEventListener('keydown', function(e){
-            if (e.key === 'Escape' && sidebarEl.classList.contains('mobile-open')) closeSidebar();
-          });
-
-          if (historyListEl){
-            historyListEl.addEventListener('click', function(e){
-              const li = e.target.closest && e.target.closest('li');
-              if (!li) return;
-              setTimeout(closeSidebar, 120);
-            });
-          }
-
-          function debounce(fn, ms){ let t; return function(){ clearTimeout(t); t = setTimeout(fn, ms); }; }
-          window.addEventListener('resize', debounce(function(){ if (window.innerWidth > 600) closeSidebar(); }, 180));
-        })();
-
+        // ------------------------------
+        // Mode toggles
         // ------------------------------
         function toggleMode(e) {
             e?.preventDefault();
             diagnosticMode = !diagnosticMode;
             if (diagnosticMode) {
                 modeBtn.classList.add('active');
-                modeBtn.title = 'Chế độ: Diagnose (chẩn đoán y khoa)';
+                modeBtn.title = 'Chế độ: Diagnose (Ctrl+M)';
                 modeBtn.innerHTML = '<i class="fas fa-stethoscope"></i>';
             } else {
                 modeBtn.classList.remove('active');
-                modeBtn.title = 'Chế độ: Chat';
+                modeBtn.title = 'Chế độ: Chat (Ctrl+M)';
                 modeBtn.innerHTML = '<i class="fas fa-comments"></i>';
-            }
-        }
-
-        function toggleThink(e) {
-            e?.preventDefault();
-            useProModel = !useProModel;
-            if (useProModel) {
-                thinkBtn.classList.add('active');
-                modelStatusEl.textContent = 'Model: JAREMIS PRO 1.5';
-            } else {
-                thinkBtn.classList.remove('active');
-                modelStatusEl.textContent = 'Model: JAREMIS 1.5';
             }
         }
 
@@ -1053,11 +983,6 @@
             renderAuthControls();
             const u = getLocalUser();
             if (u) fetchAndRenderHistory(u.username);
-            // Restore anonymous session to keep context between page reloads
-            try {
-                const savedSess = localStorage.getItem('jaremis_session');
-                if (savedSess) currentSessionId = savedSess;
-            } catch(_) {}
         });
 
         function getLocalUser() {
@@ -1105,7 +1030,7 @@
                 logoutBtn.className = 'auth-btn';
                 logoutBtn.textContent = 'Đăng xuất';
                 logoutBtn.onclick = () => {
-                    try { localStorage.removeItem('jaremis_user'); } catch(e) {}
+                    localStorage.removeItem('jaremis_user');
                     renderAuthControls();
                     historyCache = [];
                     renderHistoryList([]);
@@ -1207,16 +1132,6 @@
                 console.error('Login error', e);
                 flashNotice('Lỗi kết nối khi đăng nhập');
             }
-        }
-
-        // New: Login with Google
-        function loginWithGoogle() {
-            window.location.href = '/auth/google';
-        }
-
-        // New: Login with Facebook
-        function loginWithFacebook() {
-            window.location.href = '/auth/facebook';
         }
 
         function flashNotice(msg, duration = 2000) {
@@ -1470,30 +1385,6 @@
         // Submit: chooses /api/chat or /api/diagnose
         // ------------------------------
         async function submitData() {
-            // Prevent double-submit, but recover from stale/aborted controllers
-            if (window._currentAbortController) {
-                try {
-                    const sig = window._currentAbortController.signal;
-                    const startedAt = window._currentAbortStartedAt || 0;
-                    const tooLong = Date.now() - startedAt > 20000; // 20s safety
-                    if (sig && sig.aborted) {
-                        window._currentAbortController = null;
-                        window._currentAbortStartedAt = 0;
-                    } else if (tooLong) {
-                        // reset stuck state
-                        try { window._currentAbortController.abort(); } catch(e) {}
-                        window._currentAbortController = null;
-                        window._currentAbortStartedAt = 0;
-                    } else {
-                        // still in-progress -> ignore new send
-                        flashNotice && flashNotice('Đang xử lý phản hồi trước, hãy đợi hoặc nhấn nút dừng.');
-                        return;
-                    }
-                } catch (e) {
-                    window._currentAbortController = null;
-                    window._currentAbortStartedAt = 0;
-                }
-            }
             const labResults = chatInput.value.trim();
             const images = imageInput.files;
             if (!labResults && images.length === 0) return;
@@ -1501,8 +1392,7 @@
                 currentSessionId = 'sess-' + Date.now();
                 localStorage.setItem('jaremis_session', currentSessionId);
             }
-
-            // Build user bubble
+            // 1. Display user bubble
             let userHtml = `<div class="chat-bubble user-bubble"><div class="user-bubble-content">`;
             if (labResults) userHtml += `<p>${escapeHtml(labResults)}</p>`;
             if (images.length > 0) {
@@ -1520,458 +1410,336 @@
             userHtml += `</div></div>`;
             chatMessages.innerHTML += userHtml;
 
-            // Clear input + previews
+            // 2. Clear input + previews
             chatInput.value = '';
             autoResize(chatInput);
             imagePreviewContainer.innerHTML = '';
 
-            // Create loading bubble
+            // 3. Create loading bubble
             const loadingBubble = document.createElement('div');
             loadingBubble.className = 'chat-bubble bot-bubble';
             chatMessages.appendChild(loadingBubble);
             chatMessages.scrollTop = chatMessages.scrollHeight;
 
-            // Setup AbortController so user can stop the response
-            const controller = new AbortController();
-            window._currentAbortController = controller;
-            window._currentAbortStartedAt = Date.now();
-
-            // Toggle send button into stop button
             try {
-                sendBtn.dataset.prevHtml = sendBtn.innerHTML || '';
-                sendBtn.dataset.prevTitle = sendBtn.title || '';
-                sendBtn.innerHTML = '<i class="fas fa-stop"></i>';
-                sendBtn.title = 'Dừng AI (Ctrl+Enter)';
-                sendBtn.onclick = function(e){ e?.preventDefault(); if (window._currentAbortController) window._currentAbortController.abort(); };
-            } catch (e) {}
-
-            // Implement 15s timeout for flash model
-            let flashTimeoutId = null;
-            const modelName = useProModel ? 'pro' : 'flash';
-            const timeoutMs = (window.FLASH_TIMEOUT_MS ?? 0);
-            if (modelName === 'flash' && timeoutMs > 0) {
-                // stop if too slow
-                flashTimeoutId = setTimeout(() => {
-                    try {
-                        if (window._currentAbortController) {
-                            window._currentAbortController.abort();
-                            flashNotice && flashNotice(`Flash model exceeded ${timeoutMs}ms timeout and was stopped.`);
-                        }
-                    } catch (e) { /* ignore */ }
-                }, timeoutMs);
-            }
-
-            try {
-                // Show thinking animation while the model is responding
-                startThinking(loadingBubble);
-
                 if (diagnosticMode) {
+                    // Diagnose flow
                     const formData = new FormData();
                     if (labResults) formData.append('labResults', labResults);
                     Array.from(images).forEach(img => formData.append('images', img));
-                    formData.append('model', modelName);
+                    formData.append('model', useProModel ? 'pro' : 'flash');
                     formData.append('sessionId', currentSessionId);
                     if (currentUser) formData.append('submittedBy', currentUser.username);
 
-                    const resp = await fetch('/api/diagnose', { method: 'POST', body: formData, signal: controller.signal });
-                    if (!resp.ok) {
-                        const error = await resp.json().catch(()=>({error:'Lỗi từ server'}));
+                    const analysisPromise = animateAnalysisSteps(loadingBubble);
+                    const fetchPromise = fetch('/api/diagnose', { method: 'POST', body: formData });
+
+                    const [_, response] = await Promise.all([analysisPromise, fetchPromise]);
+
+                    if (!response.ok) {
+                        const error = await response.json().catch(() => ({ error: 'Lỗi không xác định từ máy chủ' }));
                         throw new Error(error.error || 'Lỗi không xác định từ máy chủ');
                     }
-                    const data = await resp.json();
-                    // Prefer server-rendered KaTeX HTML to avoid client-side parsing issues
-                    const html = data.diagnosisHtml;
-                    stopThinking(loadingBubble);
-                    if (html) {
-
-                        loadingBubble.innerHTML = `<div class="bot-reply">${html}</div>`;
-                        try {
-                            if (window.jaremis && typeof window.jaremis.ensureRenderMath === 'function') {
-                                window.jaremis.ensureRenderMath(loadingBubble);
-                            } else if (typeof window.renderMathIn === 'function') {
-                                window.renderMathIn(loadingBubble);
-                            }
-                        } catch(_) {}
-                        chatMessages.scrollTop = chatMessages.scrollHeight;
-                    } else {
-                        const fallback = convertMarkdown(data.diagnosis || '');
-                        await renderBotReplyAnimated(loadingBubble, fallback);
-                    }
+                    const data = await response.json();
+                    displayResults(data, loadingBubble);
                     if (currentUser) fetchAndRenderHistory(currentUser.username);
                 } else {
-                    // Use the new streaming endpoint for chat mode
-                    await streamChatResponse(labResults, images, modelName, currentUser, currentSessionId, loadingBubble, controller.signal);
+                    // Chat flow
+                    const body = { message: labResults, model: 'flash', sessionId: currentSessionId };
+                    if (currentUser) body.submittedBy = currentUser.username;
+                    if (images.length > 0) body.imagesCount = images.length;
+
+                    const resp = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+                    let data;
+                    try {
+                        data = await resp.json();
+                    } catch (e) {
+                        loadingBubble.innerHTML = '<div style="color:red">Lỗi phân tích phản hồi từ server.</div>';
+                        return;
+                    }
+                    if (!resp.ok || !data.reply) {
+                        loadingBubble.innerHTML = `<div style='color:red'>${escapeHtml(data.error || 'Lỗi khi nhận phản hồi từ AI.')}</div>`;
+                        return;
+                    }
+                    // Prefer server-rendered HTML (replyHtml) when available to avoid flicker
+                    let replyHtmlContent = '';
+                    if (data.replyHtml) replyHtmlContent = data.replyHtml;
+                    else replyHtmlContent = escapeHtml(data.reply || data.replyText || '');
+                    loadingBubble.innerHTML = `<div class="diagnosis-details math-rendered">${replyHtmlContent}</div>`;
+                    loadingBubble.dataset.katexRendered = '1';
+                    if (currentUser) fetchAndRenderHistory(currentUser.username);
                 }
-           
-           
-            } catch (err) {
-                if (err && err.name === 'AbortError') {
-                    flashNotice('AI response stopped');
-                    loadingBubble.remove();
-                } else {
-                    showError(err.message || String(err), loadingBubble);
-                }
+            } catch (error) {
+                loadingBubble.innerHTML = `<div style='color:red'>${escapeHtml(error.message || 'Lỗi không xác định.')}</div>`;
             } finally {
-                // cleanup
-                clearTimeout(flashTimeoutId);
-                               window._currentAbortController = null;
-                window._currentAbortStartedAt = 0;
-                try {
-                    sendBtn.innerHTML = sendBtn.dataset.prevHtml || '<i class="fas fa-paper-plane"></i>';
-                    sendBtn.title = sendBtn.dataset.prevTitle || 'Gửi';
-                    sendBtn.onclick = submitData;
-                    delete sendBtn.dataset.prevHtml; delete sendBtn.dataset.prevTitle;
-                } catch (e) {}
+                sendBtn.disabled = false;
                 imageInput.value = '';
             }
+         }
+
+         // ------------------------------
+         // displayResults for diagnose flows
+         // ------------------------------
+         function displayResults(data, targetBubble) {
+             // if it's a chat-style reply
+            if (data.reply) {
+                const content = data.replyHtml ? data.replyHtml : convertMarkdown(data.reply);
+                targetBubble.innerHTML = `<div class="diagnosis-details math-rendered">${content}</div>`;
+                targetBubble.dataset.katexRendered = '1';
+                return;
+            }
+
+             let html = '';
+
+             if (data.confidence !== undefined) {
+                 html += `
+                     <div class="confidence-meter">
+                         <div class="confidence-bar" style="width:${Math.max(0, Math.min(100, data.confidence))}%">Độ tin cậy: ${data.confidence}%</div>
+                     </div>
+                 `;
+             }
+
+             if (Array.isArray(data.diseases) && data.diseases.length) {
+                 html += '<h3><i class="fas fa-notes-medical"></i> Khả năng chẩn đoán</h3><div class="disease-list">';
+                 data.diseases.forEach(d => {
+                     const pct = Math.min(d.probability || 0, 100);
+                     html += `
+                         <div class="disease-item">
+                             <strong>${escapeHtml(d.name || '')}</strong>
+                             <div class="probability-bar">
+                                 <div class="probability-fill" style="width:${pct}%"></div>
+                             </div>
+                         </div>
+                     `;
+                 });
+                 html += '</div>';
+             }
+
+            if (data.diagnosis) {
+                const diagContent = data.diagnosisHtml ? data.diagnosisHtml : convertMarkdown(data.diagnosis);
+                html += `<div class="diagnosis-details math-rendered">
+                    ${diagContent}
+                    ${displayReferences(data.references)}
+                    <div class="warning">${data.warning || ''}</div>
+                </div>`;
+            } else if (data.icdDescriptions && data.icdDescriptions.length) {
+                 html += `<div class="diagnosis-details"><h3>Chẩn đoán phân biệt (ICD)</h3>`;
+                 data.icdDescriptions.forEach(item => {
+                     html += `<div class="disease-item"><strong>${escapeHtml(item.label)}</strong><div>${escapeHtml(item.icdCode || '')} - ${escapeHtml(item.description || '')}</div></div>`;
+                 });
+                 html += `</div>`;
+             }
+
+             if (data.modelUsed) {
+                 html += `<div style="margin-top:10px; font-size:12px; color:var(--text-secondary-color)">Đã dùng model: ${escapeHtml(data.modelUsed)}</div>`;
+             }
+
+             targetBubble.innerHTML = html;
+            // If server provided rendered HTML for diagnosis, mark bubble to skip client KaTeX pass
+            if (data.diagnosisHtml) targetBubble.dataset.katexRendered = '1';
+             chatMessages.scrollTop = chatMessages.scrollHeight;
+         }
+
+        // Gemini-style animation: show each line faded, then fade in
+function animateBubbleLines(bubble, htmlContent) {
+  bubble.innerHTML = '';
+  // Split by <br> or newline, keep HTML tags
+  let lines = htmlContent.split(/<br\s*\/?>|\n/);
+  lines = lines.map(l => l.trim()).filter(l => l.length > 0);
+  lines.forEach((line, i) => {
+    const div = document.createElement('div');
+    div.className = 'bubble-line faded';
+    div.innerHTML = line;
+    bubble.appendChild(div);
+    setTimeout(() => {
+      div.classList.add('fade-in');
+    }, 500 + i * 120); // delay per line
+  });
+}
+
+// Add CSS for fade effect
+const style = document.createElement('style');
+style.innerHTML = `
+.bubble-line.faded {
+  opacity: 0.35;
+  transition: opacity 0.45s;
+}
+.bubble-line.fade-in {
+  opacity: 1;
+}
+`;
+document.head.appendChild(style);
+
+        /* Sidebar resize logic */
+        const sidebar = document.getElementById('sidebar');
+        const resizer = document.getElementById('resizer');
+
+        const mouseMoveHandler = function (e) {
+            const dx = e.clientX - sidebar.getBoundingClientRect().right;
+            const newWidth = sidebar.offsetWidth + dx;
+            document.documentElement.style.setProperty('--sidebar-width', `${newWidth}px`);
+        };
+
+        const mouseUpHandler = function () {
+            document.removeEventListener('mousemove', mouseMoveHandler);
+            document.removeEventListener('mouseup', mouseUpHandler);
+            document.body.style.cursor = 'default';
+            document.body.style.userSelect = 'auto';
+        };
+
+        resizer.addEventListener('mousedown', function (e) {
+            e.preventDefault();
+            document.addEventListener('mousemove', mouseMoveHandler);
+            document.addEventListener('mouseup', mouseUpHandler);
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+        });
+
+        const sidebarEl = document.getElementById('sidebar');
+        const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+        const historyDrawerToggle = document.getElementById('history-drawer-toggle');
+
+        function isMobileView() { return window.innerWidth <= 600; }
+
+        function openSidebarMobile() {
+          sidebarEl.classList.add('mobile-open');
+          sidebarBackdrop.classList.add('show');
+          syncHistoryArrow();
+        }
+        function closeSidebarMobile() {
+          sidebarEl.classList.remove('mobile-open');
+          sidebarBackdrop.classList.remove('show');
+          syncHistoryArrow();
+        }
+        function syncHistoryArrow() {
+          if (!isMobileView()) { historyDrawerToggle.style.display='none'; return; }
+          historyDrawerToggle.style.display='flex';
+          if (!historyDrawerToggle.querySelector('.bars')) {
+             historyDrawerToggle.innerHTML =
+               '<span class="bars" aria-hidden="true"><span class="bar"></span><span class="bar"></span><span class="bar"></span></span>';
+          }
+          if (sidebarEl.classList.contains('mobile-open')) {
+             historyDrawerToggle.classList.add('open');
+          } else {
+             historyDrawerToggle.classList.remove('open');
+          }
         }
 
-        // New function to handle streaming chat responses
-        async function streamChatResponse(message, images, model, user, sessionId, targetBubble, signal) {
-            // Use GET + EventSource (SSE) to match backend route and avoid streaming errors
-            stopThinking(targetBubble);
-            targetBubble.innerHTML = '';
-            const container = document.createElement('div');
-            container.className = 'bot-reply';
-            targetBubble.appendChild(container);
 
-            // Build query params expected by backend GET SSE endpoint
-            const params = new URLSearchParams({
-                message,
-                model,
-                sessionId: sessionId || '' ,
-                includeHistory: 'true'
-            });
-            if (user && user.username) params.set('submittedBy', user.username);
-            if (images && images.length > 0) params.set('imagesCount', String(images.length));
 
-            let fullReply = '';
-            let finalHtml = null;
-            let done = false;
 
-            const es = new EventSource('/api/chat-stream?' + params.toString());
 
-            function handleMessageEvent(e){
-                try {
-                    const data = JSON.parse(e.data || '{}');
-                    if (data.chunk) {
-                        fullReply += data.chunk;
-                        // render escaped during stream to keep delimiters intact
-                        container.innerHTML = escapeHtml(fullReply).replace(/\n/g, '<br>');
-                        chatMessages.scrollTop = chatMessages.scrollHeight;
-                    }
-                    if (data.error) {
-                        container.innerHTML = `<div class="error-message">${escapeHtml(data.error)}</div>`;
-                        done = true; es.close();
-                    }
-                    if (data.done) {
-                        done = true;
-                        finalHtml = data.replyHtml || null;
-                        es.close();
-                    }
-                } catch (err) {
-                    console.error('SSE parse error', err);
-                }
-            }
 
-            function finish(){
-                try {
-                    if (done && finalHtml) {
-                        container.innerHTML = finalHtml;
-                    } else if (fullReply) {
-                        container.innerHTML = (window.marked ? marked.parse(fullReply) : escapeHtml(fullReply).replace(/\n/g,'<br>'));
-                    }
-                    if (window.jaremis && typeof window.jaremis.ensureRenderMath === 'function') {
-                        window.jaremis.ensureRenderMath(targetBubble);
-                    } else if (typeof window.renderMathIn === 'function') {
-                        window.renderMathIn(targetBubble);
-                    }
-                    chatMessages.scrollTop = chatMessages.scrollHeight;
-                    if (user && done) fetchAndRenderHistory(user.username);
-                } catch(_){ }
-            }
 
-            es.addEventListener('message', handleMessageEvent);
-            es.onerror = () => {
-                if (!done) {
-                    container.innerHTML = `<div class="error-message">Error streaming response: Server error during streaming.</div>`;
-                }
-                es.close();
-            };
+        historyDrawerToggle.addEventListener('click', () => {
+          if (sidebarEl.classList.contains('mobile-open')) closeSidebarMobile();
+          else openSidebarMobile();
+        });
+        sidebarBackdrop.addEventListener('click', closeSidebarMobile);
 
-            // Abort support: close SSE when user stops
-            if (signal && typeof signal.addEventListener === 'function') {
-                signal.addEventListener('abort', () => {
-                    try { es.close(); } catch(_) {}
-                    // keep partial content and stop further updates
-                }, { once: true });
-            }
+        // Đồng bộ khi resize
+        window.addEventListener('resize', syncHistoryArrow);
+        document.addEventListener('DOMContentLoaded', syncHistoryArrow);
+        // End of mobile additions
 
-            // Poll finish if the connection ends; Mutation happens via events
-            const checkInterval = setInterval(() => {
-                if (es.readyState === 2 /* CLOSED */) { clearInterval(checkInterval); finish(); }
-            }, 300);
-        }
-
-        // Ensure Enter sends (unless Shift+Enter), and support Ctrl+Enter as send as well
-        (function(){
-            try {
-                const ci = document.getElementById('chat-input');
-                if (ci) {
-                    ci.addEventListener('keydown', function(ev){
-                        if (ev.key === 'Enter' && !ev.shiftKey) {
-                            ev.preventDefault();
-                            // If a response is in progress, Enter stops it; otherwise, it sends
-                            if (window._currentAbortController) {
-                                try { window._currentAbortController.abort(); } catch(e) {}
-                            } else {
-                                submitData();
-                            }
-                        } else if ((ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey))) {
-                            ev.preventDefault();
-                            if (window._currentAbortController) {
-                                try { window._currentAbortController.abort(); } catch(e) {}
-                            } else {
-                                submitData();
-                            }
-                        }
-                    });
-                }
-            } catch(e){ console.warn(e); }
-        })();
-
-        // ------------------------------
-        // UI helpers referenced by inline handlers
-        // ------------------------------
         function toggleToolTray(e){
-            e?.preventDefault();
-            const panel = document.getElementById('tool-buttons');
-            const btn = document.getElementById('toggle-tools-btn');
-            if (!panel || !btn) return;
-            const willOpen = panel.classList.contains('collapsed');
-            panel.classList.toggle('collapsed');
-            btn.classList.toggle('active');
-            if (willOpen) {
-                // close when clicking outside
-                const onDocClick = (ev) => {
-                    if (btn.contains(ev.target) || panel.contains(ev.target)) return;
-                    panel.classList.add('collapsed');
-                    btn.classList.remove('active');
-                    document.removeEventListener('click', onDocClick, true);
-                };
-                // delay to avoid immediate closing by current click
-                setTimeout(()=>document.addEventListener('click', onDocClick, true), 0);
-            }
+          e?.preventDefault();
+          const tray = document.getElementById('tool-buttons');
+          const btn = document.getElementById('toggle-tools-btn');
+          if (!tray || !btn) return;
+          const opening = tray.classList.contains('collapsed');
+          tray.classList.toggle('collapsed', !opening);
+          btn.classList.toggle('active', opening);
+          btn.setAttribute('aria-expanded', opening ? 'true' : 'false');
+
+          if (opening) {
+            const closeHandler = (ev)=>{
+              if (!tray.contains(ev.target) && ev.target !== btn) {
+                tray.classList.add('collapsed');
+                btn.classList.remove('active');
+                btn.setAttribute('aria-expanded','false');
+                document.removeEventListener('click', closeHandler);
+              }
+            };
+            setTimeout(()=>document.addEventListener('click', closeHandler),0);
+          }
         }
 
-        function toggleHistoryMode(){
-            // For mobile: reuse the same sidebar overlay. Just toggle it.
-            try {
-                const topToggle = document.getElementById('history-drawer-toggle');
-                const hdrBtn = document.getElementById('history-toggle-btn');
-                if (topToggle) topToggle.click();
-                if (hdrBtn) hdrBtn.classList.toggle('active');
-            } catch(e){ console.warn('toggleHistoryMode error', e); }
-        }
+        // Nếu muốn auto đóng sau khi gửi tin nhắn:
+        const originalSubmitData = submitData;
+        submitData = async function(){
+          const tray = document.getElementById('tool-buttons');
+          const btn = document.getElementById('toggle-tools-btn');
+          if (tray && !tray.classList.contains('collapsed')) {
+            tray.classList.add('collapsed');
+            btn.classList.remove('active');
+          }
+          return originalSubmitData();
+        };
 
-        function startNewConversation(){
-            try {
-                // create a fresh session id
-                currentSessionId = 'sess-' + Date.now();
-                try { localStorage.setItem('jaremis_session', currentSessionId); } catch(_) {}
-                // reset UI messages to greeting
-                chatMessages.innerHTML = '<div style="height:12px;"></div>'+
-                  '<div class="chat-bubble bot-bubble">'+
-                  '<strong>Chào bạn 👋 Mình là JAREMIS.</strong>'+
-                  '<p style="margin-top:8px; color:var(--text-secondary-color);">Hãy nhập các dấu hiệu, hỏi chuyện, hoặc bật chế độ <strong>Diagnose</strong> để yêu cầu chẩn đoán y khoa.</p>'+
-                  '</div>';
-                chatMessages.scrollTop = chatMessages.scrollHeight;
-                // clear input & previews
-                chatInput.value = '';
-                autoResize(chatInput);
-                imagePreviewContainer.innerHTML = '';
-                // close sidebar if open (mobile)
-                const sidebarEl = document.getElementById('sidebar');
-                const backdrop = document.getElementById('sidebar-backdrop');
-                if (sidebarEl && sidebarEl.classList.contains('mobile-open')){
-                    sidebarEl.classList.remove('mobile-open');
-                    if (backdrop){ backdrop.classList.remove('show'); backdrop.style.display='none'; }
-                    const drawerBtn = document.getElementById('history-drawer-toggle');
-                    if (drawerBtn) drawerBtn.classList.remove('open');
-                }
-            } catch(e){ console.warn('startNewConversation error', e); }
-        }
-        // ------------------------------
-        // Missing helpers: thinking animation, typewriter reply, error display
-        // These were referenced but not defined previously; implement robust versions
-        // ------------------------------
-        function startThinking(bubble){
-            if(!bubble) return;
-            try{ clearInterval(bubble._thinkInterval); }catch(e){}
-            bubble.dataset.katexRendered = '0';
-            bubble.innerHTML = '';
-            const wrapper = document.createElement('div');
-            wrapper.style.display = 'flex';
-            wrapper.style.flexDirection = 'column';
-            wrapper.style.gap = '8px';
-
-            const text = document.createElement('div');
-            text.className = 'thinking-text';
-            text.style.color = 'var(--text-secondary-color)';
-            text.style.fontSize = '14px';
-            text.textContent = 'đang suy nghĩ lâu hơn để giúp bạn hài lòng hơn';
-
-            const dots = document.createElement('div');
-            dots.className = 'thinking-dots';
-            dots.style.color = 'var(--text-secondary-color)';
-            dots.style.fontSize = '14px';
-
-            wrapper.appendChild(text);
-            wrapper.appendChild(dots);
-            bubble.appendChild(wrapper);
-
-            let dcount = 0;
-            bubble._thinkInterval = setInterval(()=>{
-                dcount = (dcount + 1) % 4;
-                const n = dcount === 0 ? 1 : dcount; // at least one dot
-                dots.textContent = '.'.repeat(n);
-            }, 400);
-            bubble._thinking = true;
-            return bubble._thinkInterval;
-        }
-
-        function stopThinking(bubble){
-            try{
-                if(bubble && bubble._thinkInterval) clearInterval(bubble._thinkInterval);
-            }catch(e){}
-            if(bubble){ bubble._thinking = false; }
-        }
-
-        function showError(message, targetBubble){
-            console.error('showError:', message);
-            if (targetBubble && targetBubble.parentNode) {
-                targetBubble.innerHTML = `<div style="color:var(--error-color); font-weight:600;">Lỗi: ${escapeHtml(String(message))}</div>`;
+        chatInput.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') {
+            if (e.shiftKey) {
+              // Xuống dòng
+              e.preventDefault();
+              const start = chatInput.selectionStart;
+              const end = chatInput.selectionEnd;
+              chatInput.value = chatInput.value.substring(0, start) + "\n" + chatInput.value.substring(end);
+              chatInput.selectionStart = chatInput.selectionEnd = start + 1;
+              autoResize(chatInput);
             } else {
-                const b = document.createElement('div');
-                b.className = 'chat-bubble bot-bubble';
-                b.innerHTML = `<div style="color:var(--error-color); font-weight:600;">Lỗi: ${escapeHtml(String(message))}</div>`;
-                chatMessages.appendChild(b);
-                chatMessages.scrollTop = chatMessages.scrollHeight;
+              // Gửi tin nhắn
+              e.preventDefault();
+              submitData();
             }
-        }
+          }
+        });
+    </script>
+    <script>
+// ------------------------------
+// Keyboard shortcuts (no browser conflict)
+// ------------------------------
+document.addEventListener('keydown', function(e) {
+  // Ignore if input/modal is focused
+  if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.querySelector('.modal-backdrop[style*="display: flex"]')) return;
+  // Ctrl+Shift+X: New chat
+  if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'x') {
+    e.preventDefault(); startNewConversation(); return;
+  }
+  // Ctrl+Shift+M: Toggle Diagnose/Chat
+  if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'm') {
+    e.preventDefault(); toggleMode(); return;
+  }
+  // Ctrl+Shift+S: Toggle Record
+  if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 's') {
+    e.preventDefault(); toggleMic(); return;
+  }
+  // Ctrl+Shift+I: Attach Image
+  if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'i') {
+    e.preventDefault(); imageInput.click(); return;
+  }
+  // Ctrl+Shift+F: Search
+  if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'f') {
+    e.preventDefault(); openFindModal(); return;
+  }
+  // Ctrl+Enter: Send
+  if (e.ctrlKey && e.key === 'Enter') {
+    e.preventDefault(); submitData(); return;
+  }
+});
 
-        // Simple markdown-ish converter used as fallback when server doesn't provide HTML
-        function convertMarkdown(raw){
-            if(!raw) return '';
-            const maybeHtml = /<[^>]+>/g.test(raw);
-            if(maybeHtml) return raw;
-            let s = escapeHtml(raw);
-            s = s.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1<\/a>');
-            s = s.split(/\n\n+/).map(p => `<p>${p.replace(/\n/g,'<br>')}</p>`).join('');
-            return s;
-        }
-
-        // Typewriter / progressive reveal for bot replies. Works with HTML by appending node-by-node and typing text-nodes.
-        async function renderBotReplyAnimated(targetBubble, html){
-            if(!targetBubble) return;
-            stopThinking(targetBubble);
-            targetBubble.innerHTML = '';
-            const container = document.createElement('div');
-            container.className = 'bot-reply';
-            targetBubble.appendChild(container);
-
-            // Gemini-like: reveal line-by-line (rows), with soft fade/slide and natural pauses.
-            let fastForward = false;
-            const onFast = () => {
-                fastForward = true;
-                // Instantly render the rest of the content
-                container.innerHTML = html;
-                // Make sure all child elements are visible instantly
-                Array.from(container.children).forEach(child => child.classList.add('gemini-visible'));
-                // And render any math
-                try {
-                    if (window.jaremis && typeof window.jaremis.ensureRenderMath === 'function') {
-                        window.jaremis.ensureRenderMath(targetBubble);
-                    } else if (typeof window.renderMathIn === 'function') {
-                        window.renderMathIn(targetBubble);
-                    }
-                } catch(_){}
-            };
-            targetBubble.addEventListener('click', onFast, { once: true });
-
-            const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-            const cfg = {
-                lineBase: window.GEMINI_LINE_BASE_MS ?? 80,          // base delay per line
-                perChar: window.GEMINI_LINE_PER_CHAR_MS ?? 1.1,       // extra ms per char for rhythm
-                sentencePause: window.GEMINI_SENTENCE_PAUSE_MS ?? 150, // extra pause after sentence-ending punctuation
-                blockGap: window.GEMINI_BLOCK_GAP_MS ?? 120            // pause between major blocks (e.g. paragraphs)
-            };
-
-            function endsSentence(text){
-                return /[\.!?…]\s*$/.test(text || '');
-            }
-
-            // Use marked.js to parse the markdown into a token stream
-            const tokens = marked.lexer(html);
-            const renderer = new marked.Renderer();
-
-            for (const token of tokens) {
-                if (fastForward) break;
-
-                // Create a temporary list containing only the current token for the parser
-                const singleTokenList = [token];
-                singleTokenList.links = tokens.links; // Important: parser needs the links object
-
-                const htmlFragment = marked.parser(singleTokenList, { renderer });
-
-                const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = htmlFragment.trim();
-
-                const element = tempDiv.firstChild;
-
-                if (element && element.nodeType === Node.ELEMENT_NODE) {
-                    container.appendChild(element);
-
-                    // Wait a frame for the element to be in the DOM but invisible
-                    await new Promise(resolve => requestAnimationFrame(resolve));
-                    if (fastForward) break;
-
-                    // Add class to trigger the CSS animation
-                    element.classList.add('gemini-visible');
-
-                    // Calculate dynamic delay for the next element
-                    const text = element.textContent || '';
-                    let delay = cfg.lineBase + text.length * cfg.perChar;
-                    if (endsSentence(text)) {
-                        delay += cfg.sentencePause;
-                    }
-
-                    await sleep(delay);
-                } else if (htmlFragment.trim()) {
-                    // Handle plain text nodes if any
-                    const textNode = document.createTextNode(htmlFragment);
-                    container.appendChild(textNode);
-                    await sleep(cfg.lineBase);
-                }
-            }
-
-            // If fast-forward was triggered, it already rendered everything.
-            // If not, we just need to ensure math is rendered.
-            if (!fastForward) {
-                try {
-                    if (window.jaremis && typeof window.jaremis.ensureRenderMath === 'function') {
-                        window.jaremis.ensureRenderMath(targetBubble);
-                    } else if (typeof window.renderMathIn === 'function') {
-                        window.renderMathIn(targetBubble);
-                    }
-                } catch(_){}
-            }
-
-            // Clean up listener
-            try { targetBubble.removeEventListener('click', onFast, { once: true }); } catch(_) {}
-        }
-     </script>
-     <script>
+// Update tooltips for shortcut info
+function updateShortcutTooltips() {
+  document.querySelector('.new-chat-btn').title = 'Cuộc trò chuyện mới (Ctrl+Shift+X)';
+  document.getElementById('find-btn').title = 'Tìm kiếm (Ctrl+Shift+F)';
+  document.getElementById('mode-btn').title = 'Chế độ: Chat/Diagnose (Ctrl+Shift+M)';
+  document.getElementById('mic-btn').title = 'Ghi giọng nói (Ctrl+Shift+S)';
+  document.querySelector('.action-btn[onclick*="images"]').title = 'Đính kèm ảnh (Ctrl+Shift+I)';
+  document.getElementById('send-btn').title = 'Gửi (Ctrl+Enter)\nXuống dòng: Shift+Enter';
+}
+document.addEventListener('DOMContentLoaded', updateShortcutTooltips);
+    </script>
+    <script>
 /* === 3D Tilt Effect Script ===
    Áp dụng cho: đăng nhập / đăng xuất / xóa lịch sử (auth-btn),
    nút Diagnose (#mode-btn), Jaremis Pro (#think-btn),
@@ -1983,7 +1751,6 @@
   const SELECTORS = [
     '.auth-controls .auth-btn',        // đăng nhập / đăng ký / đăng xuất / xóa lịch sử
     '#mode-btn',                       // Diagnose toggle
-    '#think-btn',                      // Jaremis Pro
     '#mic-btn',                        // Mic
     '#tool-buttons .action-btn:first-child', // Paperclip
     '.new-chat-btn',                   // "Cuộc trò chuyện mới"
@@ -2307,63 +2074,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
 });
 </script>
 
-<!-- KaTeX helper & auto-render (Doctor-style) -->
-<script>
-(function(){
-  if (window._jaremis_shortcuts_installed) return; window._jaremis_shortcuts_installed = true;
-
-  // Safe helper to click an element by id
-  function tryClick(id){ try{ const el = document.getElementById(id); if(el){ el.click(); return true; } }catch(e){} return false; }
-
-  // Provide lightweight global stubs (will defer to real implementations when available)
-  window.jaremis = window.jaremis || {};
-  window.jaremis.ensureRenderMath = function(el){ if (window.renderMathIn) return window.renderMathIn(el); /* no-op until katex loader runs */ };
-  // Keep existing wrapResultMath/addResultBoxStyles if present; otherwise noop
-  if (!window.wrapResultMath) window.wrapResultMath = function(b){ /* will be replaced by real implementation if defined later */ };
-  if (!window.addResultBoxStyles) window.addResultBoxStyles = function(){ };
-
-  // Keyboard shortcuts mapping (use Ctrl+letter / Ctrl+Shift+letter). Avoid overriding basic input behavior.
-  document.addEventListener('keydown', function(e){
-    const tgt = e.target || {};
-    const tag = (tgt.tagName || '').toUpperCase();
-    const isEditable = tag === 'INPUT' || tag === 'TEXTAREA' || tgt.isContentEditable;
-
-    // Ctrl+Enter -> send (works even when typing)
-    if (e.ctrlKey && !e.shiftKey && e.key === 'Enter') {
-      e.preventDefault(); tryClick('send-btn'); return;
-    }
-
-    // If typing in a text field, do not hijack other shortcuts (except send)
-    if (isEditable) return;
-
-    // Map single Ctrl+letter and Ctrl+Shift+letter combinations
-    if (e.ctrlKey && !e.altKey) {
-      const k = (e.key || '').toLowerCase();
-      const shift = e.shiftKey;
-      // Mic: Ctrl+M
-      if (!shift && k === 'm') { e.preventDefault(); tryClick('mic-btn'); flashNotice && flashNotice('Mic toggled (Ctrl+M)'); return; }
-      // Attach: Ctrl+Shift+U
-      if (shift && k === 'u') { e.preventDefault(); tryClick('attach-btn') || document.getElementById('images')?.click(); flashNotice && flashNotice('Attach file (Ctrl+Shift+U)'); return; }
-      // Diagnose: Ctrl+Shift+K
-      if (shift && k === 'k') { e.preventDefault(); tryClick('mode-btn'); flashNotice && flashNotice('Toggle Diagnose (Ctrl+Shift+K)'); return; }
-      // Model switch: Ctrl+Shift+Y
-      if (shift && k === 'y') { e.preventDefault(); tryClick('think-btn'); flashNotice && flashNotice('Switch model (Ctrl+Shift+Y)'); return; }
-      // New chat: Ctrl+Shift+X
-      if (shift && k === 'x') { e.preventDefault(); startNewConversation && startNewConversation(); flashNotice && flashNotice('New chat (Ctrl+Shift+X)'); return; }
-      // Open history/find: Ctrl+Shift+F
-      if (shift && k === 'f') { e.preventDefault(); openFindModal && openFindModal(); flashNotice && flashNotice('Find (Ctrl+Shift+F)'); return; }
-    }
-  }, true);
-
-  // Ensure chatInput Ctrl+Enter works even if focus is inside textarea
-  try { const ci = document.getElementById('chat-input'); const sb = document.getElementById('send-btn');
-    if (ci && sb) {
-      ci.addEventListener('keydown', function(ev){ if (ev.ctrlKey && ev.key === 'Enter') { ev.preventDefault(); sb.click(); } });
-    }
-  } catch(e){}
-
-})();
-</script>
 <!-- KaTeX helper & auto-render (Doctor-style) -->
 <script>
 // Define helper like Doctor's implementation and an unobtrusive observer
