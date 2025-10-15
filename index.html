@@ -8,6 +8,8 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
+    <!-- Markdown Parser -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
     <style>
         :root {
             --sidebar-width: 260px;
@@ -147,6 +149,29 @@
         .action-btn:hover { background-color:#2c313a; color:var(--text-color); }
         #send-btn { background-color:var(--accent-color); color:white; border-radius:6px; width:44px; height:40px; display:flex; align-items:center; justify-content:center; }
         #send-btn:disabled { background-color:#30363d; cursor:not-allowed; }
+        
+        /* Stop button styling */
+        #stop-btn { 
+            background-color: var(--error-color); 
+            color: white; 
+            border-radius: 6px; 
+            width: 44px; 
+            height: 40px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            animation: pulse 2s infinite;
+        }
+        #stop-btn:hover { 
+            background-color: #ff6b6b; 
+            transform: scale(1.05);
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(248, 81, 73, 0.4); }
+            70% { box-shadow: 0 0 0 8px rgba(248, 81, 73, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(248, 81, 73, 0); }
+        }
 
         #image-preview-container { display:flex; gap:10px; margin-top:10px; padding:0 8px; }
         .preview-item { position:relative; }
@@ -604,6 +629,395 @@
 }
 #snow-canvas { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:0; }
 .chat-messages, .chat-bubble { position:relative; z-index:2; } /* đảm bảo tuyết không đè lên */
+
+/* Website buttons container - ChatGPT style */
+.websites-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 16px;
+    padding: 0;
+}
+
+/* Individual website button - như ChatGPT */
+.website-button {
+    display: inline-block;
+    border-radius: 8px;
+    overflow: hidden;
+    background: rgba(88, 166, 255, 0.05);
+    border: 1px solid rgba(88, 166, 255, 0.15);
+    transition: all 0.2s ease;
+    animation: websiteButtonFadeIn 0.3s ease-out;
+}
+
+.website-button:hover {
+    background: rgba(88, 166, 255, 0.1);
+    border-color: rgba(88, 166, 255, 0.3);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(88, 166, 255, 0.15);
+}
+
+.website-button:active {
+    transform: translateY(0);
+}
+
+.website-link {
+    display: flex !important;
+    align-items: center !important;
+    padding: 8px 12px !important;
+    text-decoration: none !important;
+    color: var(--text-color) !important;
+    gap: 8px !important;
+    min-width: 0;
+    transition: none !important;
+}
+
+.website-icon {
+    position: relative;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.website-icon img {
+    width: 16px;
+    height: 16px;
+    border-radius: 2px;
+    object-fit: contain;
+}
+
+.website-fallback-icon {
+    display: none;
+    font-size: 14px;
+    line-height: 1;
+}
+
+.website-name {
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    color: var(--text-color) !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 120px;
+}
+
+/* Staggered animation */
+.website-button:nth-child(1) { animation-delay: 0.1s; }
+.website-button:nth-child(2) { animation-delay: 0.15s; }
+.website-button:nth-child(3) { animation-delay: 0.2s; }
+.website-button:nth-child(4) { animation-delay: 0.25s; }
+.website-button:nth-child(5) { animation-delay: 0.3s; }
+
+@keyframes websiteButtonFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* ========== BEAUTIFUL TABLE & HEADING STYLES ========== */
+
+/* Markdown tables in chat bubbles */
+.bot-bubble table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    background: rgba(13, 17, 23, 0.5);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    table-layout: fixed; /* FIXED LAYOUT for equal column widths */
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+.bot-bubble table thead {
+    background: linear-gradient(135deg, #1f6feb 0%, #0969da 100%);
+}
+
+.bot-bubble table th {
+    padding: 14px 12px;
+    text-align: center; /* Center align headers */
+    font-weight: 600;
+    color: #fff;
+    font-size: 13px;
+    letter-spacing: 0.3px;
+    border-bottom: 2px solid rgba(47, 129, 247, 0.3);
+    white-space: nowrap; /* No wrap for headers */
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bot-bubble table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-color);
+    font-size: 13px;
+    line-height: 1.4;
+    text-align: center; /* Center align data */
+    white-space: nowrap; /* No wrap for better alignment */
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* First column (usually time/label) - left align */
+.bot-bubble table td:first-child,
+.bot-bubble table th:first-child {
+    text-align: left;
+    font-weight: 500;
+}
+
+.bot-bubble table tbody tr:hover {
+    background: rgba(47, 129, 247, 0.1);
+    transition: background 0.2s ease;
+}
+
+.bot-bubble table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Alternating row colors for better readability (like Excel) */
+.bot-bubble table tbody tr:nth-child(even) {
+    background: rgba(13, 17, 23, 0.3);
+}
+
+.bot-bubble table tbody tr:nth-child(odd) {
+    background: rgba(13, 17, 23, 0.15);
+}
+
+/* Emoji headers - phân cấp màu rõ ràng, không lạm dụng xanh dạ quang */
+.bot-bubble h1, .bot-bubble h2, .bot-bubble h3, .bot-bubble h4 {
+    margin: 24px 0 16px 0;
+    font-weight: 700;
+    line-height: 1.3;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.bot-bubble h1 {
+    font-size: 26px;
+    color: #58a6ff; /* Xanh chủ đạo - CHỈ cho H1 */
+    padding-bottom: 12px;
+    border-bottom: 2px solid rgba(88, 166, 255, 0.3);
+    margin-top: 28px;
+}
+
+.bot-bubble h2 {
+    font-size: 22px;
+    color: #79c0ff; /* Xanh nhạt hơn - cho H2 */
+    margin-top: 24px;
+}
+
+.bot-bubble h3 {
+    font-size: 18px;
+    color: #a5d6ff; /* Xanh pastel - cho H3 */
+    margin-top: 20px;
+}
+
+.bot-bubble h4 {
+    font-size: 16px;
+    color: #c9d1d9; /* Xám sáng - cho H4 */
+    margin-top: 16px;
+}
+
+/* Styled lists - phân cấp màu theo level */
+.bot-bubble ul, .bot-bubble ol {
+    margin: 16px 0;
+    padding-left: 24px;
+}
+
+.bot-bubble li {
+    margin: 10px 0;
+    line-height: 1.7;
+    color: var(--text-color); /* Màu text thường, KHÔNG xanh dạ quang */
+}
+
+/* List markers phân cấp màu */
+.bot-bubble ul > li::marker {
+    color: #58a6ff; /* Level 1: xanh dạ quang */
+}
+
+.bot-bubble ul ul > li::marker {
+    color: #79c0ff; /* Level 2: xanh nhạt hơn */
+}
+
+.bot-bubble ul ul ul > li::marker {
+    color: #a5d6ff; /* Level 3: xanh pastel */
+}
+
+.bot-bubble ol > li::marker {
+    color: #58a6ff; /* Ordered list level 1: xanh dạ quang */
+    font-weight: 600;
+}
+
+.bot-bubble ol ol > li::marker {
+    color: #79c0ff; /* Ordered list level 2 */
+}
+
+.bot-bubble ol ol ol > li::marker {
+    color: #a5d6ff; /* Ordered list level 3 */
+}
+
+/* Paragraphs - spacing tốt */
+.bot-bubble p {
+    margin: 12px 0;
+    line-height: 1.7;
+}
+
+/* First paragraph no top margin */
+.bot-bubble p:first-child {
+    margin-top: 0;
+}
+
+/* Citations section - đẹp, nổi bật */
+.bot-bubble h2:has-text('📚'), 
+.bot-bubble h3:has-text('📚'),
+.bot-bubble p:contains('📚 Nguồn tham khảo') {
+    margin-top: 28px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(47, 129, 247, 0.3);
+}
+
+/* Links in citations */
+.bot-bubble a {
+    color: #58a6ff;
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.bot-bubble a:hover {
+    color: #79c0ff;
+    border-bottom-color: #79c0ff;
+}
+
+/* Citation buttons - nút bấm đẹp cho nguồn tham khảo */
+.bot-bubble a.citation-btn {
+    display: inline-block;
+    padding: 6px 12px;
+    margin: 4px 4px 4px 0;
+    background: linear-gradient(135deg, rgba(88, 166, 255, 0.15) 0%, rgba(88, 166, 255, 0.08) 100%);
+    border: 1px solid rgba(88, 166, 255, 0.3);
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #58a6ff;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.bot-bubble a.citation-btn:hover {
+    background: linear-gradient(135deg, rgba(88, 166, 255, 0.25) 0%, rgba(88, 166, 255, 0.15) 100%);
+    border-color: rgba(88, 166, 255, 0.5);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(88, 166, 255, 0.2);
+    color: #79c0ff;
+}
+
+.bot-bubble a.citation-btn::before {
+    content: '📚 ';
+    margin-right: 4px;
+}
+
+.bot-bubble a.citation-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Code blocks */
+.bot-bubble code {
+    background: rgba(13, 17, 23, 0.7);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    color: #a5d6ff; /* Xanh pastel, KHÔNG dùng #79c0ff */
+}
+
+.bot-bubble pre {
+    background: rgba(13, 17, 23, 0.7);
+    padding: 16px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 16px 0;
+}
+
+.bot-bubble pre code {
+    background: none;
+    padding: 0;
+}
+
+/* Horizontal rules */
+.bot-bubble hr {
+    border: none;
+    border-top: 1px solid var(--border-color);
+    margin: 20px 0;
+}
+
+/* Strong emphasis - KHÔNG dùng xanh dạ quang */
+.bot-bubble strong {
+    font-weight: 600;
+    color: #e6edf3; /* Trắng sáng, nổi bật nhưng không chói */
+}
+
+/* Result box - Khung kết quả đẹp cho đáp án cuối cùng */
+.bot-bubble .result-box {
+    margin: 20px 0;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, rgba(88, 166, 255, 0.12) 0%, rgba(88, 166, 255, 0.05) 100%);
+    border: 2px solid rgba(88, 166, 255, 0.35);
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(88, 166, 255, 0.15);
+    position: relative;
+    overflow: hidden;
+}
+
+.bot-bubble .result-box::before {
+    content: '✓';
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    font-size: 28px;
+    color: rgba(88, 166, 255, 0.2);
+    font-weight: bold;
+}
+
+.bot-bubble .result-box .result-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #58a6ff;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+
+.bot-bubble .result-box .result-content {
+    font-size: 18px;
+    font-weight: 600;
+    color: #e6edf3;
+    text-align: center;
+}
+
+/* LaTeX trong result box */
+.bot-bubble .result-box .katex {
+    font-size: 1.3em !important;
+}
+
+/* Emoji spacing */
+.bot-bubble p:has(> :first-child:is(span.emoji)) {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
     </style>
     <style>
       @media (max-width:600px) {
@@ -810,6 +1224,10 @@
                         <button id="send-btn" class="action-btn" onclick="submitData()" title="Gửi (Enter)">
                             <i class="fas fa-paper-plane"></i>
                         </button>
+                        
+                        <button id="stop-btn" class="action-btn stop-btn" onclick="stopAIResponse()" title="Dừng AI (Esc)" style="display: none;">
+                            <i class="fas fa-stop"></i>
+                        </button>
 
                         <input type="file" id="images" multiple hidden onchange="handleImageUpload(event)">
                     </div>
@@ -908,11 +1326,23 @@
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
+        // Configure marked.js to allow HTML for citations
+        if (typeof marked !== 'undefined') {
+            marked.setOptions({
+                breaks: true,
+                gfm: true,
+                sanitize: false, // Allow HTML for citations
+                smartLists: true,
+                smartypants: false
+            });
+        }
+
         // ------------------------------
         // UI elements & state
         // ------------------------------
         const chatInput = document.getElementById('chat-input');
         const sendBtn = document.getElementById('send-btn');
+        const stopBtn = document.getElementById('stop-btn');
         const imageInput = document.getElementById('images');
         const imagePreviewContainer = document.getElementById('image-preview-container');
         const chatMessages = document.getElementById('chat-messages');
@@ -1018,6 +1448,59 @@
           function debounce(fn, ms){ let t; return function(){ clearTimeout(t); t = setTimeout(fn, ms); }; }
           window.addEventListener('resize', debounce(function(){ if (window.innerWidth > 600) closeSidebar(); }, 180));
         })();
+
+        // ------------------------------
+        // SEND/STOP BUTTON CONTROL
+        // ------------------------------
+        function showSendButton() {
+            if (sendBtn) {
+                sendBtn.style.display = 'flex';
+                sendBtn.disabled = false;
+            }
+            if (stopBtn) {
+                stopBtn.style.display = 'none';
+            }
+        }
+        
+        function showStopButton() {
+            if (sendBtn) {
+                sendBtn.style.display = 'none';
+            }
+            if (stopBtn) {
+                stopBtn.style.display = 'flex';
+            }
+        }
+        
+        function stopAIResponse() {
+            console.log('🛑 User clicked Stop button');
+            
+            // Abort current request
+            if (window._currentAbortController) {
+                try {
+                    window._currentAbortController.abort();
+                    console.log('✅ Request aborted');
+                } catch (e) {
+                    console.error('❌ Error aborting request:', e);
+                }
+                window._currentAbortController = null;
+                window._currentAbortStartedAt = 0;
+            }
+            
+            // Show send button again
+            showSendButton();
+            
+            // Flash notice
+            flashNotice('Đã dừng AI', 'success');
+            
+            // Remove thinking animation from all bubbles
+            const thinkingBubbles = document.querySelectorAll('.chat-bubble .thinking-animation');
+            thinkingBubbles.forEach(bubble => {
+                const parent = bubble.parentElement;
+                if (parent) {
+                    parent.innerHTML = '<div style="color: var(--text-secondary-color); font-style: italic;">⚠️ Đã dừng phản hồi</div>';
+                }
+            });
+        }
 
         // ------------------------------
         function toggleMode(e) {
@@ -1257,6 +1740,7 @@
             return;
           }
           // Gom theo sessionId
+
           const sessions = {};
           list.forEach(entry => {
             const sid = entry.sessionId || ('legacy-' + entry.id);
@@ -1379,6 +1863,7 @@
 
         function startRecognition() {
             if (!recognition) return;
+           
             try {
                 textBeforeRecording = chatInput.value || '';
                 recognition.start();
@@ -1429,549 +1914,777 @@
             handleImageUpload({ target: imageInput });
         }
 
-        // ------------------------------
-        // Animate analysis steps (UX)
-        // ------------------------------
-        async function animateAnalysisSteps(bubbleElement) {
-            const steps = [
-                'Đang khởi tạo và gửi dữ liệu...',
-                'Tìm kiếm tài liệu tham khảo (PubMed, ClinicalTrials)...',
-                'AI đang phân tích và chẩn đoán hình ảnh...',
-                'Tổng hợp và định dạng kết quả chẩn đoán...'
-            ];
+        // ========================================
+        // PASTE IMAGE SUPPORT (Ctrl+V / Ctrl+C)
+        // ========================================
+        let pastedImages = []; // Store pasted images separately
 
-            let html = '<div class="analysis-steps">';
-            steps.forEach((step, index) => {
-                html += `<div id="step-${index}" class="step-item pending">
-                            <span class="icon"><i class="fas fa-hourglass-half"></i></span>
-                            <span>${step}</span>
-                         </div>`;
-            });
-            html += '</div>';
-            bubbleElement.innerHTML = html;
-
-            for (let i = 0; i < steps.length; i++) {
-                const stepEl = bubbleElement.querySelector(`#step-${i}`);
-                const iconEl = stepEl.querySelector('.icon');
-
-                stepEl.classList.remove('pending');
-                stepEl.classList.add('active');
-                iconEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-
-                await new Promise(resolve => setTimeout(resolve, 600 + Math.random() * 600));
-
-                stepEl.classList.remove('active');
-                stepEl.classList.add('completed');
-                iconEl.innerHTML = '<i class="fas fa-check"></i>';
+        // Listen for paste events globally
+        document.addEventListener('paste', function(event) {
+            const items = (event.clipboardData || event.originalEvent.clipboardData).items;
+            
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    event.preventDefault(); // Prevent default paste behavior
+                    
+                    const file = items[i].getAsFile();
+                    if (!file) continue;
+                    
+                    // Add to pasted images array
+                    pastedImages.push(file);
+                    
+                    // Show preview
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const div = document.createElement('div');
+                        div.className = 'preview-item';
+                        div.innerHTML = `
+                            <img src="${e.target.result}" alt="Pasted Image">
+                            <button class="remove-btn" onclick="removePastedImage(${pastedImages.length - 1})">&times;</button>
+                            <div class="paste-badge">📋 Dán ảnh</div>
+                        `;
+                        imagePreviewContainer.appendChild(div);
+                    };
+                    reader.readAsDataURL(file);
+                    
+                    // Show notification
+                    if (typeof flashNotice === 'function') {
+                        flashNotice('✅ Đã dán ảnh từ clipboard! Nhấn Gửi để phân tích.', 'success');
+                    }
+                    
+                    console.log('📋 Pasted image:', file.name || 'clipboard-image.png', file.size, 'bytes');
+                }
             }
+        });
+
+        function removePastedImage(index) {
+            // Remove from pastedImages array
+            pastedImages.splice(index, 1);
+            
+            // Re-render all previews
+            renderImagePreviews();
         }
 
-        // ------------------------------
-        // Submit: chooses /api/chat or /api/diagnose
-        // ------------------------------
+        function renderImagePreviews() {
+            imagePreviewContainer.innerHTML = '';
+            
+            // Render file input images
+            Array.from(imageInput.files || []).forEach((file, index) => {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    const div = document.createElement('div');
+                    div.className = 'preview-item';
+                    div.innerHTML = `
+                        <img src="${e.target.result}" alt="Preview">
+                        <button class="remove-btn" onclick="removeImage(${index})">&times;</button>
+                    `;
+                    imagePreviewContainer.appendChild(div);
+                };
+                reader.readAsDataURL(file);
+            });
+            
+            // Render pasted images
+            pastedImages.forEach((file, index) => {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    const div = document.createElement('div');
+                    div.className = 'preview-item';
+                    div.innerHTML = `
+                        <img src="${e.target.result}" alt="Pasted Image">
+                        <button class="remove-btn" onclick="removePastedImage(${index})">&times;</button>
+                        <div class="paste-badge">📋</div>
+                    `;
+                    imagePreviewContainer.appendChild(div);
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // Helper to get all images (file input + pasted)
+        function getAllImages() {
+            const allFiles = [];
+            
+            // Add file input files
+            if (imageInput.files) {
+                allFiles.push(...Array.from(imageInput.files));
+            }
+            
+            // Add pasted images
+            allFiles.push(...pastedImages);
+            
+            return allFiles;
+        }
+
+        // Update handleImageUpload to also render pasted images
+        const originalHandleImageUpload = handleImageUpload;
+        handleImageUpload = function(event) {
+            originalHandleImageUpload(event);
+            // Also render pasted images if any
+            if (pastedImages.length > 0) {
+                renderImagePreviews();
+            }
+        };
+
+        // ========================================
+        // ENHANCED IMAGE PREVIEW STYLES
+        // ========================================
+        // Add CSS for paste badge dynamically
+        const pasteStyles = document.createElement('style');
+        pasteStyles.textContent = `
+            .paste-badge {
+                position: absolute;
+                top: 4px;
+                left: 4px;
+                background: rgba(47, 129, 247, 0.9);
+                color: white;
+                font-size: 10px;
+                padding: 2px 6px;
+                border-radius: 4px;
+                font-weight: 600;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            }
+            
+            #image-preview-container {
+                position: relative;
+            }
+            
+            .preview-item {
+                animation: slideInFromRight 0.3s ease-out;
+            }
+            
+            @keyframes slideInFromRight {
+                from {
+                    opacity: 0;
+                    transform: translateX(20px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateX(0);
+                }
+            }
+        `;
+        document.head.appendChild(pasteStyles);
+
+        // ========================================
+        // FLASH NOTIFICATION HELPER
+        // ========================================
+        function flashNotice(message, type = 'info') {
+            const notice = document.createElement('div');
+            notice.className = 'flash-notice';
+            notice.textContent = message;
+            
+            notice.style.cssText = `
+                position: fixed;
+                top: 80px;
+                right: 20px;
+                background: ${type === 'success' ? '#238636' : type === 'error' ? '#f85149' : '#2f81f7'};
+                color: white;
+                padding: 12px 16px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+                z-index: 9999;
+                animation: slideIn 0.3s ease-out;
+                max-width: 300px;
+                font-size: 14px;
+            `;
+            
+            document.body.appendChild(notice);
+            
+            setTimeout(() => {
+                notice.style.animation = 'slideOut 0.3s ease-out';
+                setTimeout(() => notice.remove(), 300);
+            }, 3000);
+        }
+
+        // Add animations
+        const noticeAnimations = document.createElement('style');
+        noticeAnimations.textContent = `
+            @keyframes slideIn {
+                from {
+                    transform: translateX(400px);
+                    opacity: 0;
+                }
+                to {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+            }
+            
+            @keyframes slideOut {
+                from {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+                to {
+                    transform: translateX(400px);
+                    opacity: 0;
+                }
+            }
+        `;
+        document.head.appendChild(noticeAnimations);
+
+        // ========================================
+        // SUBMIT DATA - Enhanced with Pasted Images
+        // ========================================
         async function submitData() {
-            // Prevent double-submit, but recover from stale/aborted controllers
+            // Prevent double-submit
             if (window._currentAbortController) {
                 try {
                     const sig = window._currentAbortController.signal;
                     const startedAt = window._currentAbortStartedAt || 0;
-                    const tooLong = Date.now() - startedAt > 20000; // 20s safety
+                    const tooLong = Date.now() - startedAt > 20000;
                     if (sig && sig.aborted) {
                         window._currentAbortController = null;
                         window._currentAbortStartedAt = 0;
+                        showSendButton(); // Reset to send button
                     } else if (tooLong) {
-                        // reset stuck state
                         try { window._currentAbortController.abort(); } catch(e) {}
                         window._currentAbortController = null;
                         window._currentAbortStartedAt = 0;
+                        showSendButton(); // Reset to send button
                     } else {
-                        // still in-progress -> ignore new send
-                        flashNotice && flashNotice('Đang xử lý phản hồi trước, hãy đợi hoặc nhấn nút dừng.');
+                        flashNotice('Đang xử lý phản hồi trước, hãy đợi hoặc nhấn nút dừng.', 'error');
                         return;
                     }
                 } catch (e) {
                     window._currentAbortController = null;
                     window._currentAbortStartedAt = 0;
+                    showSendButton(); // Reset to send button
                 }
             }
-            const labResults = chatInput.value.trim();
-            const images = imageInput.files;
-            if (!labResults && images.length === 0) return;
-            if (!currentSessionId) {
-                currentSessionId = 'sess-' + Date.now();
-                localStorage.setItem('jaremis_session', currentSessionId);
+
+            const message = chatInput.value.trim();
+            const allImages = getAllImages(); // Get both file input + pasted images
+            
+            if (!message && allImages.length === 0) {
+                flashNotice('Vui lòng nhập tin nhắn hoặc đính kèm ảnh', 'error');
+                return;
             }
 
-            // Build user bubble
-            let userHtml = `<div class="chat-bubble user-bubble"><div class="user-bubble-content">`;
-            if (labResults) userHtml += `<p>${escapeHtml(labResults)}</p>`;
-            if (images.length > 0) {
-                let imagePreviews = '<div class="user-images-preview">';
-                for (let i = 0; i < images.length; i++) {
-                    imagePreviews += `<img src="${URL.createObjectURL(images[i])}" alt="user image">`;
-                }
-                imagePreviews += '</div>';
-                userHtml += imagePreviews;
+            // Choose endpoint based on diagnosticMode
+            const endpoint = diagnosticMode ? '/api/diagnose' : '/api/chat';
+            
+            // Prepare FormData
+            const formData = new FormData();
+            formData.append('message', message);
+            formData.append('labResults', message); // For diagnose mode
+            formData.append('symptoms', message); // For diagnose mode
+            formData.append('model', useProModel ? 'pro' : 'flash');
+            formData.append('sessionId', currentSessionId || generateSessionId());
+            
+            const user = getLocalUser();
+            if (user) {
+                formData.append('submittedBy', user.username);
             }
-            const currentUser = getLocalUser();
-            if (currentUser) {
-                userHtml += `<div style="margin-top:8px; font-size:12px; color:var(--text-secondary-color)">Đã gửi bởi: ${escapeHtml(currentUser.username)}</div>`;
-            }
-            userHtml += `</div></div>`;
-            chatMessages.innerHTML += userHtml;
 
-            // Clear input + previews
-            chatInput.value = '';
-            autoResize(chatInput);
-            imagePreviewContainer.innerHTML = '';
+            // Append all images (file input + pasted)
+            allImages.forEach((file, index) => {
+                // Rename pasted images for clarity
+                const filename = file.name || `pasted-image-${index + 1}.png`;
+                formData.append('images', file, filename);
+            });
 
-            // Create loading bubble
-            const loadingBubble = document.createElement('div');
-            loadingBubble.className = 'chat-bubble bot-bubble';
-            chatMessages.appendChild(loadingBubble);
+            // Add user message bubble
+            const userBubble = document.createElement('div');
+            userBubble.className = 'chat-bubble user-bubble';
+            userBubble.innerHTML = `
+                <div>${escapeHtml(message)}</div>
+                ${allImages.length > 0 ? `<div style="margin-top:8px;color:var(--text-secondary-color);font-size:12px;">📎 ${allImages.length} ảnh đính kèm</div>` : ''}
+            `;
+            chatMessages.appendChild(userBubble);
             chatMessages.scrollTop = chatMessages.scrollHeight;
 
-            // Setup AbortController so user can stop the response
-            const controller = new AbortController();
-            window._currentAbortController = controller;
-            window._currentAbortStartedAt = Date.now();
+            // Clear input and images
+            chatInput.value = '';
+            imageInput.value = '';
+            pastedImages = [];
+            imagePreviewContainer.innerHTML = '';
+            autoResize(chatInput);
 
-            // Toggle send button into stop button
-            try {
-                sendBtn.dataset.prevHtml = sendBtn.innerHTML || '';
-                sendBtn.dataset.prevTitle = sendBtn.title || '';
-                sendBtn.innerHTML = '<i class="fas fa-stop"></i>';
-                sendBtn.title = 'Dừng AI (Ctrl+Enter)';
-                sendBtn.onclick = function(e){ e?.preventDefault(); if (window._currentAbortController) window._currentAbortController.abort(); };
-            } catch (e) {}
+            // Add bot bubble with loading animation
+            const botBubble = document.createElement('div');
+            botBubble.className = 'chat-bubble bot-bubble';
+            chatMessages.appendChild(botBubble);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
 
-            // Implement 15s timeout for flash model
-            let flashTimeoutId = null;
-            const modelName = useProModel ? 'pro' : 'flash';
-            const timeoutMs = (window.FLASH_TIMEOUT_MS ?? 0);
-            if (modelName === 'flash' && timeoutMs > 0) {
-                // stop if too slow
-                flashTimeoutId = setTimeout(() => {
-                    try {
-                        if (window._currentAbortController) {
-                            window._currentAbortController.abort();
-                            flashNotice && flashNotice(`Flash model exceeded ${timeoutMs}ms timeout and was stopped.`);
-                        }
-                    } catch (e) { /* ignore */ }
-                }, timeoutMs);
-            }
-
-            try {
-                // Show thinking animation while the model is responding
-                startThinking(loadingBubble);
-
-                if (diagnosticMode) {
-                    const formData = new FormData();
-                    if (labResults) formData.append('labResults', labResults);
-                    Array.from(images).forEach(img => formData.append('images', img));
-                    formData.append('model', modelName);
-                    formData.append('sessionId', currentSessionId);
-                    if (currentUser) formData.append('submittedBy', currentUser.username);
-
-                    const resp = await fetch('/api/diagnose', { method: 'POST', body: formData, signal: controller.signal });
-                    if (!resp.ok) {
-                        const error = await resp.json().catch(()=>({error:'Lỗi từ server'}));
-                        throw new Error(error.error || 'Lỗi không xác định từ máy chủ');
-                    }
-                    const data = await resp.json();
-                    // Prefer server-rendered KaTeX HTML to avoid client-side parsing issues
-                    const html = data.diagnosisHtml;
-                    stopThinking(loadingBubble);
-                    if (html) {
-
-                        loadingBubble.innerHTML = `<div class="bot-reply">${html}</div>`;
-                        try {
-                            if (window.jaremis && typeof window.jaremis.ensureRenderMath === 'function') {
-                                window.jaremis.ensureRenderMath(loadingBubble);
-                            } else if (typeof window.renderMathIn === 'function') {
-                                window.renderMathIn(loadingBubble);
-                            }
-                        } catch(_) {}
-                        chatMessages.scrollTop = chatMessages.scrollHeight;
-                    } else {
-                        const fallback = convertMarkdown(data.diagnosis || '');
-                        await renderBotReplyAnimated(loadingBubble, fallback);
-                    }
-                    if (currentUser) fetchAndRenderHistory(currentUser.username);
-                } else {
-                    // Use the new streaming endpoint for chat mode
-                    await streamChatResponse(labResults, images, modelName, currentUser, currentSessionId, loadingBubble, controller.signal);
-                }
-           
-           
-            } catch (err) {
-                if (err && err.name === 'AbortError') {
-                    flashNotice('AI response stopped');
-                    loadingBubble.remove();
-                } else {
-                    showError(err.message || String(err), loadingBubble);
-                }
-            } finally {
-                // cleanup
-                clearTimeout(flashTimeoutId);
-                               window._currentAbortController = null;
-                window._currentAbortStartedAt = 0;
-                try {
-                    sendBtn.innerHTML = sendBtn.dataset.prevHtml || '<i class="fas fa-paper-plane"></i>';
-                    sendBtn.title = sendBtn.dataset.prevTitle || 'Gửi';
-                    sendBtn.onclick = submitData;
-                    delete sendBtn.dataset.prevHtml; delete sendBtn.dataset.prevTitle;
-                } catch (e) {}
-                imageInput.value = '';
-            }
-        }
-
-        // New function to handle streaming chat responses
-        async function streamChatResponse(message, images, model, user, sessionId, targetBubble, signal) {
-            // Use GET + EventSource (SSE) to match backend route and avoid streaming errors
-            stopThinking(targetBubble);
-            targetBubble.innerHTML = '';
-            const container = document.createElement('div');
-            container.className = 'bot-reply';
-            targetBubble.appendChild(container);
-
-            // Build query params expected by backend GET SSE endpoint
-            const params = new URLSearchParams({
-                message,
-                model,
-                sessionId: sessionId || '' ,
-                includeHistory: 'true'
-            });
-            if (user && user.username) params.set('submittedBy', user.username);
-            if (images && images.length > 0) params.set('imagesCount', String(images.length));
-
-            let fullReply = '';
-            let finalHtml = null;
-            let done = false;
-
-            const es = new EventSource('/api/chat-stream?' + params.toString());
-
-            function handleMessageEvent(e){
-                try {
-                    const data = JSON.parse(e.data || '{}');
-                    if (data.chunk) {
-                        fullReply += data.chunk;
-                        // render escaped during stream to keep delimiters intact
-                        container.innerHTML = escapeHtml(fullReply).replace(/\n/g, '<br>');
-                        chatMessages.scrollTop = chatMessages.scrollHeight;
-                    }
-                    if (data.error) {
-                        container.innerHTML = `<div class="error-message">${escapeHtml(data.error)}</div>`;
-                        done = true; es.close();
-                    }
-                    if (data.done) {
-                        done = true;
-                        finalHtml = data.replyHtml || null;
-                        es.close();
-                    }
-                } catch (err) {
-                    console.error('SSE parse error', err);
-                }
-            }
-
-            function finish(){
-                try {
-                    if (done && finalHtml) {
-                        container.innerHTML = finalHtml;
-                    } else if (fullReply) {
-                        container.innerHTML = (window.marked ? marked.parse(fullReply) : escapeHtml(fullReply).replace(/\n/g,'<br>'));
-                    }
-                    if (window.jaremis && typeof window.jaremis.ensureRenderMath === 'function') {
-                        window.jaremis.ensureRenderMath(targetBubble);
-                    } else if (typeof window.renderMathIn === 'function') {
-                        window.renderMathIn(targetBubble);
-                    }
-                    chatMessages.scrollTop = chatMessages.scrollHeight;
-                    if (user && done) fetchAndRenderHistory(user.username);
-                } catch(_){ }
-            }
-
-            es.addEventListener('message', handleMessageEvent);
-            es.onerror = () => {
-                if (!done) {
-                    container.innerHTML = `<div class="error-message">Error streaming response: Server error during streaming.</div>`;
-                }
-                es.close();
-            };
-
-            // Abort support: close SSE when user stops
-            if (signal && typeof signal.addEventListener === 'function') {
-                signal.addEventListener('abort', () => {
-                    try { es.close(); } catch(_) {}
-                    // keep partial content and stop further updates
-                }, { once: true });
-            }
-
-            // Poll finish if the connection ends; Mutation happens via events
-            const checkInterval = setInterval(() => {
-                if (es.readyState === 2 /* CLOSED */) { clearInterval(checkInterval); finish(); }
-            }, 300);
-        }
-
-        // Ensure Enter sends (unless Shift+Enter), and support Ctrl+Enter as send as well
-        (function(){
-            try {
-                const ci = document.getElementById('chat-input');
-                if (ci) {
-                    ci.addEventListener('keydown', function(ev){
-                        if (ev.key === 'Enter' && !ev.shiftKey) {
-                            ev.preventDefault();
-                            // If a response is in progress, Enter stops it; otherwise, it sends
-                            if (window._currentAbortController) {
-                                try { window._currentAbortController.abort(); } catch(e) {}
-                            } else {
-                                submitData();
-                            }
-                        } else if ((ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey))) {
-                            ev.preventDefault();
-                            if (window._currentAbortController) {
-                                try { window._currentAbortController.abort(); } catch(e) {}
-                            } else {
-                                submitData();
-                            }
-                        }
-                    });
-                }
-            } catch(e){ console.warn(e); }
-        })();
-
-        // ------------------------------
-        // UI helpers referenced by inline handlers
-        // ------------------------------
-        function toggleToolTray(e){
-            e?.preventDefault();
-            const panel = document.getElementById('tool-buttons');
-            const btn = document.getElementById('toggle-tools-btn');
-            if (!panel || !btn) return;
-            const willOpen = panel.classList.contains('collapsed');
-            panel.classList.toggle('collapsed');
-            btn.classList.toggle('active');
-            if (willOpen) {
-                // close when clicking outside
-                const onDocClick = (ev) => {
-                    if (btn.contains(ev.target) || panel.contains(ev.target)) return;
-                    panel.classList.add('collapsed');
-                    btn.classList.remove('active');
-                    document.removeEventListener('click', onDocClick, true);
-                };
-                // delay to avoid immediate closing by current click
-                setTimeout(()=>document.addEventListener('click', onDocClick, true), 0);
-            }
-        }
-
-        function toggleHistoryMode(){
-            // For mobile: reuse the same sidebar overlay. Just toggle it.
-            try {
-                const topToggle = document.getElementById('history-drawer-toggle');
-                const hdrBtn = document.getElementById('history-toggle-btn');
-                if (topToggle) topToggle.click();
-                if (hdrBtn) hdrBtn.classList.toggle('active');
-            } catch(e){ console.warn('toggleHistoryMode error', e); }
-        }
-
-        function startNewConversation(){
-            try {
-                // create a fresh session id
-                currentSessionId = 'sess-' + Date.now();
-                try { localStorage.setItem('jaremis_session', currentSessionId); } catch(_) {}
-                // reset UI messages to greeting
-                chatMessages.innerHTML = '<div style="height:12px;"></div>'+
-                  '<div class="chat-bubble bot-bubble">'+
-                  '<strong>Chào bạn 👋 Mình là JAREMIS.</strong>'+
-                  '<p style="margin-top:8px; color:var(--text-secondary-color);">Hãy nhập các dấu hiệu, hỏi chuyện, hoặc bật chế độ <strong>Diagnose</strong> để yêu cầu chẩn đoán y khoa.</p>'+
-                  '</div>';
-                chatMessages.scrollTop = chatMessages.scrollHeight;
-                // clear input & previews
-                chatInput.value = '';
-                autoResize(chatInput);
-                imagePreviewContainer.innerHTML = '';
-                // close sidebar if open (mobile)
-                const sidebarEl = document.getElementById('sidebar');
-                const backdrop = document.getElementById('sidebar-backdrop');
-                if (sidebarEl && sidebarEl.classList.contains('mobile-open')){
-                    sidebarEl.classList.remove('mobile-open');
-                    if (backdrop){ backdrop.classList.remove('show'); backdrop.style.display='none'; }
-                    const drawerBtn = document.getElementById('history-drawer-toggle');
-                    if (drawerBtn) drawerBtn.classList.remove('open');
-                }
-            } catch(e){ console.warn('startNewConversation error', e); }
-        }
-        // ------------------------------
-        // Missing helpers: thinking animation, typewriter reply, error display
-        // These were referenced but not defined previously; implement robust versions
-        // ------------------------------
-        function startThinking(bubble){
-            if(!bubble) return;
-            try{ clearInterval(bubble._thinkInterval); }catch(e){}
-            bubble.dataset.katexRendered = '0';
-            bubble.innerHTML = '';
-            const wrapper = document.createElement('div');
-            wrapper.style.display = 'flex';
-            wrapper.style.flexDirection = 'column';
-            wrapper.style.gap = '8px';
-
-            const text = document.createElement('div');
-            text.className = 'thinking-text';
-            text.style.color = 'var(--text-secondary-color)';
-            text.style.fontSize = '14px';
-            text.textContent = 'đang suy nghĩ lâu hơn để giúp bạn hài lòng hơn';
-
-            const dots = document.createElement('div');
-            dots.className = 'thinking-dots';
-            dots.style.color = 'var(--text-secondary-color)';
-            dots.style.fontSize = '14px';
-
-            wrapper.appendChild(text);
-            wrapper.appendChild(dots);
-            bubble.appendChild(wrapper);
-
-            let dcount = 0;
-            bubble._thinkInterval = setInterval(()=>{
-                dcount = (dcount + 1) % 4;
-                const n = dcount === 0 ? 1 : dcount; // at least one dot
-                dots.textContent = '.'.repeat(n);
-            }, 400);
-            bubble._thinking = true;
-            return bubble._thinkInterval;
-        }
-
-        function stopThinking(bubble){
-            try{
-                if(bubble && bubble._thinkInterval) clearInterval(bubble._thinkInterval);
-            }catch(e){}
-            if(bubble){ bubble._thinking = false; }
-        }
-
-        function showError(message, targetBubble){
-            console.error('showError:', message);
-            if (targetBubble && targetBubble.parentNode) {
-                targetBubble.innerHTML = `<div style="color:var(--error-color); font-weight:600;">Lỗi: ${escapeHtml(String(message))}</div>`;
+            // Show thinking animation
+            if (diagnosticMode) {
+                await animateAnalysisSteps(botBubble);
             } else {
-                const b = document.createElement('div');
-                b.className = 'chat-bubble bot-bubble';
-                b.innerHTML = `<div style="color:var(--error-color); font-weight:600;">Lỗi: ${escapeHtml(String(message))}</div>`;
-                chatMessages.appendChild(b);
+                showThinking(botBubble);
+            }
+
+            // Send request
+            try {
+                const controller = new AbortController();
+                window._currentAbortController = controller;
+                window._currentAbortStartedAt = Date.now();
+                
+                // Show stop button instead of send button
+                showStopButton();
+
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    body: formData,
+                    signal: controller.signal
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Lỗi server');
+                }
+
+                const result = await response.json();
+                
+                // Debug: log response
+                console.log('📦 Diagnosis Response:', result);
+                
+                // Clear abort controller
+                window._currentAbortController = null;
+                window._currentAbortStartedAt = 0;
+                
+                // Show send button again
+                showSendButton();
+
+                // Render response
+                if (diagnosticMode) {
+                    renderDiagnosisResponse(result, botBubble);
+                } else {
+                    // Render chat response with animated typing
+                    const replyHtml = result.replyHtml || result.reply || 'Không có phản hồi';
+                    await renderBotReplyAnimated(botBubble, replyHtml);
+                }
+
+                // Show citations if available
+                if (result.citations && result.citations.length > 0) {
+                    const citationBubble = document.createElement('div');
+                    citationBubble.className = 'chat-bubble bot-bubble';
+                    citationBubble.innerHTML = result.citationsHtml || formatCitations(result.citations);
+                    chatMessages.appendChild(citationBubble);
+                }
+
                 chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            } catch (error) {
+                console.error('Submit error:', error);
+                
+                stopThinking(botBubble);
+                botBubble.innerHTML = `
+                    <div style="color:var(--error-color);">
+                        ❌ <strong>Lỗi:</strong> ${escapeHtml(error.message)}
+                    </div>
+                `;
+
+                window._currentAbortController = null;
+                window._currentAbortStartedAt = 0;
+                
+                // Show send button again on error
+                showSendButton();
             }
         }
 
-        // Simple markdown-ish converter used as fallback when server doesn't provide HTML
-        function convertMarkdown(raw){
-            if(!raw) return '';
-            const maybeHtml = /<[^>]+>/g.test(raw);
-            if(maybeHtml) return raw;
-            let s = escapeHtml(raw);
-            s = s.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1<\/a>');
-            s = s.split(/\n\n+/).map(p => `<p>${p.replace(/\n/g,'<br>')}</p>`).join('');
-            return s;
+        function generateSessionId() {
+            const id = 'session-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+            currentSessionId = id;
+            try {
+                localStorage.setItem('jaremis_session', id);
+            } catch(e) {}
+            return id;
         }
 
-        // Typewriter / progressive reveal for bot replies. Works with HTML by appending node-by-node and typing text-nodes.
-        async function renderBotReplyAnimated(targetBubble, html){
-            if(!targetBubble) return;
-            stopThinking(targetBubble);
-            targetBubble.innerHTML = '';
-            const container = document.createElement('div');
-            container.className = 'bot-reply';
-            targetBubble.appendChild(container);
+        function formatCitations(citations) {
+            if (!citations || citations.length === 0) return '';
+            
+            let html = '<div style="margin-top:16px;"><h4>📖 Nguồn tham khảo:</h4><div style="margin:8px 0;">';
+            citations.forEach((c, i) => {
+                const shortTitle = c.title && c.title.length > 50 ? c.title.substring(0, 50) + '...' : (c.title || 'Source');
+                html += `<a href="${escapeHtml(c.url)}" class="citation-btn" target="_blank" rel="noopener">${c.icon || '📚'} ${escapeHtml(c.type || 'Source')}: ${escapeHtml(shortTitle)}</a> `;
+            });
+            html += '</div></div>';
+            return html;
+        }
 
-            // Gemini-like: reveal line-by-line (rows), with soft fade/slide and natural pauses.
-            let fastForward = false;
-            const onFast = () => {
-                fastForward = true;
-                // Instantly render the rest of the content
-                container.innerHTML = html;
-                // Make sure all child elements are visible instantly
-                Array.from(container.children).forEach(child => child.classList.add('gemini-visible'));
-                // And render any math
-                try {
-                    if (window.jaremis && typeof window.jaremis.ensureRenderMath === 'function') {
-                        window.jaremis.ensureRenderMath(targetBubble);
-                    } else if (typeof window.renderMathIn === 'function') {
-                        window.renderMathIn(targetBubble);
+        function renderDiagnosisResponse(result, bubbleElement) {
+            stopThinking(bubbleElement);
+            
+            console.log('🔍 Rendering diagnosis response:', result);
+            
+            let html = '<div class="diagnosis-result">';
+            
+            // Main diagnosis - PRIORITIZE markdown over HTML
+            // diagnosisHtml doesn't parse markdown tables, so use diagnosis (raw markdown) instead
+            if (result.diagnosis) {
+                console.log('✅ Using diagnosis (converting markdown with GFM tables)');
+                // Convert markdown to HTML
+                if (typeof marked !== 'undefined') {
+                    try {
+                        // IMPORTANT: Parse full markdown including tables
+                        const parsedHtml = marked.parse(result.diagnosis, {
+                            breaks: true,
+                            gfm: true, // GitHub Flavored Markdown (supports tables)
+                            tables: true,
+                            headerIds: false,
+                            mangle: false
+                        });
+                        html += parsedHtml;
+                    } catch (e) {
+                        console.warn('Markdown parse error:', e);
+                        html += result.diagnosis.replace(/\n/g, '<br>');
                     }
-                } catch(_){}
-            };
-            targetBubble.addEventListener('click', onFast, { once: true });
-
-            const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-            const cfg = {
-                lineBase: window.GEMINI_LINE_BASE_MS ?? 80,          // base delay per line
-                perChar: window.GEMINI_LINE_PER_CHAR_MS ?? 1.1,       // extra ms per char for rhythm
-                sentencePause: window.GEMINI_SENTENCE_PAUSE_MS ?? 150, // extra pause after sentence-ending punctuation
-                blockGap: window.GEMINI_BLOCK_GAP_MS ?? 120            // pause between major blocks (e.g. paragraphs)
-            };
-
-            function endsSentence(text){
-                return /[\.!?…]\s*$/.test(text || '');
+                } else {
+                    html += result.diagnosis.replace(/\n/g, '<br>');
+                }
+            } else if (result.diagnosisHtml) {
+                console.log('⚠️ Fallback to diagnosisHtml (may not render tables correctly)');
+                html += result.diagnosisHtml;
+            } else {
+                // Fallback: hiển thị toàn bộ response nếu không có diagnosis
+                console.warn('⚠️ No diagnosis field found, showing full response');
+                html += '<div style="color:orange;">⚠️ Không tìm thấy kết quả chẩn đoán. Response:</div>';
+                html += `<pre style="background:rgba(0,0,0,0.3);padding:12px;border-radius:8px;overflow:auto;max-height:300px;font-size:11px;">${escapeHtml(JSON.stringify(result, null, 2))}</pre>`;
             }
 
-            // Use marked.js to parse the markdown into a token stream
-            const tokens = marked.lexer(html);
-            const renderer = new marked.Renderer();
+            // Lab analysis
+            if (result.labAnalysis && result.labAnalysis.abnormal && result.labAnalysis.abnormal.length > 0) {
+                html += '<h4 style="margin-top:16px;">🔬 Xét nghiệm bất thường:</h4>';
+                html += '<table style="width:100%;border-collapse:collapse;margin:8px 0;">';
+                html += '<thead><tr><th>Chỉ số</th><th>Giá trị</th><th>Trạng thái</th><th>Mức độ</th></tr></thead><tbody>';
+                result.labAnalysis.abnormal.forEach(a => {
+                    html += `<tr>
+                        <td>${escapeHtml(a.name)}</td>
+                        <td>${a.value} (BT: ${escapeHtml(a.normal)})</td>
+                        <td>${a.status}</td>
+                        <td><span style="color:${a.severity === 'SEVERE' ? 'var(--error-color)' : a.severity === 'MODERATE' ? 'orange' : 'yellow'}">${a.severity}</span></td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+            }
 
-            for (const token of tokens) {
-                if (fastForward) break;
+            // NEWS2 Score
+            if (result.news2Score) {
+                html += `<div style="margin:16px 0;padding:12px;background:rgba(255,255,255,0.03);border-radius:8px;">
+                    <h4>📊 NEWS2 Score: ${result.news2Score.score}/20</h4>
+                    <p style="color:${result.news2Score.risk === 'HIGH' ? 'var(--error-color)' : result.news2Score.risk === 'MODERATE' ? 'orange' : 'var(--success-color)'}">
+                        <strong>${result.news2Score.risk} RISK</strong>
+                    </p>
+                    <p style="font-size:13px;">${result.news2Score.interpretation}</p>
+                </div>`;
+            }
 
-                // Create a temporary list containing only the current token for the parser
-                const singleTokenList = [token];
-                singleTokenList.links = tokens.links; // Important: parser needs the links object
-
-                const htmlFragment = marked.parser(singleTokenList, { renderer });
-
-                const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = htmlFragment.trim();
-
-                const element = tempDiv.firstChild;
-
-                if (element && element.nodeType === Node.ELEMENT_NODE) {
-                    container.appendChild(element);
-
-                    // Wait a frame for the element to be in the DOM but invisible
-                    await new Promise(resolve => requestAnimationFrame(resolve));
-                    if (fastForward) break;
-
-                    // Add class to trigger the CSS animation
-                    element.classList.add('gemini-visible');
-
-                    // Calculate dynamic delay for the next element
-                    const text = element.textContent || '';
-                    let delay = cfg.lineBase + text.length * cfg.perChar;
-                    if (endsSentence(text)) {
-                        delay += cfg.sentencePause;
-                    }
-
-                    await sleep(delay);
-                } else if (htmlFragment.trim()) {
-                    // Handle plain text nodes if any
-                    const textNode = document.createTextNode(htmlFragment);
-                    container.appendChild(textNode);
-                    await sleep(cfg.lineBase);
+            // Treatment recommendations
+            if (result.treatmentRecommendations) {
+                html += '<h4 style="margin-top:16px;">💊 Khuyến nghị điều trị:</h4>';
+                const tr = result.treatmentRecommendations;
+                if (tr.firstLine && tr.firstLine.length > 0) {
+                    html += '<ul>';
+                    tr.firstLine.forEach(drug => {
+                        html += `<li><strong>${escapeHtml(drug.drug)}</strong>: ${escapeHtml(drug.dose)} <em>(${escapeHtml(drug.evidence)})</em></li>`;
+                    });
+                    html += '</ul>';
+                }
+                if (tr.citation) {
+                    html += `<p style="font-size:12px;color:var(--text-secondary-color);margin-top:8px;">📖 ${escapeHtml(tr.citation)}</p>`;
                 }
             }
 
-            // If fast-forward was triggered, it already rendered everything.
-            // If not, we just need to ensure math is rendered.
-            if (!fastForward) {
-                try {
-                    if (window.jaremis && typeof window.jaremis.ensureRenderMath === 'function') {
-                        window.jaremis.ensureRenderMath(targetBubble);
-                    } else if (typeof window.renderMathIn === 'function') {
-                        window.renderMathIn(targetBubble);
+            // XAI Explanation
+            if (result.xaiExplanation) {
+                // xaiExplanation might be string or object
+                let xaiText = '';
+                if (typeof result.xaiExplanation === 'string') {
+                    xaiText = result.xaiExplanation;
+                } else if (typeof result.xaiExplanation === 'object') {
+                    // If it's an object, try to extract text from common properties
+                    xaiText = result.xaiExplanation.reasoning || 
+                              result.xaiExplanation.text || 
+                              result.xaiExplanation.explanation ||
+                              JSON.stringify(result.xaiExplanation, null, 2);
+                }
+                
+                let xaiHtml = xaiText;
+                if (typeof marked !== 'undefined' && xaiText) {
+                    try {
+                        xaiHtml = marked.parse(xaiText);
+                    } catch (e) {
+                        console.warn('XAI markdown parse error:', e);
+                        xaiHtml = xaiText.replace(/\n/g, '<br>');
                     }
-                } catch(_){}
+                }
+                
+                if (xaiHtml) {
+                    html += `<details style="margin-top:16px;">
+                        <summary style="cursor:pointer;color:var(--accent-color);"><strong>🧠 Giải thích AI (XAI)</strong></summary>
+                        <div style="margin-top:8px;padding:12px;background:rgba(255,255,255,0.02);border-radius:8px;">
+                            ${xaiHtml}
+                        </div>
+                    </details>`;
+                }
+            }
+            
+            // Warning message
+            if (result.warning) {
+                html += `<div class="warning" style="margin-top:20px;padding:12px;background:rgba(241,224,90,0.12);border-left:4px solid #f1e05a;color:#d4c873;font-size:14px;border-radius:4px;">
+                    ${result.warning}
+                </div>`;
             }
 
-            // Clean up listener
-            try { targetBubble.removeEventListener('click', onFast, { once: true }); } catch(_) {}
+            html += '</div>';
+            
+            bubbleElement.innerHTML = html;
+            
+            // Render LaTeX in diagnosis
+            console.log('🔍 Rendering LaTeX in diagnosis...');
+            if (typeof renderMathInElement === 'function') {
+                try {
+                    renderMathInElement(bubbleElement, {
+                        delimiters: [
+                            {left: '$$', right: '$$', display: true},
+                            {left: '$', right: '$', display: false},
+                            {left: '\\(', right: '\\)', display: false},
+                            {left: '\\[', right: '\\]', display: true}
+                        ],
+                        throwOnError: false
+                    });
+                    console.log('✅ LaTeX rendered successfully');
+                } catch (e) {
+                    console.warn('⚠️ LaTeX render error:', e);
+                }
+            } else {
+                console.warn('⚠️ renderMathInElement not available');
+            }
         }
-     </script>
-     <script>
+
+        function showThinking(bubble) {
+            bubble.innerHTML = '<div class="thinking-dots"><span></span><span></span><span></span></div>';
+        }
+
+        function stopThinking(bubble) {
+            const thinking = bubble.querySelector('.thinking-dots');
+            if (thinking) thinking.remove();
+        }
+
+        // ========================================
+        // EVENT LISTENERS
+        // ========================================
+        document.addEventListener('DOMContentLoaded', () => {
+            // Enter key to send
+            chatInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    submitData();
+                }
+            });
+
+            // Generate session ID on load
+            if (!currentSessionId) {
+                generateSessionId();
+            }
+        });
+
+        // ========================================
+        // ANIMATE ANALYSIS STEPS (UX)
+        // ========================================
+        async function animateAnalysisSteps(bubbleElement) {
+            stopThinking(bubbleElement);
+            
+            // Clear previous content
+            bubbleElement.innerHTML = '';
+
+            const steps = [
+                { text: 'Đang phân tích...', delay: 1000 },
+                { text: 'Đang thu thập dữ liệu bệnh án...', delay: 1500 },
+                { text: 'Đang so sánh triệu chứng...', delay: 1200 },
+                { text: 'Đang đưa ra chẩn đoán khả thi...', delay: 1300 },
+                { text: 'Đang lập kế hoạch điều trị...', delay: 1100 },
+                { text: 'Hoàn tất!', delay: 800 }
+            ];
+
+            for (const step of steps) {
+                const stepEl = document.createElement('div');
+                stepEl.className = 'step-item';
+                stepEl.innerHTML = `
+                    <div class="icon"><i class="fas fa-check-circle"></i></div>
+                    <div class="text">${step.text}</div>
+                `;
+                bubbleElement.appendChild(stepEl);
+                bubbleElement.scrollTop = bubbleElement.scrollHeight;
+
+                await new Promise(resolve => setTimeout(resolve, step.delay));
+            }
+
+            // Final message
+            bubbleElement.innerHTML += `
+                <div class="step-item completed">
+                    <div class="icon"><i class="fas fa-thumbs-up"></i></div>
+                    <div class="text">Phân tích hoàn tất! Xem kết quả bên dưới.</div>
+                </div>
+            `;
+            bubbleElement.scrollTop = bubbleElement.scrollHeight;
+        }
+
+        // Auto-wrap math expressions in LaTeX delimiters
+        // Detects common math patterns like x^2, √5, fractions, equations
+        function autoWrapMathExpressions(text) {
+            if (!text || typeof text !== 'string') return text;
+            
+            // Skip if already has LaTeX delimiters
+            if (text.includes('$') || text.includes('\\(') || text.includes('\\[')) return text;
+            
+            // Protect code blocks and inline code from modification
+            const codeBlocks = [];
+            const inlineCode = [];
+            
+            // Extract code blocks
+            text = text.replace(/```[\s\S]*?```/g, (match) => {
+                codeBlocks.push(match);
+                return `__CODE_BLOCK_${codeBlocks.length - 1}__`;
+            });
+            
+            // Extract inline code
+            text = text.replace(/`[^`]+`/g, (match) => {
+                inlineCode.push(match);
+                return `__INLINE_CODE_${inlineCode.length - 1}__`;
+            });
+            
+            // === PHASE 1: Complex patterns first ===
+            
+            // 1. Equations with sqrt: x = √5, x = -√5
+            text = text.replace(/\b([a-zA-Z])\s*=\s*-?\s*√(\d+)/g, '$$$1 = -\\sqrt{$2}$$');
+            text = text.replace(/\b([a-zA-Z])\s*=\s*√(\d+)/g, '$$$1 = \\sqrt{$2}$$');
+            
+            // 2. Square root with parentheses: √(x+5) → $\sqrt{x+5}$
+            text = text.replace(/√\(([^)]+)\)/g, '$\\sqrt{$1}$');
+            
+            // 3. Power of sqrt: (√5)^2 → $(\sqrt{5})^2$
+            text = text.replace(/\(√(\d+)\)\^(\d+)/g, '$(\\sqrt{$1})^{$2}$');
+            
+            // 4. Standalone sqrt: √5 → $\sqrt{5}$
+            text = text.replace(/√(\d+)/g, '$\\sqrt{$1}$');
+            text = text.replace(/√([a-zA-Z])/g, '$\\sqrt{$1}$');
+            
+            // === PHASE 2: Exponents ===
+            
+            // 5. Expression with exponent in parentheses: (x+1)^2
+            text = text.replace(/\(([^)]+)\)\^(\d+)/g, '$($1)^{$2}$');
+            
+            // 6. Variable/number with exponent: x^2, 2^10
+            text = text.replace(/\b([a-zA-Z0-9]+)\^(\d+)\b/g, '$$$1^{$2}$$');
+            text = text.replace(/\b([a-zA-Z])\^([a-zA-Z0-9]+)\b/g, '$$$1^{$2}$$');
+            
+            // === PHASE 3: Equations ===
+            
+            // 7. Simple equations: x = 5, x + y = 10
+            // (skip if already wrapped in previous phases)
+            text = text.replace(/(?<!\$)\b([a-zA-Z][²³⁴⁵⁶⁷⁸⁹⁰]*)\s*=\s*([0-9\.\-+]+)\b(?!\$)/g, '$$$1 = $2$$');
+            
+            // 8. Equations with operators: x + y = 10
+            text = text.replace(/\b([a-zA-Z])\s*([+\-])\s*([a-zA-Z0-9])\s*=\s*([0-9\.\-+]+)/g, '$$$1 $2 $3 = $4$$');
+            
+            // === PHASE 4: Fractions ===
+            
+            // 9. Fractions a/b → $\frac{a}{b}$ (only in math context, not URLs)
+            text = text.replace(/(?<![\w:\/])\b(\d+)\/(\d+)\b(?![\w\/])/g, '$\\frac{$1}{$2}$');
+            
+            // === PHASE 5: Special symbols ===
+            
+            // 10. Special symbols (wrap individually)
+            text = text.replace(/±/g, '$\\pm$');
+            text = text.replace(/×/g, '$\\times$');
+            text = text.replace(/÷/g, '$\\div$');
+            text = text.replace(/≤/g, '$\\leq$');
+            text = text.replace(/≥/g, '$\\geq$');
+            text = text.replace(/≠/g, '$\\neq$');
+            text = text.replace(/∞/g, '$\\infty$');
+            text = text.replace(/≈/g, '$\\approx$');
+            
+            // === PHASE 6: Unicode superscripts ===
+            
+            // 11. Superscript numbers to proper exponents: x² → $x^2$
+            text = text.replace(/([a-zA-Z])([²³⁴⁵⁶⁷⁸⁹⁰]+)/g, (match, letter, superscripts) => {
+                const normalMap = {'²':'2','³':'3','⁴':'4','⁵':'5','⁶':'6','⁷':'7','⁸':'8','⁹':'9','⁰':'0'};
+                const exp = superscripts.split('').map(c => normalMap[c] || c).join('');
+                return `$${letter}^{${exp}}$`;
+            });
+            
+            // === PHASE 7: Clean up ===
+            
+            // 12. Merge consecutive $ delimiters ($$$ → $$, but keep display $$ separate from inline $)
+            text = text.replace(/\$\$/g, '__DISPLAY__');
+            text = text.replace(/\$+/g, '$');
+            text = text.replace(/__DISPLAY__/g, '$$');
+            
+            // 13. Merge adjacent inline math: $x$ $=$ $5$ → $x = 5$
+            text = text.replace(/\$([^$]+)\$\s*\$([^$]+)\$/g, '$$$1 $2$$');
+            text = text.replace(/\$([^$]+)\$\s*\$([^$]+)\$/g, '$$$1 $2$$'); // Run twice for chains
+            
+            // Restore code blocks and inline code
+            text = text.replace(/__CODE_BLOCK_(\d+)__/g, (_, i) => codeBlocks[i]);
+            text = text.replace(/__INLINE_CODE_(\d+)__/g, (_, i) => inlineCode[i]);
+            
+            return text;
+        }
+
+        async function renderBotReplyAnimated(bubbleElement, htmlContent) {
+            stopThinking(bubbleElement);
+            
+            // Auto-wrap math expressions in LaTeX delimiters
+            htmlContent = autoWrapMathExpressions(htmlContent);
+            
+            // Parse markdown to HTML if content looks like markdown
+            let finalHtml = htmlContent;
+            if (typeof marked !== 'undefined' && (htmlContent.includes('##') || htmlContent.includes('|') || htmlContent.includes('-'))) {
+                try {
+                    finalHtml = marked.parse(htmlContent);
+                } catch (e) {
+                    console.warn('Markdown parse error:', e);
+                }
+            }
+            
+            // Create wrapper
+            const wrapper = document.createElement('div');
+            wrapper.className = 'bot-reply-content';
+            wrapper.style.opacity = '0';
+            bubbleElement.innerHTML = '';
+            bubbleElement.appendChild(wrapper);
+            
+            // Gemini-style: Show content immediately with fade-in (no char-by-char)
+            wrapper.innerHTML = finalHtml;
+            
+            // Render LaTeX math BEFORE fade-in to avoid flicker
+            if (typeof renderMathInElement === 'function') {
+                try {
+                    renderMathInElement(wrapper, {
+                        delimiters: [
+                            {left: '$$', right: '$$', display: true},
+                            {left: '$', right: '$', display: false},
+                            {left: '\\(', right: '\\)', display: false},
+                            {left: '\\[', right: '\\]', display: true}
+                        ],
+                        throwOnError: false
+                    });
+                } catch (e) {
+                    console.warn('KaTeX render error:', e);
+                }
+            }
+            
+            // Fade in animation AFTER LaTeX is rendered
+            requestAnimationFrame(() => {
+                wrapper.style.transition = 'opacity 0.4s ease-out';
+                wrapper.style.opacity = '1';
+            });
+            
+            // Smooth scroll to bottom
+            setTimeout(() => {
+                chatMessages.scrollTo({
+                    top: chatMessages.scrollHeight,
+                    behavior: 'smooth'
+                });
+            }, 150);
+            
+            return { finish: () => {}, replace: (html) => { wrapper.innerHTML = html; } };
+        }
+    </script>
+    <script>
 /* === 3D Tilt Effect Script ===
    Áp dụng cho: đăng nhập / đăng xuất / xóa lịch sử (auth-btn),
    nút Diagnose (#mode-btn), Jaremis Pro (#think-btn),
@@ -2328,6 +3041,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
     const tag = (tgt.tagName || '').toUpperCase();
     const isEditable = tag === 'INPUT' || tag === 'TEXTAREA' || tgt.isContentEditable;
 
+    // ESC -> stop AI (works globally)
+    if (e.key === 'Escape') {
+      if (window._currentAbortController) {
+        e.preventDefault();
+        stopAIResponse();
+        return;
+      }
+    }
+
     // Ctrl+Enter -> send (works even when typing)
     if (e.ctrlKey && !e.shiftKey && e.key === 'Enter') {
       e.preventDefault(); tryClick('send-btn'); return;
@@ -2470,6 +3192,86 @@ if (!window._jaremis_katex_setup) {
     });
     mo.observe(container, { childList: true, subtree: true });
   });
+}
+</script>
+
+<!-- Animated Reply Script -->
+<script src="animated-reply.js"></script>
+<script>
+// Configure marked.js for better markdown rendering
+if (typeof marked !== 'undefined') {
+    marked.setOptions({
+        breaks: true,
+        gfm: true,
+        tables: true,
+        sanitize: false
+    });
+}
+
+// Function to render bot reply with Gemini-style streaming animation
+async function renderBotReplyAnimated(bubbleElement, htmlContent) {
+    stopThinking(bubbleElement);
+    
+    // Auto-wrap math expressions in LaTeX delimiters
+    htmlContent = autoWrapMathExpressions(htmlContent);
+    
+    // Parse markdown to HTML if content looks like markdown
+    let finalHtml = htmlContent;
+    if (typeof marked !== 'undefined' && (htmlContent.includes('##') || htmlContent.includes('|') || htmlContent.includes('-'))) {
+        try {
+            // Enable GFM (GitHub Flavored Markdown) for tables
+            finalHtml = marked.parse(htmlContent, {
+                breaks: true,
+                gfm: true, // Support tables, strikethrough, etc.
+                tables: true
+            });
+        } catch (e) {
+            console.warn('Markdown parse error:', e);
+        }
+    }
+    
+    // Create wrapper
+    const wrapper = document.createElement('div');
+    wrapper.className = 'bot-reply-content';
+    wrapper.style.opacity = '0';
+    bubbleElement.innerHTML = '';
+    bubbleElement.appendChild(wrapper);
+    
+    // Gemini-style: Show content immediately with fade-in (no char-by-char)
+    wrapper.innerHTML = finalHtml;
+    
+    // Render LaTeX math BEFORE fade-in to avoid flicker
+    if (typeof renderMathInElement === 'function') {
+        try {
+            renderMathInElement(wrapper, {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false},
+                    {left: '\\(', right: '\\)', display: false},
+                    {left: '\\[', right: '\\]', display: true}
+                ],
+                throwOnError: false
+            });
+        } catch (e) {
+            console.warn('KaTeX render error:', e);
+        }
+    }
+    
+    // Fade in animation AFTER LaTeX is rendered
+    requestAnimationFrame(() => {
+        wrapper.style.transition = 'opacity 0.4s ease-out';
+        wrapper.style.opacity = '1';
+    });
+    
+    // Smooth scroll to bottom
+    setTimeout(() => {
+        chatMessages.scrollTo({
+            top: chatMessages.scrollHeight,
+            behavior: 'smooth'
+        });
+    }, 150);
+    
+    return { finish: () => {}, replace: (html) => { wrapper.innerHTML = html; } };
 }
 </script>
 </body>
