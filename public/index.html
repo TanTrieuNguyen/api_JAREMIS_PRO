@@ -244,6 +244,25 @@
             .auth-controls { right: 10px; }
         }
 
+        /* Mobile Auth Controls in Sidebar */
+        .mobile-auth-container {
+            display: none; /* Hidden on desktop */
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        @media (max-width: 768px) {
+            .mobile-auth-container {
+                display: block;
+            }
+            
+            /* Hide desktop auth on mobile */
+            .auth-container {
+                display: none !important;
+            }
+        }
+
         /* Modal */
         .modal-backdrop {
             position: fixed;
@@ -1159,6 +1178,9 @@
                 </h3>
                 <ul id="history-list"></ul>
             </nav>
+            <!-- Mobile Auth Controls (only visible on mobile) -->
+            <div class="mobile-auth-container" id="mobile-auth-container"></div>
+            
             <div class="sidebar-footer">Made with ❤️ by TT1403 & Ant.</div>
         </aside>
 
@@ -1554,8 +1576,20 @@
         }
 
         function renderAuthControls() {
+            // Render desktop auth
             authControls.innerHTML = '';
+            
+            // Also render mobile auth
+            const mobileAuthContainer = document.getElementById('mobile-auth-container');
+            if (mobileAuthContainer) {
+                mobileAuthContainer.innerHTML = '';
+            }
+            
             const user = getLocalUser();
+            
+            // Create elements
+            let elements = [];
+            
             if (user) {
                 const nameEl = document.createElement('div');
                 nameEl.style.color = 'var(--text-color)';
@@ -1594,9 +1628,7 @@
                     renderHistoryList([]);
                 };
 
-                authControls.appendChild(nameEl);
-                authControls.appendChild(btnHistoryClear);
-                authControls.appendChild(logoutBtn);
+                elements = [nameEl, btnHistoryClear, logoutBtn];
             } else {
                 const loginBtn = document.createElement('button');
                 loginBtn.className = 'auth-btn';
@@ -1608,8 +1640,22 @@
                 registerBtn.textContent = 'Đăng ký';
                 registerBtn.onclick = () => { openAuthModal(); showTab('register'); };
 
-                authControls.appendChild(loginBtn);
-                authControls.appendChild(registerBtn);
+                elements = [loginBtn, registerBtn];
+            }
+            
+            // Append to desktop
+            elements.forEach(el => authControls.appendChild(el));
+            
+            // Clone and append to mobile
+            if (mobileAuthContainer) {
+                elements.forEach(el => {
+                    const clone = el.cloneNode(true);
+                    // Copy event listeners
+                    if (el.onclick) {
+                        clone.onclick = el.onclick;
+                    }
+                    mobileAuthContainer.appendChild(clone);
+                });
             }
         }
 
@@ -1647,7 +1693,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, email, password })
                 });
-                const json = await res.json();
+                               const json = await res.json();
                 if (!res.ok) {
                     flashNotice(json.error || 'Đăng ký thất bại');
                     return;
@@ -2634,7 +2680,12 @@
             let finalHtml = htmlContent;
             if (typeof marked !== 'undefined' && (htmlContent.includes('##') || htmlContent.includes('|') || htmlContent.includes('-'))) {
                 try {
-                    finalHtml = marked.parse(htmlContent);
+                    // Enable GFM (GitHub Flavored Markdown) for tables
+                    finalHtml = marked.parse(htmlContent, {
+                        breaks: true,
+                        gfm: true, // Support tables, strikethrough, etc.
+                        tables: true
+                    });
                 } catch (e) {
                     console.warn('Markdown parse error:', e);
                 }
@@ -2978,7 +3029,7 @@ function activateCurrentMatch(){
     const rect = el.getBoundingClientRect();
     const cRect = container.getBoundingClientRect();
     const scrollTo = rect.top - cRect.top + container.scrollTop - (container.clientHeight/2) + rect.height/2;
-    container.scrollTo({ top: scrollTo, behavior:'smooth' });
+    container.scrollTo({ top: scrollTo, behavior: 'smooth' });
   }
 }
 
@@ -3275,4 +3326,4 @@ async function renderBotReplyAnimated(bubbleElement, htmlContent) {
 }
 </script>
 </body>
-</html> 
+</html>
