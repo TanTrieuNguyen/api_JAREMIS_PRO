@@ -6,6 +6,10 @@
     <title>JAREMIS - AI Chat</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
+    <!-- Markdown Parser -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
     <style>
         :root {
             --sidebar-width: 260px;
@@ -39,6 +43,10 @@
             height: 100vh;
             overflow: hidden;
         }
+
+        /* Hide mobile-only toggles on desktop */
+        .mobile-header { display: none; }
+        #history-drawer-toggle { display: none; }
 
         .chat-container { display: flex; width: 100%; height: 100%; }
 
@@ -141,6 +149,29 @@
         .action-btn:hover { background-color:#2c313a; color:var(--text-color); }
         #send-btn { background-color:var(--accent-color); color:white; border-radius:6px; width:44px; height:40px; display:flex; align-items:center; justify-content:center; }
         #send-btn:disabled { background-color:#30363d; cursor:not-allowed; }
+        
+        /* Stop button styling */
+        #stop-btn { 
+            background-color: var(--error-color); 
+            color: white; 
+            border-radius: 6px; 
+            width: 44px; 
+            height: 40px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            animation: pulse 2s infinite;
+        }
+        #stop-btn:hover { 
+            background-color: #ff6b6b; 
+            transform: scale(1.05);
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(248, 81, 73, 0.4); }
+            70% { box-shadow: 0 0 0 8px rgba(248, 81, 73, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(248, 81, 73, 0); }
+        }
 
         #image-preview-container { display:flex; gap:10px; margin-top:10px; padding:0 8px; }
         .preview-item { position:relative; }
@@ -176,6 +207,11 @@
 
         .warning { margin-top:20px; padding:12px; background:var(--who-bg); border-left:4px solid #f1e05a; color:#d4c873; font-size:14px; border-radius:4px; }
         .warning strong { color:#f1e05a; }
+
+        /* Think button style */
+        #think-btn { background:none; border:1px solid var(--border-color); border-radius:6px; padding:6px 8px; color:var(--text-secondary-color); cursor:pointer; width:auto; height:40px; display:flex; align-items:center; justify-content:center; }
+        #think-btn.active { background: linear-gradient(90deg, rgba(47,129,247,0.12), rgba(47,129,247,0.06)); color:var(--text-color); border-color: rgba(47,129,247,0.6); }
+        #model-status { font-size:12px; color:var(--text-secondary-color); margin-left:8px; align-self:center; }
 
         /* Mic button style */
         #mic-btn { background:none; border:1px solid var(--border-color); border-radius:6px; padding:6px 8px; color:var(--text-secondary-color); cursor:pointer; width:auto; height:40px; display:flex; align-items:center; justify-content:center; }
@@ -593,6 +629,395 @@
 }
 #snow-canvas { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:0; }
 .chat-messages, .chat-bubble { position:relative; z-index:2; } /* đảm bảo tuyết không đè lên */
+
+/* Website buttons container - ChatGPT style */
+.websites-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 16px;
+    padding: 0;
+}
+
+/* Individual website button - như ChatGPT */
+.website-button {
+    display: inline-block;
+    border-radius: 8px;
+    overflow: hidden;
+    background: rgba(88, 166, 255, 0.05);
+    border: 1px solid rgba(88, 166, 255, 0.15);
+    transition: all 0.2s ease;
+    animation: websiteButtonFadeIn 0.3s ease-out;
+}
+
+.website-button:hover {
+    background: rgba(88, 166, 255, 0.1);
+    border-color: rgba(88, 166, 255, 0.3);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(88, 166, 255, 0.15);
+}
+
+.website-button:active {
+    transform: translateY(0);
+}
+
+.website-link {
+    display: flex !important;
+    align-items: center !important;
+    padding: 8px 12px !important;
+    text-decoration: none !important;
+    color: var(--text-color) !important;
+    gap: 8px !important;
+    min-width: 0;
+    transition: none !important;
+}
+
+.website-icon {
+    position: relative;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.website-icon img {
+    width: 16px;
+    height: 16px;
+    border-radius: 2px;
+    object-fit: contain;
+}
+
+.website-fallback-icon {
+    display: none;
+    font-size: 14px;
+    line-height: 1;
+}
+
+.website-name {
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    color: var(--text-color) !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 120px;
+}
+
+/* Staggered animation */
+.website-button:nth-child(1) { animation-delay: 0.1s; }
+.website-button:nth-child(2) { animation-delay: 0.15s; }
+.website-button:nth-child(3) { animation-delay: 0.2s; }
+.website-button:nth-child(4) { animation-delay: 0.25s; }
+.website-button:nth-child(5) { animation-delay: 0.3s; }
+
+@keyframes websiteButtonFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* ========== BEAUTIFUL TABLE & HEADING STYLES ========== */
+
+/* Markdown tables in chat bubbles */
+.bot-bubble table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    background: rgba(13, 17, 23, 0.5);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    table-layout: fixed; /* FIXED LAYOUT for equal column widths */
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+.bot-bubble table thead {
+    background: linear-gradient(135deg, #1f6feb 0%, #0969da 100%);
+}
+
+.bot-bubble table th {
+    padding: 14px 12px;
+    text-align: center; /* Center align headers */
+    font-weight: 600;
+    color: #fff;
+    font-size: 13px;
+    letter-spacing: 0.3px;
+    border-bottom: 2px solid rgba(47, 129, 247, 0.3);
+    white-space: nowrap; /* No wrap for headers */
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bot-bubble table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-color);
+    font-size: 13px;
+    line-height: 1.4;
+    text-align: center; /* Center align data */
+    white-space: nowrap; /* No wrap for better alignment */
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* First column (usually time/label) - left align */
+.bot-bubble table td:first-child,
+.bot-bubble table th:first-child {
+    text-align: left;
+    font-weight: 500;
+}
+
+.bot-bubble table tbody tr:hover {
+    background: rgba(47, 129, 247, 0.1);
+    transition: background 0.2s ease;
+}
+
+.bot-bubble table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Alternating row colors for better readability (like Excel) */
+.bot-bubble table tbody tr:nth-child(even) {
+    background: rgba(13, 17, 23, 0.3);
+}
+
+.bot-bubble table tbody tr:nth-child(odd) {
+    background: rgba(13, 17, 23, 0.15);
+}
+
+/* Emoji headers - phân cấp màu rõ ràng, không lạm dụng xanh dạ quang */
+.bot-bubble h1, .bot-bubble h2, .bot-bubble h3, .bot-bubble h4 {
+    margin: 24px 0 16px 0;
+    font-weight: 700;
+    line-height: 1.3;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.bot-bubble h1 {
+    font-size: 26px;
+    color: #58a6ff; /* Xanh chủ đạo - CHỈ cho H1 */
+    padding-bottom: 12px;
+    border-bottom: 2px solid rgba(88, 166, 255, 0.3);
+    margin-top: 28px;
+}
+
+.bot-bubble h2 {
+    font-size: 22px;
+    color: #79c0ff; /* Xanh nhạt hơn - cho H2 */
+    margin-top: 24px;
+}
+
+.bot-bubble h3 {
+    font-size: 18px;
+    color: #a5d6ff; /* Xanh pastel - cho H3 */
+    margin-top: 20px;
+}
+
+.bot-bubble h4 {
+    font-size: 16px;
+    color: #c9d1d9; /* Xám sáng - cho H4 */
+    margin-top: 16px;
+}
+
+/* Styled lists - phân cấp màu theo level */
+.bot-bubble ul, .bot-bubble ol {
+    margin: 16px 0;
+    padding-left: 24px;
+}
+
+.bot-bubble li {
+    margin: 10px 0;
+    line-height: 1.7;
+    color: var(--text-color); /* Màu text thường, KHÔNG xanh dạ quang */
+}
+
+/* List markers phân cấp màu */
+.bot-bubble ul > li::marker {
+    color: #58a6ff; /* Level 1: xanh dạ quang */
+}
+
+.bot-bubble ul ul > li::marker {
+    color: #79c0ff; /* Level 2: xanh nhạt hơn */
+}
+
+.bot-bubble ul ul ul > li::marker {
+    color: #a5d6ff; /* Level 3: xanh pastel */
+}
+
+.bot-bubble ol > li::marker {
+    color: #58a6ff; /* Ordered list level 1: xanh dạ quang */
+    font-weight: 600;
+}
+
+.bot-bubble ol ol > li::marker {
+    color: #79c0ff; /* Ordered list level 2 */
+}
+
+.bot-bubble ol ol ol > li::marker {
+    color: #a5d6ff; /* Ordered list level 3 */
+}
+
+/* Paragraphs - spacing tốt */
+.bot-bubble p {
+    margin: 12px 0;
+    line-height: 1.7;
+}
+
+/* First paragraph no top margin */
+.bot-bubble p:first-child {
+    margin-top: 0;
+}
+
+/* Citations section - đẹp, nổi bật */
+.bot-bubble h2:has-text('📚'), 
+.bot-bubble h3:has-text('📚'),
+.bot-bubble p:contains('📚 Nguồn tham khảo') {
+    margin-top: 28px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(47, 129, 247, 0.3);
+}
+
+/* Links in citations */
+.bot-bubble a {
+    color: #58a6ff;
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.bot-bubble a:hover {
+    color: #79c0ff;
+    border-bottom-color: #79c0ff;
+}
+
+/* Citation buttons - nút bấm đẹp cho nguồn tham khảo */
+.bot-bubble a.citation-btn {
+    display: inline-block;
+    padding: 6px 12px;
+    margin: 4px 4px 4px 0;
+    background: linear-gradient(135deg, rgba(88, 166, 255, 0.15) 0%, rgba(88, 166, 255, 0.08) 100%);
+    border: 1px solid rgba(88, 166, 255, 0.3);
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #58a6ff;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.bot-bubble a.citation-btn:hover {
+    background: linear-gradient(135deg, rgba(88, 166, 255, 0.25) 0%, rgba(88, 166, 255, 0.15) 100%);
+    border-color: rgba(88, 166, 255, 0.5);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(88, 166, 255, 0.2);
+    color: #79c0ff;
+}
+
+.bot-bubble a.citation-btn::before {
+    content: '📚 ';
+    margin-right: 4px;
+}
+
+.bot-bubble a.citation-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Code blocks */
+.bot-bubble code {
+    background: rgba(13, 17, 23, 0.7);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    color: #a5d6ff; /* Xanh pastel, KHÔNG dùng #79c0ff */
+}
+
+.bot-bubble pre {
+    background: rgba(13, 17, 23, 0.7);
+    padding: 16px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 16px 0;
+}
+
+.bot-bubble pre code {
+    background: none;
+    padding: 0;
+}
+
+/* Horizontal rules */
+.bot-bubble hr {
+    border: none;
+    border-top: 1px solid var(--border-color);
+    margin: 20px 0;
+}
+
+/* Strong emphasis - KHÔNG dùng xanh dạ quang */
+.bot-bubble strong {
+    font-weight: 600;
+    color: #e6edf3; /* Trắng sáng, nổi bật nhưng không chói */
+}
+
+/* Result box - Khung kết quả đẹp cho đáp án cuối cùng */
+.bot-bubble .result-box {
+    margin: 20px 0;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, rgba(88, 166, 255, 0.12) 0%, rgba(88, 166, 255, 0.05) 100%);
+    border: 2px solid rgba(88, 166, 255, 0.35);
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(88, 166, 255, 0.15);
+    position: relative;
+    overflow: hidden;
+}
+
+.bot-bubble .result-box::before {
+    content: '✓';
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    font-size: 28px;
+    color: rgba(88, 166, 255, 0.2);
+    font-weight: bold;
+}
+
+.bot-bubble .result-box .result-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #58a6ff;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+
+.bot-bubble .result-box .result-content {
+    font-size: 18px;
+    font-weight: 600;
+    color: #e6edf3;
+    text-align: center;
+}
+
+/* LaTeX trong result box */
+.bot-bubble .result-box .katex {
+    font-size: 1.3em !important;
+}
+
+/* Emoji spacing */
+.bot-bubble p:has(> :first-child:is(span.emoji)) {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
     </style>
     <style>
       @media (max-width:600px) {
@@ -697,6 +1122,13 @@
   transform:perspective(800px) rotateX(0deg) rotateY(0deg) translateZ(0) scale(.95);
 }
 </style>
+<!-- Ensure the drawer toggle appears on mobile only -->
+<style>
+  @media (max-width:600px){
+    #history-drawer-toggle { display: inline-flex; }
+    .mobile-header { display: flex; }
+  }
+</style>
 </head>
 <body>
     <div class="bg-animation">
@@ -744,7 +1176,7 @@
                 </span>
             </button>
             <!-- Mobile header (shown on small screens) -->
-            <div class="mobile-header" id="mobile-header" style="display:none;">
+            <div class="mobile-header" id="mobile-header">
                 <button class="hamburger" id="mobile-menu-btn" aria-label="Mở menu"><i class="fas fa-bars"></i></button>
                 <div class="title">JAREMIS</div>
                 <button id="history-toggle-btn" aria-label="Xem lịch sử" onclick="toggleHistoryMode()">
@@ -777,20 +1209,24 @@
                         </button>
 
                         <div id="tool-buttons" class="tool-buttons collapsed">
-                            <button class="action-btn" onclick="document.getElementById('images').click()" title="Đính kèm ảnh (Ctrl+I)">
+                            <button class="action-btn" id="attach-btn" onclick="document.getElementById('images').click()" title="Đính kèm ảnh (Ctrl+Shift+U)">
                                 <i class="fas fa-paperclip"></i>
                             </button>
-                            <button id="mode-btn" class="action-btn" title="Chế độ: Chat (Ctrl+M)" onclick="toggleMode(event)">
+                            <button id="mode-btn" class="action-btn" title="Chế độ: Chat (Ctrl+Shift+K)" onclick="toggleMode(event)">
                                 <i class="fas fa-comments"></i>
                             </button>
-                            <button id="mic-btn" class="action-btn" title="Ghi giọng nói (Ctrl+Shift+S)" onclick="toggleMic(event)">
+                            <button id="mic-btn" class="action-btn" title="Ghi giọng nói (Ctrl+M). Nhấn để bắt đầu/dừng" onclick="toggleMic(event)">
                                 <i class="fas fa-microphone"></i>
                                 <span id="mic-indicator"></span>
                             </button>
-                        </div>
+                                                    </div>
 
-                        <button id="send-btn" class="action-btn" onclick="submitData()" title="Gửi (Enter)\nXuống dòng: Shift+Enter">
+                        <button id="send-btn" class="action-btn" onclick="submitData()" title="Gửi (Enter)">
                             <i class="fas fa-paper-plane"></i>
+                        </button>
+                        
+                        <button id="stop-btn" class="action-btn stop-btn" onclick="stopAIResponse()" title="Dừng AI (Esc)" style="display: none;">
+                            <i class="fas fa-stop"></i>
                         </button>
 
                         <input type="file" id="images" multiple hidden onchange="handleImageUpload(event)">
@@ -825,9 +1261,13 @@
                     <label>Mật khẩu</label>
                     <input id="login-password" type="password" placeholder="Mật khẩu">
                 </div>
+                <div class="form-row">
+                    <button class="btn-primary" onclick="submitLogin()">Đăng nhập</button>
+                    <button class="btn-primary" onclick="loginWithGoogle()" style="background-color: #4285F4;"> <i class="fab fa-google"></i> Google</button>
+                    <button class="btn-primary" onclick="loginWithFacebook()" style="background-color: #3b5998;"> <i class="fab fa-facebook"></i> Facebook</button>
+                </div>
 
                 <div class="form-actions">
-                    <button class="btn-primary" onclick="submitLogin()">Đăng nhập</button>
                     <button class="btn-ghost" onclick="closeAuthModal()">Hủy</button>
                 </div>
                 <div class="small-muted">Bạn chưa có tài khoản? Chuyển sang tab "Đăng ký".</div>
@@ -884,17 +1324,29 @@
       </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
+        // Configure marked.js to allow HTML for citations
+        if (typeof marked !== 'undefined') {
+            marked.setOptions({
+                breaks: true,
+                gfm: true,
+                sanitize: false, // Allow HTML for citations
+                smartLists: true,
+                smartypants: false
+            });
+        }
+
         // ------------------------------
         // UI elements & state
         // ------------------------------
-        // Remove thinkBtn & useProModel
-        // const thinkBtn = document.getElementById('think-btn'); (removed)
         const chatInput = document.getElementById('chat-input');
         const sendBtn = document.getElementById('send-btn');
+        const stopBtn = document.getElementById('stop-btn');
         const imageInput = document.getElementById('images');
         const imagePreviewContainer = document.getElementById('image-preview-container');
         const chatMessages = document.getElementById('chat-messages');
+        const thinkBtn = document.getElementById('think-btn');
         const modelStatusEl = document.getElementById('model-status');
         const micBtn = document.getElementById('mic-btn');
         const micIndicator = document.getElementById('mic-indicator');
@@ -906,6 +1358,7 @@
         const authBackdrop = document.getElementById('auth-backdrop');
         const authControls = document.getElementById('auth-controls');
 
+        let useProModel = false;
         let diagnosticMode = false; // Chat mode default
         let recognition = null;
         let isRecording = false;
@@ -914,65 +1367,165 @@
 
         let currentSessionId = null;
 
-        // Khởi tạo session hiện tại
-        document.addEventListener('DOMContentLoaded', () => {
-          if (!localStorage.getItem('jaremis_session')) {
-            localStorage.setItem('jaremis_session', 'sess-' + Date.now());
+        // Config: optional timeout cap for the 'flash' model. 0 disables auto-stop.
+        // Set e.g. window.FLASH_TIMEOUT_MS = 45000 to cap at 45s.
+        window.FLASH_TIMEOUT_MS = window.FLASH_TIMEOUT_MS ?? 0;
+
+        // Helpers required by inline handlers and rendering
+        function escapeHtml(str){
+          if (str === null || str === undefined) return '';
+          return String(str)
+            .replace(/&/g,'&amp;')
+            .replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;')
+            .replace(/"/g,'&quot;')
+            .replace(/'/g,'&#039;');
+        }
+        function autoResize(el){
+          if(!el) return;
+          el.style.height = 'auto';
+          const maxH = 200;
+          el.style.height = Math.min(maxH, el.scrollHeight || 0) + 'px';
+        }
+
+        // Mobile sidebar (hamburger) behavior: open/close existing sidebar overlay (no new elements)
+        (function(){
+          const mobileBtn = document.getElementById('mobile-menu-btn');
+          const drawerToggleBtn = document.getElementById('history-drawer-toggle');
+          const sidebarEl = document.getElementById('sidebar');
+          const backdrop = document.getElementById('sidebar-backdrop');
+          if (!sidebarEl || !backdrop) return;
+
+          function openSidebar(){
+            sidebarEl.classList.add('mobile-open');
+            backdrop.style.display = 'block';
+            backdrop.classList.add('show');
+            document.body.classList.add('no-scroll');
+            if (mobileBtn) mobileBtn.setAttribute('aria-expanded','true');
+            if (drawerToggleBtn) drawerToggleBtn.classList.add('open');
+            setTimeout(()=>{ try{ sidebarEl.focus(); }catch(e){} },50);
           }
-          currentSessionId = localStorage.getItem('jaremis_session');
-          // Thêm lời chào nếu trống
-          if (!chatMessages.innerHTML.trim()) {
-            chatMessages.innerHTML = `<div class="chat-bubble bot-bubble"><strong>Chào bạn 👋 Mình là JAREMIS.</strong><p style="margin-top:8px; color:var(--text-secondary-color);">Bắt đầu cuộc trò chuyện mới.</p></div>`;
+
+          function closeSidebar(){
+            sidebarEl.classList.remove('mobile-open');
+            backdrop.classList.remove('show');
+            backdrop.style.display = 'none';
+            document.body.classList.remove('no-scroll');
+            if (mobileBtn) mobileBtn.setAttribute('aria-expanded','false');
+            if (drawerToggleBtn) drawerToggleBtn.classList.remove('open');
           }
-        });
 
-        // Tạo cuộc trò chuyện mới (giống ChatGPT)
-        function startNewConversation() {
-          currentSessionId = 'sess-' + Date.now();
-          localStorage.setItem('jaremis_session', currentSessionId);
-          chatMessages.innerHTML = `
-            <div class="chat-bubble bot-bubble">
-              <strong>Cuộc trò chuyện mới đã bắt đầu.</strong>
-              <p style="margin-top:8px; color:var(--text-secondary-color);">Hãy nhập câu hỏi đầu tiên của bạn.</p>
-            </div>`;
-          chatMessages.scrollTop = chatMessages.scrollHeight;
+          if (mobileBtn) {
+            mobileBtn.addEventListener('click', function(e){
+              e && e.preventDefault();
+              if (sidebarEl.classList.contains('mobile-open')) closeSidebar();
+              else openSidebar();
+            });
+          }
+
+          if (drawerToggleBtn) {
+            drawerToggleBtn.addEventListener('click', function(e){
+              e && e.preventDefault();
+              if (sidebarEl.classList.contains('mobile-open')) closeSidebar();
+              else openSidebar();
+            });
+          }
+
+          backdrop.addEventListener('click', function(){ closeSidebar(); });
+
+          document.addEventListener('keydown', function(e){
+            if (e.key === 'Escape' && sidebarEl.classList.contains('mobile-open')) closeSidebar();
+          });
+
+          if (historyListEl){
+            historyListEl.addEventListener('click', function(e){
+              const li = e.target.closest && e.target.closest('li');
+              if (!li) return;
+              setTimeout(closeSidebar, 120);
+            });
+          }
+
+          function debounce(fn, ms){ let t; return function(){ clearTimeout(t); t = setTimeout(fn, ms); }; }
+          window.addEventListener('resize', debounce(function(){ if (window.innerWidth > 600) closeSidebar(); }, 180));
+        })();
+
+        // ------------------------------
+        // SEND/STOP BUTTON CONTROL
+        // ------------------------------
+        function showSendButton() {
+            if (sendBtn) {
+                sendBtn.style.display = 'flex';
+                sendBtn.disabled = false;
+            }
+            if (stopBtn) {
+                stopBtn.style.display = 'none';
+            }
+        }
+        
+        function showStopButton() {
+            if (sendBtn) {
+                sendBtn.style.display = 'none';
+            }
+            if (stopBtn) {
+                stopBtn.style.display = 'flex';
+            }
+        }
+        
+        function stopAIResponse() {
+            console.log('🛑 User clicked Stop button');
+            
+            // Abort current request
+            if (window._currentAbortController) {
+                try {
+                    window._currentAbortController.abort();
+                    console.log('✅ Request aborted');
+                } catch (e) {
+                    console.error('❌ Error aborting request:', e);
+                }
+                window._currentAbortController = null;
+                window._currentAbortStartedAt = 0;
+            }
+            
+            // Show send button again
+            showSendButton();
+            
+            // Flash notice
+            flashNotice('Đã dừng AI', 'success');
+            
+            // Remove thinking animation from all bubbles
+            const thinkingBubbles = document.querySelectorAll('.chat-bubble .thinking-animation');
+            thinkingBubbles.forEach(bubble => {
+                const parent = bubble.parentElement;
+                if (parent) {
+                    parent.innerHTML = '<div style="color: var(--text-secondary-color); font-style: italic;">⚠️ Đã dừng phản hồi</div>';
+                }
+            });
         }
 
-        // ------------------------------
-        // Helper: Escape HTML
-        // ------------------------------
-        function escapeHtml(unsafe) {
-            if (unsafe === null || unsafe === undefined) return '';
-            return String(unsafe)
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
-        }
-
-        // ------------------------------
-        // Auto-resize textarea
-        // ------------------------------
-        function autoResize(textarea) {
-            textarea.style.height = 'auto';
-            textarea.style.height = textarea.scrollHeight + 'px';
-        }
-
-        // ------------------------------
-        // Mode toggles
         // ------------------------------
         function toggleMode(e) {
             e?.preventDefault();
             diagnosticMode = !diagnosticMode;
             if (diagnosticMode) {
                 modeBtn.classList.add('active');
-                modeBtn.title = 'Chế độ: Diagnose (Ctrl+M)';
+                modeBtn.title = 'Chế độ: Diagnose (chẩn đoán y khoa)';
                 modeBtn.innerHTML = '<i class="fas fa-stethoscope"></i>';
             } else {
                 modeBtn.classList.remove('active');
-                modeBtn.title = 'Chế độ: Chat (Ctrl+M)';
+                modeBtn.title = 'Chế độ: Chat';
                 modeBtn.innerHTML = '<i class="fas fa-comments"></i>';
+            }
+        }
+
+        function toggleThink(e) {
+            e?.preventDefault();
+            useProModel = !useProModel;
+            if (useProModel) {
+                thinkBtn.classList.add('active');
+                modelStatusEl.textContent = 'Model: JAREMIS PRO 1.5';
+            } else {
+                thinkBtn.classList.remove('active');
+                modelStatusEl.textContent = 'Model: JAREMIS 1.5';
             }
         }
 
@@ -983,6 +1536,11 @@
             renderAuthControls();
             const u = getLocalUser();
             if (u) fetchAndRenderHistory(u.username);
+            // Restore anonymous session to keep context between page reloads
+            try {
+                const savedSess = localStorage.getItem('jaremis_session');
+                if (savedSess) currentSessionId = savedSess;
+            } catch(_) {}
         });
 
         function getLocalUser() {
@@ -1030,7 +1588,7 @@
                 logoutBtn.className = 'auth-btn';
                 logoutBtn.textContent = 'Đăng xuất';
                 logoutBtn.onclick = () => {
-                    localStorage.removeItem('jaremis_user');
+                    try { localStorage.removeItem('jaremis_user'); } catch(e) {}
                     renderAuthControls();
                     historyCache = [];
                     renderHistoryList([]);
@@ -1134,6 +1692,16 @@
             }
         }
 
+        // New: Login with Google
+        function loginWithGoogle() {
+            window.location.href = '/auth/google';
+        }
+
+        // New: Login with Facebook
+        function loginWithFacebook() {
+            window.location.href = '/auth/facebook';
+        }
+
         function flashNotice(msg, duration = 2000) {
             const bubble = document.createElement('div');
             bubble.className = 'chat-bubble bot-bubble';
@@ -1172,6 +1740,7 @@
             return;
           }
           // Gom theo sessionId
+
           const sessions = {};
           list.forEach(entry => {
             const sid = entry.sessionId || ('legacy-' + entry.id);
@@ -1294,6 +1863,7 @@
 
         function startRecognition() {
             if (!recognition) return;
+           
             try {
                 textBeforeRecording = chatInput.value || '';
                 recognition.start();
@@ -1344,400 +1914,775 @@
             handleImageUpload({ target: imageInput });
         }
 
-        // ------------------------------
-        // Animate analysis steps (UX)
-        // ------------------------------
-        async function animateAnalysisSteps(bubbleElement) {
-            const steps = [
-                'Đang khởi tạo và gửi dữ liệu...',
-                'Tìm kiếm tài liệu tham khảo (PubMed, ClinicalTrials)...',
-                'AI đang phân tích và chẩn đoán hình ảnh...',
-                'Tổng hợp và định dạng kết quả chẩn đoán...'
-            ];
+        // ========================================
+        // PASTE IMAGE SUPPORT (Ctrl+V / Ctrl+C)
+        // ========================================
+        let pastedImages = []; // Store pasted images separately
 
-            let html = '<div class="analysis-steps">';
-            steps.forEach((step, index) => {
-                html += `<div id="step-${index}" class="step-item pending">
-                            <span class="icon"><i class="fas fa-hourglass-half"></i></span>
-                            <span>${step}</span>
-                         </div>`;
-            });
-            html += '</div>';
-            bubbleElement.innerHTML = html;
-
-            for (let i = 0; i < steps.length; i++) {
-                const stepEl = bubbleElement.querySelector(`#step-${i}`);
-                const iconEl = stepEl.querySelector('.icon');
-
-                stepEl.classList.remove('pending');
-                stepEl.classList.add('active');
-                iconEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-
-                await new Promise(resolve => setTimeout(resolve, 600 + Math.random() * 600));
-
-                stepEl.classList.remove('active');
-                stepEl.classList.add('completed');
-                iconEl.innerHTML = '<i class="fas fa-check"></i>';
+        // Listen for paste events globally
+        document.addEventListener('paste', function(event) {
+            const items = (event.clipboardData || event.originalEvent.clipboardData).items;
+            
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    event.preventDefault(); // Prevent default paste behavior
+                    
+                    const file = items[i].getAsFile();
+                    if (!file) continue;
+                    
+                    // Add to pasted images array
+                    pastedImages.push(file);
+                    
+                    // Show preview
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const div = document.createElement('div');
+                        div.className = 'preview-item';
+                        div.innerHTML = `
+                            <img src="${e.target.result}" alt="Pasted Image">
+                            <button class="remove-btn" onclick="removePastedImage(${pastedImages.length - 1})">&times;</button>
+                            <div class="paste-badge">📋 Dán ảnh</div>
+                        `;
+                        imagePreviewContainer.appendChild(div);
+                    };
+                    reader.readAsDataURL(file);
+                    
+                    // Show notification
+                    if (typeof flashNotice === 'function') {
+                        flashNotice('✅ Đã dán ảnh từ clipboard! Nhấn Gửi để phân tích.', 'success');
+                    }
+                    
+                    console.log('📋 Pasted image:', file.name || 'clipboard-image.png', file.size, 'bytes');
+                }
             }
+        });
+
+        function removePastedImage(index) {
+            // Remove from pastedImages array
+            pastedImages.splice(index, 1);
+            
+            // Re-render all previews
+            renderImagePreviews();
         }
 
-        // ------------------------------
-        // Submit: chooses /api/chat or /api/diagnose
-        // ------------------------------
-        async function submitData() {
-            const labResults = chatInput.value.trim();
-            const images = imageInput.files;
-            if (!labResults && images.length === 0) return;
-            if (!currentSessionId) {
-                currentSessionId = 'sess-' + Date.now();
-                localStorage.setItem('jaremis_session', currentSessionId);
-            }
-            // 1. Display user bubble
-            let userHtml = `<div class="chat-bubble user-bubble"><div class="user-bubble-content">`;
-            if (labResults) userHtml += `<p>${escapeHtml(labResults)}</p>`;
-            if (images.length > 0) {
-                let imagePreviews = '<div class="user-images-preview">';
-                for (let i = 0; i < images.length; i++) {
-                    imagePreviews += `<img src="${URL.createObjectURL(images[i])}" alt="user image">`;
-                }
-                imagePreviews += '</div>';
-                userHtml += imagePreviews;
-            }
-            const currentUser = getLocalUser();
-            if (currentUser) {
-                userHtml += `<div style="margin-top:8px; font-size:12px; color:var(--text-secondary-color)">Đã gửi bởi: ${escapeHtml(currentUser.username)}</div>`;
-            }
-            userHtml += `</div></div>`;
-            chatMessages.innerHTML += userHtml;
-
-            // 2. Clear input + previews
-            chatInput.value = '';
-            autoResize(chatInput);
+        function renderImagePreviews() {
             imagePreviewContainer.innerHTML = '';
+            
+            // Render file input images
+            Array.from(imageInput.files || []).forEach((file, index) => {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    const div = document.createElement('div');
+                    div.className = 'preview-item';
+                    div.innerHTML = `
+                        <img src="${e.target.result}" alt="Preview">
+                        <button class="remove-btn" onclick="removeImage(${index})">&times;</button>
+                    `;
+                    imagePreviewContainer.appendChild(div);
+                };
+                reader.readAsDataURL(file);
+            });
+            
+            // Render pasted images
+            pastedImages.forEach((file, index) => {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    const div = document.createElement('div');
+                    div.className = 'preview-item';
+                    div.innerHTML = `
+                        <img src="${e.target.result}" alt="Pasted Image">
+                        <button class="remove-btn" onclick="removePastedImage(${index})">&times;</button>
+                        <div class="paste-badge">📋</div>
+                    `;
+                    imagePreviewContainer.appendChild(div);
+                };
+                reader.readAsDataURL(file);
+            });
+        }
 
-            // 3. Create loading bubble
-            const loadingBubble = document.createElement('div');
-            loadingBubble.className = 'chat-bubble bot-bubble';
-            chatMessages.appendChild(loadingBubble);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-
-            try {
-                if (diagnosticMode) {
-                    // Diagnose flow
-                    const formData = new FormData();
-                    if (labResults) formData.append('labResults', labResults);
-                    Array.from(images).forEach(img => formData.append('images', img));
-                    formData.append('model', useProModel ? 'pro' : 'flash');
-                    formData.append('sessionId', currentSessionId);
-                    if (currentUser) formData.append('submittedBy', currentUser.username);
-
-                    const analysisPromise = animateAnalysisSteps(loadingBubble);
-                    const fetchPromise = fetch('/api/diagnose', { method: 'POST', body: formData });
-
-                    const [_, response] = await Promise.all([analysisPromise, fetchPromise]);
-
-                    if (!response.ok) {
-                        const error = await response.json().catch(() => ({ error: 'Lỗi không xác định từ máy chủ' }));
-                        throw new Error(error.error || 'Lỗi không xác định từ máy chủ');
-                    }
-                    const data = await response.json();
-                    displayResults(data, loadingBubble);
-                    if (currentUser) fetchAndRenderHistory(currentUser.username);
-                } else {
-                    // Chat flow
-                    const body = { message: labResults, model: 'flash', sessionId: currentSessionId };
-                    if (currentUser) body.submittedBy = currentUser.username;
-                    if (images.length > 0) body.imagesCount = images.length;
-
-                    const resp = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-                    let data;
-                    try {
-                        data = await resp.json();
-                    } catch (e) {
-                        loadingBubble.innerHTML = '<div style="color:red">Lỗi phân tích phản hồi từ server.</div>';
-                        return;
-                    }
-                    if (!resp.ok || !data.reply) {
-                        loadingBubble.innerHTML = `<div style='color:red'>${escapeHtml(data.error || 'Lỗi khi nhận phản hồi từ AI.')}</div>`;
-                        return;
-                    }
-                    // Prefer server-rendered HTML (replyHtml) when available to avoid flicker
-                    let replyHtmlContent = '';
-                    if (data.replyHtml) replyHtmlContent = data.replyHtml;
-                    else replyHtmlContent = escapeHtml(data.reply || data.replyText || '');
-                    loadingBubble.innerHTML = `<div class="diagnosis-details math-rendered">${replyHtmlContent}</div>`;
-                    loadingBubble.dataset.katexRendered = '1';
-                    if (currentUser) fetchAndRenderHistory(currentUser.username);
-                }
-            } catch (error) {
-                loadingBubble.innerHTML = `<div style='color:red'>${escapeHtml(error.message || 'Lỗi không xác định.')}</div>`;
-            } finally {
-                sendBtn.disabled = false;
-                imageInput.value = '';
+        // Helper to get all images (file input + pasted)
+        function getAllImages() {
+            const allFiles = [];
+            
+            // Add file input files
+            if (imageInput.files) {
+                allFiles.push(...Array.from(imageInput.files));
             }
-         }
+            
+            // Add pasted images
+            allFiles.push(...pastedImages);
+            
+            return allFiles;
+        }
 
-         // ------------------------------
-         // displayResults for diagnose flows
-         // ------------------------------
-         function displayResults(data, targetBubble) {
-             // if it's a chat-style reply
-            if (data.reply) {
-                const content = data.replyHtml ? data.replyHtml : convertMarkdown(data.reply);
-                targetBubble.innerHTML = `<div class="diagnosis-details math-rendered">${content}</div>`;
-                targetBubble.dataset.katexRendered = '1';
+        // Update handleImageUpload to also render pasted images
+        const originalHandleImageUpload = handleImageUpload;
+        handleImageUpload = function(event) {
+            originalHandleImageUpload(event);
+            // Also render pasted images if any
+            if (pastedImages.length > 0) {
+                renderImagePreviews();
+            }
+        };
+
+        // ========================================
+        // ENHANCED IMAGE PREVIEW STYLES
+        // ========================================
+        // Add CSS for paste badge dynamically
+        const pasteStyles = document.createElement('style');
+        pasteStyles.textContent = `
+            .paste-badge {
+                position: absolute;
+                top: 4px;
+                left: 4px;
+                background: rgba(47, 129, 247, 0.9);
+                color: white;
+                font-size: 10px;
+                padding: 2px 6px;
+                border-radius: 4px;
+                font-weight: 600;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            }
+            
+            #image-preview-container {
+                position: relative;
+            }
+            
+            .preview-item {
+                animation: slideInFromRight 0.3s ease-out;
+            }
+            
+            @keyframes slideInFromRight {
+                from {
+                    opacity: 0;
+                    transform: translateX(20px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateX(0);
+                }
+            }
+        `;
+        document.head.appendChild(pasteStyles);
+
+        // ========================================
+        // FLASH NOTIFICATION HELPER
+        // ========================================
+        function flashNotice(message, type = 'info') {
+            const notice = document.createElement('div');
+            notice.className = 'flash-notice';
+            notice.textContent = message;
+            
+            notice.style.cssText = `
+                position: fixed;
+                top: 80px;
+                right: 20px;
+                background: ${type === 'success' ? '#238636' : type === 'error' ? '#f85149' : '#2f81f7'};
+                color: white;
+                padding: 12px 16px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+                z-index: 9999;
+                animation: slideIn 0.3s ease-out;
+                max-width: 300px;
+                font-size: 14px;
+            `;
+            
+            document.body.appendChild(notice);
+            
+            setTimeout(() => {
+                notice.style.animation = 'slideOut 0.3s ease-out';
+                setTimeout(() => notice.remove(), 300);
+            }, 3000);
+        }
+
+        // Add animations
+        const noticeAnimations = document.createElement('style');
+        noticeAnimations.textContent = `
+            @keyframes slideIn {
+                from {
+                    transform: translateX(400px);
+                    opacity: 0;
+                }
+                to {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+            }
+            
+            @keyframes slideOut {
+                from {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+                to {
+                    transform: translateX(400px);
+                    opacity: 0;
+                }
+            }
+        `;
+        document.head.appendChild(noticeAnimations);
+
+        // ========================================
+        // SUBMIT DATA - Enhanced with Pasted Images
+        // ========================================
+        async function submitData() {
+            // Prevent double-submit
+            if (window._currentAbortController) {
+                try {
+                    const sig = window._currentAbortController.signal;
+                    const startedAt = window._currentAbortStartedAt || 0;
+                    const tooLong = Date.now() - startedAt > 20000;
+                    if (sig && sig.aborted) {
+                        window._currentAbortController = null;
+                        window._currentAbortStartedAt = 0;
+                        showSendButton(); // Reset to send button
+                    } else if (tooLong) {
+                        try { window._currentAbortController.abort(); } catch(e) {}
+                        window._currentAbortController = null;
+                        window._currentAbortStartedAt = 0;
+                        showSendButton(); // Reset to send button
+                    } else {
+                        flashNotice('Đang xử lý phản hồi trước, hãy đợi hoặc nhấn nút dừng.', 'error');
+                        return;
+                    }
+                } catch (e) {
+                    window._currentAbortController = null;
+                    window._currentAbortStartedAt = 0;
+                    showSendButton(); // Reset to send button
+                }
+            }
+
+            const message = chatInput.value.trim();
+            const allImages = getAllImages(); // Get both file input + pasted images
+            
+            if (!message && allImages.length === 0) {
+                flashNotice('Vui lòng nhập tin nhắn hoặc đính kèm ảnh', 'error');
                 return;
             }
 
-             let html = '';
-
-             if (data.confidence !== undefined) {
-                 html += `
-                     <div class="confidence-meter">
-                         <div class="confidence-bar" style="width:${Math.max(0, Math.min(100, data.confidence))}%">Độ tin cậy: ${data.confidence}%</div>
-                     </div>
-                 `;
-             }
-
-             if (Array.isArray(data.diseases) && data.diseases.length) {
-                 html += '<h3><i class="fas fa-notes-medical"></i> Khả năng chẩn đoán</h3><div class="disease-list">';
-                 data.diseases.forEach(d => {
-                     const pct = Math.min(d.probability || 0, 100);
-                     html += `
-                         <div class="disease-item">
-                             <strong>${escapeHtml(d.name || '')}</strong>
-                             <div class="probability-bar">
-                                 <div class="probability-fill" style="width:${pct}%"></div>
-                             </div>
-                         </div>
-                     `;
-                 });
-                 html += '</div>';
-             }
-
-            if (data.diagnosis) {
-                const diagContent = data.diagnosisHtml ? data.diagnosisHtml : convertMarkdown(data.diagnosis);
-                html += `<div class="diagnosis-details math-rendered">
-                    ${diagContent}
-                    ${displayReferences(data.references)}
-                    <div class="warning">${data.warning || ''}</div>
-                </div>`;
-            } else if (data.icdDescriptions && data.icdDescriptions.length) {
-                 html += `<div class="diagnosis-details"><h3>Chẩn đoán phân biệt (ICD)</h3>`;
-                 data.icdDescriptions.forEach(item => {
-                     html += `<div class="disease-item"><strong>${escapeHtml(item.label)}</strong><div>${escapeHtml(item.icdCode || '')} - ${escapeHtml(item.description || '')}</div></div>`;
-                 });
-                 html += `</div>`;
-             }
-
-             if (data.modelUsed) {
-                 html += `<div style="margin-top:10px; font-size:12px; color:var(--text-secondary-color)">Đã dùng model: ${escapeHtml(data.modelUsed)}</div>`;
-             }
-
-             targetBubble.innerHTML = html;
-            // If server provided rendered HTML for diagnosis, mark bubble to skip client KaTeX pass
-            if (data.diagnosisHtml) targetBubble.dataset.katexRendered = '1';
-             chatMessages.scrollTop = chatMessages.scrollHeight;
-         }
-
-        // Gemini-style animation: show each line faded, then fade in
-function animateBubbleLines(bubble, htmlContent) {
-  bubble.innerHTML = '';
-  // Split by <br> or newline, keep HTML tags
-  let lines = htmlContent.split(/<br\s*\/?>|\n/);
-  lines = lines.map(l => l.trim()).filter(l => l.length > 0);
-  lines.forEach((line, i) => {
-    const div = document.createElement('div');
-    div.className = 'bubble-line faded';
-    div.innerHTML = line;
-    bubble.appendChild(div);
-    setTimeout(() => {
-      div.classList.add('fade-in');
-    }, 500 + i * 120); // delay per line
-  });
-}
-
-// Add CSS for fade effect
-const style = document.createElement('style');
-style.innerHTML = `
-.bubble-line.faded {
-  opacity: 0.35;
-  transition: opacity 0.45s;
-}
-.bubble-line.fade-in {
-  opacity: 1;
-}
-`;
-document.head.appendChild(style);
-
-        /* Sidebar resize logic */
-        const sidebar = document.getElementById('sidebar');
-        const resizer = document.getElementById('resizer');
-
-        const mouseMoveHandler = function (e) {
-            const dx = e.clientX - sidebar.getBoundingClientRect().right;
-            const newWidth = sidebar.offsetWidth + dx;
-            document.documentElement.style.setProperty('--sidebar-width', `${newWidth}px`);
-        };
-
-        const mouseUpHandler = function () {
-            document.removeEventListener('mousemove', mouseMoveHandler);
-            document.removeEventListener('mouseup', mouseUpHandler);
-            document.body.style.cursor = 'default';
-            document.body.style.userSelect = 'auto';
-        };
-
-        resizer.addEventListener('mousedown', function (e) {
-            e.preventDefault();
-            document.addEventListener('mousemove', mouseMoveHandler);
-            document.addEventListener('mouseup', mouseUpHandler);
-            document.body.style.cursor = 'col-resize';
-            document.body.style.userSelect = 'none';
-        });
-
-        const sidebarEl = document.getElementById('sidebar');
-        const sidebarBackdrop = document.getElementById('sidebar-backdrop');
-        const historyDrawerToggle = document.getElementById('history-drawer-toggle');
-
-        function isMobileView() { return window.innerWidth <= 600; }
-
-        function openSidebarMobile() {
-          sidebarEl.classList.add('mobile-open');
-          sidebarBackdrop.classList.add('show');
-          syncHistoryArrow();
-        }
-        function closeSidebarMobile() {
-          sidebarEl.classList.remove('mobile-open');
-          sidebarBackdrop.classList.remove('show');
-          syncHistoryArrow();
-        }
-        function syncHistoryArrow() {
-          if (!isMobileView()) { historyDrawerToggle.style.display='none'; return; }
-          historyDrawerToggle.style.display='flex';
-          if (!historyDrawerToggle.querySelector('.bars')) {
-             historyDrawerToggle.innerHTML =
-               '<span class="bars" aria-hidden="true"><span class="bar"></span><span class="bar"></span><span class="bar"></span></span>';
-          }
-          if (sidebarEl.classList.contains('mobile-open')) {
-             historyDrawerToggle.classList.add('open');
-          } else {
-             historyDrawerToggle.classList.remove('open');
-          }
-        }
-
-
-
-
-
-
-
-        historyDrawerToggle.addEventListener('click', () => {
-          if (sidebarEl.classList.contains('mobile-open')) closeSidebarMobile();
-          else openSidebarMobile();
-        });
-        sidebarBackdrop.addEventListener('click', closeSidebarMobile);
-
-        // Đồng bộ khi resize
-        window.addEventListener('resize', syncHistoryArrow);
-        document.addEventListener('DOMContentLoaded', syncHistoryArrow);
-        // End of mobile additions
-
-        function toggleToolTray(e){
-          e?.preventDefault();
-          const tray = document.getElementById('tool-buttons');
-          const btn = document.getElementById('toggle-tools-btn');
-          if (!tray || !btn) return;
-          const opening = tray.classList.contains('collapsed');
-          tray.classList.toggle('collapsed', !opening);
-          btn.classList.toggle('active', opening);
-          btn.setAttribute('aria-expanded', opening ? 'true' : 'false');
-
-          if (opening) {
-            const closeHandler = (ev)=>{
-              if (!tray.contains(ev.target) && ev.target !== btn) {
-                tray.classList.add('collapsed');
-                btn.classList.remove('active');
-                btn.setAttribute('aria-expanded','false');
-                document.removeEventListener('click', closeHandler);
-              }
-            };
-            setTimeout(()=>document.addEventListener('click', closeHandler),0);
-          }
-        }
-
-        // Nếu muốn auto đóng sau khi gửi tin nhắn:
-        const originalSubmitData = submitData;
-        submitData = async function(){
-          const tray = document.getElementById('tool-buttons');
-          const btn = document.getElementById('toggle-tools-btn');
-          if (tray && !tray.classList.contains('collapsed')) {
-            tray.classList.add('collapsed');
-            btn.classList.remove('active');
-          }
-          return originalSubmitData();
-        };
-
-        chatInput.addEventListener('keydown', function(e) {
-          if (e.key === 'Enter') {
-            if (e.shiftKey) {
-              // Xuống dòng
-              e.preventDefault();
-              const start = chatInput.selectionStart;
-              const end = chatInput.selectionEnd;
-              chatInput.value = chatInput.value.substring(0, start) + "\n" + chatInput.value.substring(end);
-              chatInput.selectionStart = chatInput.selectionEnd = start + 1;
-              autoResize(chatInput);
-            } else {
-              // Gửi tin nhắn
-              e.preventDefault();
-              submitData();
+            // Choose endpoint based on diagnosticMode
+            const endpoint = diagnosticMode ? '/api/diagnose' : '/api/chat';
+            
+            // Prepare FormData
+            const formData = new FormData();
+            formData.append('message', message);
+            formData.append('labResults', message); // For diagnose mode
+            formData.append('symptoms', message); // For diagnose mode
+            formData.append('model', useProModel ? 'pro' : 'flash');
+            formData.append('sessionId', currentSessionId || generateSessionId());
+            
+            const user = getLocalUser();
+            if (user) {
+                formData.append('submittedBy', user.username);
             }
-          }
-        });
-    </script>
-    <script>
-// ------------------------------
-// Keyboard shortcuts (no browser conflict)
-// ------------------------------
-document.addEventListener('keydown', function(e) {
-  // Ignore if input/modal is focused
-  if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.querySelector('.modal-backdrop[style*="display: flex"]')) return;
-  // Ctrl+Shift+X: New chat
-  if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'x') {
-    e.preventDefault(); startNewConversation(); return;
-  }
-  // Ctrl+Shift+M: Toggle Diagnose/Chat
-  if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'm') {
-    e.preventDefault(); toggleMode(); return;
-  }
-  // Ctrl+Shift+S: Toggle Record
-  if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 's') {
-    e.preventDefault(); toggleMic(); return;
-  }
-  // Ctrl+Shift+I: Attach Image
-  if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'i') {
-    e.preventDefault(); imageInput.click(); return;
-  }
-  // Ctrl+Shift+F: Search
-  if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'f') {
-    e.preventDefault(); openFindModal(); return;
-  }
-  // Ctrl+Enter: Send
-  if (e.ctrlKey && e.key === 'Enter') {
-    e.preventDefault(); submitData(); return;
-  }
-});
 
-// Update tooltips for shortcut info
-function updateShortcutTooltips() {
-  document.querySelector('.new-chat-btn').title = 'Cuộc trò chuyện mới (Ctrl+Shift+X)';
-  document.getElementById('find-btn').title = 'Tìm kiếm (Ctrl+Shift+F)';
-  document.getElementById('mode-btn').title = 'Chế độ: Chat/Diagnose (Ctrl+Shift+M)';
-  document.getElementById('mic-btn').title = 'Ghi giọng nói (Ctrl+Shift+S)';
-  document.querySelector('.action-btn[onclick*="images"]').title = 'Đính kèm ảnh (Ctrl+Shift+I)';
-  document.getElementById('send-btn').title = 'Gửi (Ctrl+Enter)\nXuống dòng: Shift+Enter';
-}
-document.addEventListener('DOMContentLoaded', updateShortcutTooltips);
+            // Append all images (file input + pasted)
+            allImages.forEach((file, index) => {
+                // Rename pasted images for clarity
+                const filename = file.name || `pasted-image-${index + 1}.png`;
+                formData.append('images', file, filename);
+            });
+
+            // Add user message bubble
+            const userBubble = document.createElement('div');
+            userBubble.className = 'chat-bubble user-bubble';
+            userBubble.innerHTML = `
+                <div>${escapeHtml(message)}</div>
+                ${allImages.length > 0 ? `<div style="margin-top:8px;color:var(--text-secondary-color);font-size:12px;">📎 ${allImages.length} ảnh đính kèm</div>` : ''}
+            `;
+            chatMessages.appendChild(userBubble);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            // Clear input and images
+            chatInput.value = '';
+            imageInput.value = '';
+            pastedImages = [];
+            imagePreviewContainer.innerHTML = '';
+            autoResize(chatInput);
+
+            // Add bot bubble with loading animation
+            const botBubble = document.createElement('div');
+            botBubble.className = 'chat-bubble bot-bubble';
+            chatMessages.appendChild(botBubble);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            // Show thinking animation
+            if (diagnosticMode) {
+                await animateAnalysisSteps(botBubble);
+            } else {
+                showThinking(botBubble);
+            }
+
+            // Send request
+            try {
+                const controller = new AbortController();
+                window._currentAbortController = controller;
+                window._currentAbortStartedAt = Date.now();
+                
+                // Show stop button instead of send button
+                showStopButton();
+
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    body: formData,
+                    signal: controller.signal
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Lỗi server');
+                }
+
+                const result = await response.json();
+                
+                // Debug: log response
+                console.log('📦 Diagnosis Response:', result);
+                
+                // Clear abort controller
+                window._currentAbortController = null;
+                window._currentAbortStartedAt = 0;
+                
+                // Show send button again
+                showSendButton();
+
+                // Render response
+                if (diagnosticMode) {
+                    renderDiagnosisResponse(result, botBubble);
+                } else {
+                    // Render chat response with animated typing
+                    const replyHtml = result.replyHtml || result.reply || 'Không có phản hồi';
+                    await renderBotReplyAnimated(botBubble, replyHtml);
+                }
+
+                // Show citations if available
+                if (result.citations && result.citations.length > 0) {
+                    const citationBubble = document.createElement('div');
+                    citationBubble.className = 'chat-bubble bot-bubble';
+                    citationBubble.innerHTML = result.citationsHtml || formatCitations(result.citations);
+                    chatMessages.appendChild(citationBubble);
+                }
+
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            } catch (error) {
+                console.error('Submit error:', error);
+                
+                stopThinking(botBubble);
+                botBubble.innerHTML = `
+                    <div style="color:var(--error-color);">
+                        ❌ <strong>Lỗi:</strong> ${escapeHtml(error.message)}
+                    </div>
+                `;
+
+                window._currentAbortController = null;
+                window._currentAbortStartedAt = 0;
+                
+                // Show send button again on error
+                showSendButton();
+            }
+        }
+
+        function generateSessionId() {
+            const id = 'session-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+            currentSessionId = id;
+            try {
+                localStorage.setItem('jaremis_session', id);
+            } catch(e) {}
+            return id;
+        }
+
+        function formatCitations(citations) {
+            if (!citations || citations.length === 0) return '';
+            
+            let html = '<div style="margin-top:16px;"><h4>📖 Nguồn tham khảo:</h4><div style="margin:8px 0;">';
+            citations.forEach((c, i) => {
+                const shortTitle = c.title && c.title.length > 50 ? c.title.substring(0, 50) + '...' : (c.title || 'Source');
+                html += `<a href="${escapeHtml(c.url)}" class="citation-btn" target="_blank" rel="noopener">${c.icon || '📚'} ${escapeHtml(c.type || 'Source')}: ${escapeHtml(shortTitle)}</a> `;
+            });
+            html += '</div></div>';
+            return html;
+        }
+
+        function renderDiagnosisResponse(result, bubbleElement) {
+            stopThinking(bubbleElement);
+            
+            console.log('🔍 Rendering diagnosis response:', result);
+            
+            let html = '<div class="diagnosis-result">';
+            
+            // Main diagnosis - PRIORITIZE markdown over HTML
+            // diagnosisHtml doesn't parse markdown tables, so use diagnosis (raw markdown) instead
+            if (result.diagnosis) {
+                console.log('✅ Using diagnosis (converting markdown with GFM tables)');
+                // Convert markdown to HTML
+                if (typeof marked !== 'undefined') {
+                    try {
+                        // IMPORTANT: Parse full markdown including tables
+                        const parsedHtml = marked.parse(result.diagnosis, {
+                            breaks: true,
+                            gfm: true, // GitHub Flavored Markdown (supports tables)
+                            tables: true,
+                            headerIds: false,
+                            mangle: false
+                        });
+                        html += parsedHtml;
+                    } catch (e) {
+                        console.warn('Markdown parse error:', e);
+                        html += result.diagnosis.replace(/\n/g, '<br>');
+                    }
+                } else {
+                    html += result.diagnosis.replace(/\n/g, '<br>');
+                }
+            } else if (result.diagnosisHtml) {
+                console.log('⚠️ Fallback to diagnosisHtml (may not render tables correctly)');
+                html += result.diagnosisHtml;
+            } else {
+                // Fallback: hiển thị toàn bộ response nếu không có diagnosis
+                console.warn('⚠️ No diagnosis field found, showing full response');
+                html += '<div style="color:orange;">⚠️ Không tìm thấy kết quả chẩn đoán. Response:</div>';
+                html += `<pre style="background:rgba(0,0,0,0.3);padding:12px;border-radius:8px;overflow:auto;max-height:300px;font-size:11px;">${escapeHtml(JSON.stringify(result, null, 2))}</pre>`;
+            }
+
+            // Lab analysis
+            if (result.labAnalysis && result.labAnalysis.abnormal && result.labAnalysis.abnormal.length > 0) {
+                html += '<h4 style="margin-top:16px;">🔬 Xét nghiệm bất thường:</h4>';
+                html += '<table style="width:100%;border-collapse:collapse;margin:8px 0;">';
+                html += '<thead><tr><th>Chỉ số</th><th>Giá trị</th><th>Trạng thái</th><th>Mức độ</th></tr></thead><tbody>';
+                result.labAnalysis.abnormal.forEach(a => {
+                    html += `<tr>
+                        <td>${escapeHtml(a.name)}</td>
+                        <td>${a.value} (BT: ${escapeHtml(a.normal)})</td>
+                        <td>${a.status}</td>
+                        <td><span style="color:${a.severity === 'SEVERE' ? 'var(--error-color)' : a.severity === 'MODERATE' ? 'orange' : 'yellow'}">${a.severity}</span></td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+            }
+
+            // NEWS2 Score
+            if (result.news2Score) {
+                html += `<div style="margin:16px 0;padding:12px;background:rgba(255,255,255,0.03);border-radius:8px;">
+                    <h4>📊 NEWS2 Score: ${result.news2Score.score}/20</h4>
+                    <p style="color:${result.news2Score.risk === 'HIGH' ? 'var(--error-color)' : result.news2Score.risk === 'MODERATE' ? 'orange' : 'var(--success-color)'}">
+                        <strong>${result.news2Score.risk} RISK</strong>
+                    </p>
+                    <p style="font-size:13px;">${result.news2Score.interpretation}</p>
+                </div>`;
+            }
+
+            // Treatment recommendations
+            if (result.treatmentRecommendations) {
+                html += '<h4 style="margin-top:16px;">💊 Khuyến nghị điều trị:</h4>';
+                const tr = result.treatmentRecommendations;
+                if (tr.firstLine && tr.firstLine.length > 0) {
+                    html += '<ul>';
+                    tr.firstLine.forEach(drug => {
+                        html += `<li><strong>${escapeHtml(drug.drug)}</strong>: ${escapeHtml(drug.dose)} <em>(${escapeHtml(drug.evidence)})</em></li>`;
+                    });
+                    html += '</ul>';
+                }
+                if (tr.citation) {
+                    html += `<p style="font-size:12px;color:var(--text-secondary-color);margin-top:8px;">📖 ${escapeHtml(tr.citation)}</p>`;
+                }
+            }
+
+            // XAI Explanation
+            if (result.xaiExplanation) {
+                // xaiExplanation might be string or object
+                let xaiText = '';
+                if (typeof result.xaiExplanation === 'string') {
+                    xaiText = result.xaiExplanation;
+                } else if (typeof result.xaiExplanation === 'object') {
+                    // If it's an object, try to extract text from common properties
+                    xaiText = result.xaiExplanation.reasoning || 
+                              result.xaiExplanation.text || 
+                              result.xaiExplanation.explanation ||
+                              JSON.stringify(result.xaiExplanation, null, 2);
+                }
+                
+                let xaiHtml = xaiText;
+                if (typeof marked !== 'undefined' && xaiText) {
+                    try {
+                        xaiHtml = marked.parse(xaiText);
+                    } catch (e) {
+                        console.warn('XAI markdown parse error:', e);
+                        xaiHtml = xaiText.replace(/\n/g, '<br>');
+                    }
+                }
+                
+                if (xaiHtml) {
+                    html += `<details style="margin-top:16px;">
+                        <summary style="cursor:pointer;color:var(--accent-color);"><strong>🧠 Giải thích AI (XAI)</strong></summary>
+                        <div style="margin-top:8px;padding:12px;background:rgba(255,255,255,0.02);border-radius:8px;">
+                            ${xaiHtml}
+                        </div>
+                    </details>`;
+                }
+            }
+            
+            // Warning message
+            if (result.warning) {
+                html += `<div class="warning" style="margin-top:20px;padding:12px;background:rgba(241,224,90,0.12);border-left:4px solid #f1e05a;color:#d4c873;font-size:14px;border-radius:4px;">
+                    ${result.warning}
+                </div>`;
+            }
+
+            html += '</div>';
+            
+            bubbleElement.innerHTML = html;
+            
+            // Render LaTeX in diagnosis
+            console.log('🔍 Rendering LaTeX in diagnosis...');
+            if (typeof renderMathInElement === 'function') {
+                try {
+                    renderMathInElement(bubbleElement, {
+                        delimiters: [
+                            {left: '$$', right: '$$', display: true},
+                            {left: '$', right: '$', display: false},
+                            {left: '\\(', right: '\\)', display: false},
+                            {left: '\\[', right: '\\]', display: true}
+                        ],
+                        throwOnError: false
+                    });
+                    console.log('✅ LaTeX rendered successfully');
+                } catch (e) {
+                    console.warn('⚠️ LaTeX render error:', e);
+                }
+            } else {
+                console.warn('⚠️ renderMathInElement not available');
+            }
+        }
+
+        function showThinking(bubble) {
+            bubble.innerHTML = '<div class="thinking-dots"><span></span><span></span><span></span></div>';
+        }
+
+        function stopThinking(bubble) {
+            const thinking = bubble.querySelector('.thinking-dots');
+            if (thinking) thinking.remove();
+        }
+
+        // ========================================
+        // EVENT LISTENERS
+        // ========================================
+        document.addEventListener('DOMContentLoaded', () => {
+            // Enter key to send
+            chatInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    submitData();
+                }
+            });
+
+            // Generate session ID on load
+            if (!currentSessionId) {
+                generateSessionId();
+            }
+        });
+
+        // ========================================
+        // ANIMATE ANALYSIS STEPS (UX)
+        // ========================================
+        async function animateAnalysisSteps(bubbleElement) {
+            stopThinking(bubbleElement);
+            
+            // Clear previous content
+            bubbleElement.innerHTML = '';
+
+            const steps = [
+                { text: 'Đang phân tích...', delay: 1000 },
+                { text: 'Đang thu thập dữ liệu bệnh án...', delay: 1500 },
+                { text: 'Đang so sánh triệu chứng...', delay: 1200 },
+                { text: 'Đang đưa ra chẩn đoán khả thi...', delay: 1300 },
+                { text: 'Đang lập kế hoạch điều trị...', delay: 1100 },
+                { text: 'Hoàn tất!', delay: 800 }
+            ];
+
+            for (const step of steps) {
+                const stepEl = document.createElement('div');
+                stepEl.className = 'step-item';
+                stepEl.innerHTML = `
+                    <div class="icon"><i class="fas fa-check-circle"></i></div>
+                    <div class="text">${step.text}</div>
+                `;
+                bubbleElement.appendChild(stepEl);
+                bubbleElement.scrollTop = bubbleElement.scrollHeight;
+
+                await new Promise(resolve => setTimeout(resolve, step.delay));
+            }
+
+            // Final message
+            bubbleElement.innerHTML += `
+                <div class="step-item completed">
+                    <div class="icon"><i class="fas fa-thumbs-up"></i></div>
+                    <div class="text">Phân tích hoàn tất! Xem kết quả bên dưới.</div>
+                </div>
+            `;
+            bubbleElement.scrollTop = bubbleElement.scrollHeight;
+        }
+
+        // Auto-wrap math expressions in LaTeX delimiters
+        // Detects common math patterns like x^2, √5, fractions, equations
+        function autoWrapMathExpressions(text) {
+            if (!text || typeof text !== 'string') return text;
+            
+            // Skip if already has LaTeX delimiters
+            if (text.includes('$') || text.includes('\\(') || text.includes('\\[')) return text;
+            
+            // Protect code blocks and inline code from modification
+            const codeBlocks = [];
+            const inlineCode = [];
+            
+            // Extract code blocks
+            text = text.replace(/```[\s\S]*?```/g, (match) => {
+                codeBlocks.push(match);
+                return `__CODE_BLOCK_${codeBlocks.length - 1}__`;
+            });
+            
+            // Extract inline code
+            text = text.replace(/`[^`]+`/g, (match) => {
+                inlineCode.push(match);
+                return `__INLINE_CODE_${inlineCode.length - 1}__`;
+            });
+            
+            // === PHASE 1: Complex patterns first ===
+            
+            // 1. Equations with sqrt: x = √5, x = -√5
+            text = text.replace(/\b([a-zA-Z])\s*=\s*-?\s*√(\d+)/g, '$$$1 = -\\sqrt{$2}$$');
+            text = text.replace(/\b([a-zA-Z])\s*=\s*√(\d+)/g, '$$$1 = \\sqrt{$2}$$');
+            
+            // 2. Square root with parentheses: √(x+5) → $\sqrt{x+5}$
+            text = text.replace(/√\(([^)]+)\)/g, '$\\sqrt{$1}$');
+            
+            // 3. Power of sqrt: (√5)^2 → $(\sqrt{5})^2$
+            text = text.replace(/\(√(\d+)\)\^(\d+)/g, '$(\\sqrt{$1})^{$2}$');
+            
+            // 4. Standalone sqrt: √5 → $\sqrt{5}$
+            text = text.replace(/√(\d+)/g, '$\\sqrt{$1}$');
+            text = text.replace(/√([a-zA-Z])/g, '$\\sqrt{$1}$');
+            
+            // === PHASE 2: Exponents ===
+            
+            // 5. Expression with exponent in parentheses: (x+1)^2
+            text = text.replace(/\(([^)]+)\)\^(\d+)/g, '$($1)^{$2}$');
+            
+            // 6. Variable/number with exponent: x^2, 2^10
+            text = text.replace(/\b([a-zA-Z0-9]+)\^(\d+)\b/g, '$$$1^{$2}$$');
+            text = text.replace(/\b([a-zA-Z])\^([a-zA-Z0-9]+)\b/g, '$$$1^{$2}$$');
+            
+            // === PHASE 3: Equations ===
+            
+            // 7. Simple equations: x = 5, x + y = 10
+            // (skip if already wrapped in previous phases)
+            text = text.replace(/(?<!\$)\b([a-zA-Z][²³⁴⁵⁶⁷⁸⁹⁰]*)\s*=\s*([0-9\.\-+]+)\b(?!\$)/g, '$$$1 = $2$$');
+            
+            // 8. Equations with operators: x + y = 10
+            text = text.replace(/\b([a-zA-Z])\s*([+\-])\s*([a-zA-Z0-9])\s*=\s*([0-9\.\-+]+)/g, '$$$1 $2 $3 = $4$$');
+            
+            // === PHASE 4: Fractions ===
+            
+            // 9. Fractions a/b → $\frac{a}{b}$ (only in math context, not URLs)
+            text = text.replace(/(?<![\w:\/])\b(\d+)\/(\d+)\b(?![\w\/])/g, '$\\frac{$1}{$2}$');
+            
+            // === PHASE 5: Special symbols ===
+            
+            // 10. Special symbols (wrap individually)
+            text = text.replace(/±/g, '$\\pm$');
+            text = text.replace(/×/g, '$\\times$');
+            text = text.replace(/÷/g, '$\\div$');
+            text = text.replace(/≤/g, '$\\leq$');
+            text = text.replace(/≥/g, '$\\geq$');
+            text = text.replace(/≠/g, '$\\neq$');
+            text = text.replace(/∞/g, '$\\infty$');
+            text = text.replace(/≈/g, '$\\approx$');
+            
+            // === PHASE 6: Unicode superscripts ===
+            
+            // 11. Superscript numbers to proper exponents: x² → $x^2$
+            text = text.replace(/([a-zA-Z])([²³⁴⁵⁶⁷⁸⁹⁰]+)/g, (match, letter, superscripts) => {
+                const normalMap = {'²':'2','³':'3','⁴':'4','⁵':'5','⁶':'6','⁷':'7','⁸':'8','⁹':'9','⁰':'0'};
+                const exp = superscripts.split('').map(c => normalMap[c] || c).join('');
+                return `$${letter}^{${exp}}$`;
+            });
+            
+            // === PHASE 7: Clean up ===
+            
+            // 12. Merge consecutive $ delimiters ($$$ → $$, but keep display $$ separate from inline $)
+            text = text.replace(/\$\$/g, '__DISPLAY__');
+            text = text.replace(/\$+/g, '$');
+            text = text.replace(/__DISPLAY__/g, '$$');
+            
+            // 13. Merge adjacent inline math: $x$ $=$ $5$ → $x = 5$
+            text = text.replace(/\$([^$]+)\$\s*\$([^$]+)\$/g, '$$$1 $2$$');
+            text = text.replace(/\$([^$]+)\$\s*\$([^$]+)\$/g, '$$$1 $2$$'); // Run twice for chains
+            
+            // Restore code blocks and inline code
+            text = text.replace(/__CODE_BLOCK_(\d+)__/g, (_, i) => codeBlocks[i]);
+            text = text.replace(/__INLINE_CODE_(\d+)__/g, (_, i) => inlineCode[i]);
+            
+            return text;
+        }
+
+        async function renderBotReplyAnimated(bubbleElement, htmlContent) {
+            stopThinking(bubbleElement);
+            
+            // Auto-wrap math expressions in LaTeX delimiters
+            htmlContent = autoWrapMathExpressions(htmlContent);
+            
+            // Parse markdown to HTML if content looks like markdown
+            let finalHtml = htmlContent;
+            if (typeof marked !== 'undefined' && (htmlContent.includes('##') || htmlContent.includes('|') || htmlContent.includes('-'))) {
+                try {
+                    finalHtml = marked.parse(htmlContent);
+                } catch (e) {
+                    console.warn('Markdown parse error:', e);
+                }
+            }
+            
+            // Create wrapper
+            const wrapper = document.createElement('div');
+            wrapper.className = 'bot-reply-content';
+            wrapper.style.opacity = '0';
+            bubbleElement.innerHTML = '';
+            bubbleElement.appendChild(wrapper);
+            
+            // Gemini-style: Show content immediately with fade-in (no char-by-char)
+            wrapper.innerHTML = finalHtml;
+            
+            // Render LaTeX math BEFORE fade-in to avoid flicker
+            if (typeof renderMathInElement === 'function') {
+                try {
+                    renderMathInElement(wrapper, {
+                        delimiters: [
+                            {left: '$$', right: '$$', display: true},
+                            {left: '$', right: '$', display: false},
+                            {left: '\\(', right: '\\)', display: false},
+                            {left: '\\[', right: '\\]', display: true}
+                        ],
+                        throwOnError: false
+                    });
+                } catch (e) {
+                    console.warn('KaTeX render error:', e);
+                }
+            }
+            
+            // Fade in animation AFTER LaTeX is rendered
+            requestAnimationFrame(() => {
+                wrapper.style.transition = 'opacity 0.4s ease-out';
+                wrapper.style.opacity = '1';
+            });
+            
+            // Smooth scroll to bottom
+            setTimeout(() => {
+                chatMessages.scrollTo({
+                    top: chatMessages.scrollHeight,
+                    behavior: 'smooth'
+                });
+            }, 150);
+            
+            return { finish: () => {}, replace: (html) => { wrapper.innerHTML = html; } };
+        }
     </script>
     <script>
 /* === 3D Tilt Effect Script ===
@@ -1751,6 +2696,7 @@ document.addEventListener('DOMContentLoaded', updateShortcutTooltips);
   const SELECTORS = [
     '.auth-controls .auth-btn',        // đăng nhập / đăng ký / đăng xuất / xóa lịch sử
     '#mode-btn',                       // Diagnose toggle
+    '#think-btn',                      // Jaremis Pro
     '#mic-btn',                        // Mic
     '#tool-buttons .action-btn:first-child', // Paperclip
     '.new-chat-btn',                   // "Cuộc trò chuyện mới"
@@ -2076,6 +3022,72 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 <!-- KaTeX helper & auto-render (Doctor-style) -->
 <script>
+(function(){
+  if (window._jaremis_shortcuts_installed) return; window._jaremis_shortcuts_installed = true;
+
+  // Safe helper to click an element by id
+  function tryClick(id){ try{ const el = document.getElementById(id); if(el){ el.click(); return true; } }catch(e){} return false; }
+
+  // Provide lightweight global stubs (will defer to real implementations when available)
+  window.jaremis = window.jaremis || {};
+  window.jaremis.ensureRenderMath = function(el){ if (window.renderMathIn) return window.renderMathIn(el); /* no-op until katex loader runs */ };
+  // Keep existing wrapResultMath/addResultBoxStyles if present; otherwise noop
+  if (!window.wrapResultMath) window.wrapResultMath = function(b){ /* will be replaced by real implementation if defined later */ };
+  if (!window.addResultBoxStyles) window.addResultBoxStyles = function(){ };
+
+  // Keyboard shortcuts mapping (use Ctrl+letter / Ctrl+Shift+letter). Avoid overriding basic input behavior.
+  document.addEventListener('keydown', function(e){
+    const tgt = e.target || {};
+    const tag = (tgt.tagName || '').toUpperCase();
+    const isEditable = tag === 'INPUT' || tag === 'TEXTAREA' || tgt.isContentEditable;
+
+    // ESC -> stop AI (works globally)
+    if (e.key === 'Escape') {
+      if (window._currentAbortController) {
+        e.preventDefault();
+        stopAIResponse();
+        return;
+      }
+    }
+
+    // Ctrl+Enter -> send (works even when typing)
+    if (e.ctrlKey && !e.shiftKey && e.key === 'Enter') {
+      e.preventDefault(); tryClick('send-btn'); return;
+    }
+
+    // If typing in a text field, do not hijack other shortcuts (except send)
+    if (isEditable) return;
+
+    // Map single Ctrl+letter and Ctrl+Shift+letter combinations
+    if (e.ctrlKey && !e.altKey) {
+      const k = (e.key || '').toLowerCase();
+      const shift = e.shiftKey;
+      // Mic: Ctrl+M
+      if (!shift && k === 'm') { e.preventDefault(); tryClick('mic-btn'); flashNotice && flashNotice('Mic toggled (Ctrl+M)'); return; }
+      // Attach: Ctrl+Shift+U
+      if (shift && k === 'u') { e.preventDefault(); tryClick('attach-btn') || document.getElementById('images')?.click(); flashNotice && flashNotice('Attach file (Ctrl+Shift+U)'); return; }
+      // Diagnose: Ctrl+Shift+K
+      if (shift && k === 'k') { e.preventDefault(); tryClick('mode-btn'); flashNotice && flashNotice('Toggle Diagnose (Ctrl+Shift+K)'); return; }
+      // Model switch: Ctrl+Shift+Y
+      if (shift && k === 'y') { e.preventDefault(); tryClick('think-btn'); flashNotice && flashNotice('Switch model (Ctrl+Shift+Y)'); return; }
+      // New chat: Ctrl+Shift+X
+      if (shift && k === 'x') { e.preventDefault(); startNewConversation && startNewConversation(); flashNotice && flashNotice('New chat (Ctrl+Shift+X)'); return; }
+      // Open history/find: Ctrl+Shift+F
+      if (shift && k === 'f') { e.preventDefault(); openFindModal && openFindModal(); flashNotice && flashNotice('Find (Ctrl+Shift+F)'); return; }
+    }
+  }, true);
+
+  // Ensure chatInput Ctrl+Enter works even if focus is inside textarea
+  try { const ci = document.getElementById('chat-input'); const sb = document.getElementById('send-btn');
+    if (ci && sb) {
+      ci.addEventListener('keydown', function(ev){ if (ev.ctrlKey && ev.key === 'Enter') { ev.preventDefault(); sb.click(); } });
+    }
+  } catch(e){}
+
+})();
+</script>
+<!-- KaTeX helper & auto-render (Doctor-style) -->
+<script>
 // Define helper like Doctor's implementation and an unobtrusive observer
 if (!window._jaremis_katex_setup) {
   window._jaremis_katex_setup = true;
@@ -2182,5 +3194,85 @@ if (!window._jaremis_katex_setup) {
   });
 }
 </script>
+
+<!-- Animated Reply Script -->
+<script src="animated-reply.js"></script>
+<script>
+// Configure marked.js for better markdown rendering
+if (typeof marked !== 'undefined') {
+    marked.setOptions({
+        breaks: true,
+        gfm: true,
+        tables: true,
+        sanitize: false
+    });
+}
+
+// Function to render bot reply with Gemini-style streaming animation
+async function renderBotReplyAnimated(bubbleElement, htmlContent) {
+    stopThinking(bubbleElement);
+    
+    // Auto-wrap math expressions in LaTeX delimiters
+    htmlContent = autoWrapMathExpressions(htmlContent);
+    
+    // Parse markdown to HTML if content looks like markdown
+    let finalHtml = htmlContent;
+    if (typeof marked !== 'undefined' && (htmlContent.includes('##') || htmlContent.includes('|') || htmlContent.includes('-'))) {
+        try {
+            // Enable GFM (GitHub Flavored Markdown) for tables
+            finalHtml = marked.parse(htmlContent, {
+                breaks: true,
+                gfm: true, // Support tables, strikethrough, etc.
+                tables: true
+            });
+        } catch (e) {
+            console.warn('Markdown parse error:', e);
+        }
+    }
+    
+    // Create wrapper
+    const wrapper = document.createElement('div');
+    wrapper.className = 'bot-reply-content';
+    wrapper.style.opacity = '0';
+    bubbleElement.innerHTML = '';
+    bubbleElement.appendChild(wrapper);
+    
+    // Gemini-style: Show content immediately with fade-in (no char-by-char)
+    wrapper.innerHTML = finalHtml;
+    
+    // Render LaTeX math BEFORE fade-in to avoid flicker
+    if (typeof renderMathInElement === 'function') {
+        try {
+            renderMathInElement(wrapper, {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false},
+                    {left: '\\(', right: '\\)', display: false},
+                    {left: '\\[', right: '\\]', display: true}
+                ],
+                throwOnError: false
+            });
+        } catch (e) {
+            console.warn('KaTeX render error:', e);
+        }
+    }
+    
+    // Fade in animation AFTER LaTeX is rendered
+    requestAnimationFrame(() => {
+        wrapper.style.transition = 'opacity 0.4s ease-out';
+        wrapper.style.opacity = '1';
+    });
+    
+    // Smooth scroll to bottom
+    setTimeout(() => {
+        chatMessages.scrollTo({
+            top: chatMessages.scrollHeight,
+            behavior: 'smooth'
+        });
+    }, 150);
+    
+    return { finish: () => {}, replace: (html) => { wrapper.innerHTML = html; } };
+}
+</script>
 </body>
-</html>
+</html> 
