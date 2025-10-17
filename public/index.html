@@ -244,25 +244,6 @@
             .auth-controls { right: 10px; }
         }
 
-        /* Mobile Auth Controls in Sidebar */
-        .mobile-auth-container {
-            display: none; /* Hidden on desktop */
-            margin-top: 16px;
-            padding-top: 16px;
-            border-top: 1px solid var(--border-color);
-        }
-        
-        @media (max-width: 768px) {
-            .mobile-auth-container {
-                display: block;
-            }
-            
-            /* Hide desktop auth on mobile */
-            .auth-container {
-                display: none !important;
-            }
-        }
-
         /* Modal */
         .modal-backdrop {
             position: fixed;
@@ -1178,9 +1159,6 @@
                 </h3>
                 <ul id="history-list"></ul>
             </nav>
-            <!-- Mobile Auth Controls (only visible on mobile) -->
-            <div class="mobile-auth-container" id="mobile-auth-container"></div>
-            
             <div class="sidebar-footer">Made with ❤️ by TT1403 & Ant.</div>
         </aside>
 
@@ -1551,6 +1529,49 @@
             }
         }
 
+        // Toggle tool tray on mobile (nút dấu +)
+        function toggleToolTray(e) {
+            e?.preventDefault();
+            e?.stopPropagation();
+            
+            const toggleBtn = document.getElementById('toggle-tools-btn');
+            const toolButtons = document.getElementById('tool-buttons');
+            const inputWrapper = document.querySelector('.input-wrapper');
+            
+            if (!toggleBtn || !toolButtons) {
+                console.warn('toggleToolTray: Elements not found');
+                return;
+            }
+            
+            // Toggle active state
+            const isActive = toggleBtn.classList.contains('active');
+            
+            if (isActive) {
+                // Đóng tool tray
+                toggleBtn.classList.remove('active');
+                toolButtons.classList.add('collapsed');
+                inputWrapper?.classList.remove('mobile-tools-active');
+            } else {
+                // Mở tool tray
+                toggleBtn.classList.add('active');
+                toolButtons.classList.remove('collapsed');
+                inputWrapper?.classList.add('mobile-tools-active');
+            }
+        }
+
+        // Đóng tool tray khi click bên ngoài (mobile)
+        document.addEventListener('click', (e) => {
+            const toggleBtn = document.getElementById('toggle-tools-btn');
+            const toolButtons = document.getElementById('tool-buttons');
+            const inputWrapper = document.querySelector('.input-wrapper');
+            
+            // Nếu click bên ngoài tool tray và nút toggle
+            if (toggleBtn && toolButtons && !toggleBtn.contains(e.target) && !toolButtons.contains(e.target)) {
+                toggleBtn.classList.remove('active');
+                toolButtons.classList.add('collapsed');
+                inputWrapper?.classList.remove('mobile-tools-active');
+            }
+        });
         // ------------------------------
         // Authentication & user state (client session stored in localStorage)
         // ------------------------------
@@ -1576,20 +1597,8 @@
         }
 
         function renderAuthControls() {
-            // Render desktop auth
             authControls.innerHTML = '';
-            
-            // Also render mobile auth
-            const mobileAuthContainer = document.getElementById('mobile-auth-container');
-            if (mobileAuthContainer) {
-                mobileAuthContainer.innerHTML = '';
-            }
-            
             const user = getLocalUser();
-            
-            // Create elements
-            let elements = [];
-            
             if (user) {
                 const nameEl = document.createElement('div');
                 nameEl.style.color = 'var(--text-color)';
@@ -1628,7 +1637,9 @@
                     renderHistoryList([]);
                 };
 
-                elements = [nameEl, btnHistoryClear, logoutBtn];
+                authControls.appendChild(nameEl);
+                authControls.appendChild(btnHistoryClear);
+                authControls.appendChild(logoutBtn);
             } else {
                 const loginBtn = document.createElement('button');
                 loginBtn.className = 'auth-btn';
@@ -1640,22 +1651,8 @@
                 registerBtn.textContent = 'Đăng ký';
                 registerBtn.onclick = () => { openAuthModal(); showTab('register'); };
 
-                elements = [loginBtn, registerBtn];
-            }
-            
-            // Append to desktop
-            elements.forEach(el => authControls.appendChild(el));
-            
-            // Clone and append to mobile
-            if (mobileAuthContainer) {
-                elements.forEach(el => {
-                    const clone = el.cloneNode(true);
-                    // Copy event listeners
-                    if (el.onclick) {
-                        clone.onclick = el.onclick;
-                    }
-                    mobileAuthContainer.appendChild(clone);
-                });
+                authControls.appendChild(loginBtn);
+                authControls.appendChild(registerBtn);
             }
         }
 
@@ -1693,7 +1690,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, email, password })
                 });
-                               const json = await res.json();
+                const json = await res.json();
                 if (!res.ok) {
                     flashNotice(json.error || 'Đăng ký thất bại');
                     return;
