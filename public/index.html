@@ -2631,6 +2631,106 @@
             
             let html = '<div class="diagnosis-result">';
             
+            // ========================================
+            // SEVERITY ALERT BANNER (NEW)
+            // ========================================
+            if (result.severityLevel) {
+                console.log('🚨 Severity Level:', result.severityLevel);
+                
+                let alertColor, alertIcon, alertText, alertBg;
+                
+                if (result.severityLevel === 'CRITICAL' || result.isEmergency) {
+                    alertColor = '#ff4d4d';
+                    alertBg = 'rgba(255, 77, 77, 0.15)';
+                    alertIcon = '🚨';
+                    alertText = 'CẢNH BÁO NGUY HIỂM';
+                } else if (result.severityLevel === 'MODERATE') {
+                    alertColor = '#ff9933';
+                    alertBg = 'rgba(255, 153, 51, 0.15)';
+                    alertIcon = '⚠️';
+                    alertText = 'CHÚ Ý - CẦN THEO DÕI';
+                } else {
+                    alertColor = '#4CAF50';
+                    alertBg = 'rgba(76, 175, 80, 0.15)';
+                    alertIcon = '✅';
+                    alertText = 'BỆNH NHẸ';
+                }
+                
+                html += `
+                    <div style="
+                        background: ${alertBg};
+                        border: 2px solid ${alertColor};
+                        border-radius: 12px;
+                        padding: 16px 20px;
+                        margin-bottom: 20px;
+                        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                    ">
+                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                            <span style="font-size: 32px;">${alertIcon}</span>
+                            <div>
+                                <div style="font-size: 18px; font-weight: 700; color: ${alertColor};">
+                                    ${alertText}
+                                </div>
+                                ${result.mortalityRate > 0 ? `<div style="font-size: 13px; color: var(--text-secondary-color); margin-top: 4px;">
+                                    Tỷ lệ tử vong ước tính: ${result.mortalityRate}%
+                                </div>` : ''}
+                            </div>
+                        </div>
+                        ${result.warning ? `<div style="font-size: 14px; color: var(--text-color); margin-top: 8px;">
+                            ${result.warning}
+                        </div>` : ''}
+                    </div>
+                `;
+                
+                // Red Flags Alert
+                if (result.redFlags && result.redFlags.length > 0) {
+                    html += `
+                        <div style="
+                            background: rgba(255, 77, 77, 0.2);
+                            border-left: 4px solid #ff4d4d;
+                            border-radius: 8px;
+                            padding: 16px;
+                            margin-bottom: 16px;
+                        ">
+                            <h4 style="color: #ff4d4d; margin: 0 0 12px 0;">🚨 DẤU HIỆU NGUY HIỂM PHÁT HIỆN:</h4>
+                            ${result.redFlags.map(f => `
+                                <div style="margin-bottom: 12px; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 6px;">
+                                    <div style="font-weight: 600; color: #ff4d4d;">▸ ${f.symptom.toUpperCase()}</div>
+                                    <div style="font-size: 13px; margin-top: 4px;">Nguy cơ: ${f.risk}</div>
+                                    <div style="font-size: 14px; margin-top: 6px; color: #ffcc00; font-weight: 600;">
+                                        → ${f.action}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                }
+                
+                // Yellow Flags Alert
+                if (result.yellowFlags && result.yellowFlags.length > 0) {
+                    html += `
+                        <div style="
+                            background: rgba(255, 193, 7, 0.15);
+                            border-left: 4px solid #ffc107;
+                            border-radius: 8px;
+                            padding: 16px;
+                            margin-bottom: 16px;
+                        ">
+                            <h4 style="color: #ffc107; margin: 0 0 12px 0;">⚠️ DẤU HIỆU CẦN CHÚ Ý:</h4>
+                            ${result.yellowFlags.map(f => `
+                                <div style="margin-bottom: 10px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 6px;">
+                                    <div style="font-weight: 600; color: #ffc107;">▸ ${f.symptom}</div>
+                                    <div style="font-size: 13px; margin-top: 4px;">Nguy cơ: ${f.risk}</div>
+                                    <div style="font-size: 13px; margin-top: 4px; color: #ffeb3b;">
+                                        → ${f.action}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                }
+            }
+            
             // Main diagnosis - PRIORITIZE markdown over HTML
             // diagnosisHtml doesn't parse markdown tables, so use diagnosis (raw markdown) instead
             if (result.diagnosis) {
@@ -2662,6 +2762,45 @@
                 console.warn('⚠️ No diagnosis field found, showing full response');
                 html += '<div style="color:orange;">⚠️ Không tìm thấy kết quả chẩn đoán. Response:</div>';
                 html += `<pre style="background:rgba(0,0,0,0.3);padding:12px;border-radius:8px;overflow:auto;max-height:300px;font-size:11px;">${escapeHtml(JSON.stringify(result, null, 2))}</pre>`;
+            }
+            
+            // ========================================
+            // EMERGENCY GUIDANCE (NEW)
+            // ========================================
+            if (result.emergencyGuidance) {
+                console.log('🚨 Adding Emergency Guidance');
+                
+                // Convert markdown guidance to HTML
+                let guidanceHtml = result.emergencyGuidance;
+                if (typeof marked !== 'undefined') {
+                    try {
+                        guidanceHtml = marked.parse(result.emergencyGuidance, {
+                            breaks: true,
+                            gfm: true
+                        });
+                    } catch (e) {
+                        guidanceHtml = result.emergencyGuidance.replace(/\n/g, '<br>');
+                    }
+                }
+                
+                html += `
+                    <div style="
+                        background: linear-gradient(135deg, rgba(47, 129, 247, 0.1) 0%, rgba(47, 129, 247, 0.05) 100%);
+                        border: 2px solid rgba(47, 129, 247, 0.4);
+                        border-radius: 12px;
+                        padding: 20px;
+                        margin-top: 24px;
+                        box-shadow: 0 4px 12px rgba(47, 129, 247, 0.15);
+                    ">
+                        <h3 style="margin: 0 0 16px 0; color: #58a6ff; display: flex; align-items: center; gap: 10px;">
+                            ${result.severityLevel === 'CRITICAL' ? '🚨' : result.severityLevel === 'MODERATE' ? '⚠️' : '🏠'}
+                            ${result.severityLevel === 'CRITICAL' ? 'HƯỚNG DẪN XỬ TRÍ KHẨN CẤP' : result.severityLevel === 'MODERATE' ? 'HƯỚNG DẪN CHĂM SÓC & THEO DÕI' : 'HƯỚNG DẪN CHĂM SÓC TẠI NHÀ'}
+                        </h3>
+                        <div style="color: var(--text-color);">
+                            ${guidanceHtml}
+                        </div>
+                    </div>
+                `;
             }
 
             // Lab analysis
