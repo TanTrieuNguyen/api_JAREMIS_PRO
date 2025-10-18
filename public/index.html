@@ -213,19 +213,70 @@
         #think-btn.active { background: linear-gradient(90deg, rgba(47,129,247,0.12), rgba(47,129,247,0.06)); color:var(--text-color); border-color: rgba(47,129,247,0.6); }
         #model-status { font-size:12px; color:var(--text-secondary-color); margin-left:8px; align-self:center; }
 
-        /* Mic button style */
-        #mic-btn { background:none; border:1px solid var(--border-color); border-radius:6px; padding:6px 8px; color:var(--text-secondary-color); cursor:pointer; width:auto; height:40px; display:flex; align-items:center; justify-content:center; }
-        #mic-btn.recording { background: rgba(255,77,77,0.12); color: var(--text-color); border-color: rgba(255,77,77,0.5); box-shadow: 0 0 8px rgba(255,77,77,0.12); }
+        /* Mic button style - Multi-language support */
+        #mic-btn { 
+            background:none; 
+            border:1px solid var(--border-color); 
+            border-radius:6px; 
+            padding:6px 8px; 
+            color:var(--text-secondary-color); 
+            cursor:pointer; 
+            width:auto; 
+            height:40px; 
+            display:flex; 
+            align-items:center; 
+            justify-content:center; 
+            position: relative;
+            transition: all 0.2s ease;
+        }
+        #mic-btn:hover {
+            background: rgba(255,255,255,0.05);
+            border-color: var(--accent-color);
+        }
+        #mic-btn.recording { 
+            background: rgba(255,77,77,0.12); 
+            color: var(--text-color); 
+            border-color: rgba(255,77,77,0.5); 
+            box-shadow: 0 0 8px rgba(255,77,77,0.12); 
+        }
         #mic-indicator {
-            width:8px; height:8px; border-radius:50%; background:var(--mic-red); margin-left:6px; display:inline-block; opacity:0;
-            box-shadow: 0 0 6px rgba(255,77,77,0.8);
+            width:18px; 
+            height:18px; 
+            border-radius:50%; 
+            background: transparent;
+            margin-left:6px; 
+            display:none; 
+            font-size: 14px;
+            line-height: 18px;
+            text-align: center;
             animation: pulse 1.2s infinite;
         }
-        #mic-btn.recording #mic-indicator { opacity:1; }
+        #mic-btn.recording #mic-indicator { 
+            display: inline-block;
+        }
         @keyframes pulse {
             0% { transform: scale(1); opacity: 0.9; }
-            50% { transform: scale(1.5); opacity: 0.5; }
+            50% { transform: scale(1.2); opacity: 0.6; }
             100% { transform: scale(1); opacity: 0.9; }
+        }
+
+        /* Language selection menu */
+        #lang-menu {
+            scrollbar-width: thin;
+            scrollbar-color: var(--border-color) transparent;
+        }
+        #lang-menu::-webkit-scrollbar {
+            width: 6px;
+        }
+        #lang-menu::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        #lang-menu::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 3px;
+        }
+        #lang-menu::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-color);
         }
 
         /* Auth UI (top-right) */
@@ -1848,29 +1899,76 @@
         }
 
         // ------------------------------
-        // Mic / SpeechRecognition
+        // Mic / SpeechRecognition - MULTI-LANGUAGE SUPPORT
         // ------------------------------
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition || null;
 
+        // Supported languages with auto-detection
+        const SUPPORTED_LANGUAGES = {
+            'vi-VN': { name: 'Tiếng Việt', flag: '🇻🇳', priority: 1 },
+            'en-US': { name: 'English (US)', flag: '🇺🇸', priority: 2 },
+            'en-GB': { name: 'English (UK)', flag: '🇬🇧', priority: 3 },
+            'zh-CN': { name: '中文 (简体)', flag: '🇨🇳', priority: 4 },
+            'zh-TW': { name: '中文 (繁體)', flag: '🇹🇼', priority: 5 },
+            'ja-JP': { name: '日本語', flag: '🇯🇵', priority: 6 },
+            'ko-KR': { name: '한국어', flag: '🇰🇷', priority: 7 },
+            'hi-IN': { name: 'हिन्दी (Hindi)', flag: '🇮🇳', priority: 8 },
+            'th-TH': { name: 'ไทย (Thai)', flag: '🇹🇭', priority: 9 },
+            'es-ES': { name: 'Español', flag: '🇪🇸', priority: 10 },
+            'fr-FR': { name: 'Français', flag: '🇫🇷', priority: 11 },
+            'de-DE': { name: 'Deutsch', flag: '🇩🇪', priority: 12 },
+            'ru-RU': { name: 'Русский', flag: '🇷🇺', priority: 13 },
+            'ar-SA': { name: 'العربية (Arabic)', flag: '🇸🇦', priority: 14 },
+            'pt-BR': { name: 'Português (Brasil)', flag: '🇧🇷', priority: 15 },
+            'id-ID': { name: 'Bahasa Indonesia', flag: '🇮🇩', priority: 16 }
+        };
+
+        // Current recognition language (default Vietnamese)
+        let currentRecognitionLang = localStorage.getItem('jaremis_speech_lang') || 'vi-VN';
+
         if (SpeechRecognition) {
             recognition = new SpeechRecognition();
-            recognition.lang = 'vi-VN';
+            recognition.lang = currentRecognitionLang;
             recognition.interimResults = true;
-            recognition.maxAlternatives = 1;
+            recognition.maxAlternatives = 3; // Get multiple alternatives for better accuracy
             recognition.continuous = false;
 
             recognition.onstart = () => {
                 isRecording = true;
                 micBtn.classList.add('recording');
-                micBtn.title = 'Đang ghi âm — nhấn để dừng';
+                const langInfo = SUPPORTED_LANGUAGES[currentRecognitionLang];
+                micBtn.title = `🎤 Đang ghi âm (${langInfo?.name || currentRecognitionLang}) — nhấn để dừng`;
                 textBeforeRecording = chatInput.value || '';
                 chatInput.focus();
+                
+                // Show language indicator
+                const indicator = document.getElementById('mic-indicator');
+                if (indicator) {
+                    indicator.textContent = langInfo?.flag || '🎤';
+                    indicator.style.display = 'block';
+                }
             };
 
             recognition.onerror = (event) => {
                 console.warn('Speech recognition error', event.error);
                 stopRecognition();
-                flashNotice('Lỗi ghi âm: ' + (event.error || 'Không xác định'));
+                
+                let errorMsg = 'Lỗi ghi âm';
+                if (event.error === 'no-speech') {
+                    errorMsg = 'Không phát hiện giọng nói. Vui lòng thử lại.';
+                } else if (event.error === 'audio-capture') {
+                    errorMsg = 'Không tìm thấy microphone. Kiểm tra quyền truy cập.';
+                } else if (event.error === 'not-allowed') {
+                    errorMsg = 'Vui lòng cấp quyền sử dụng microphone.';
+                } else if (event.error === 'network') {
+                    errorMsg = 'Lỗi mạng. Kiểm tra kết nối internet.';
+                } else if (event.error === 'language-not-supported') {
+                    errorMsg = `Ngôn ngữ ${currentRecognitionLang} không được hỗ trợ.`;
+                } else {
+                    errorMsg += ': ' + (event.error || 'Không xác định');
+                }
+                
+                flashNotice(errorMsg, 'error');
             };
 
             recognition.onend = () => {
@@ -1880,14 +1978,29 @@
             recognition.onresult = (event) => {
                 let interimTranscript = '';
                 let finalTranscript = '';
+                
                 for (let i = 0; i < event.results.length; i++) {
-                    const transcript = event.results[i][0].transcript;
-                    if (event.results[i].isFinal) {
-                        finalTranscript += transcript + ' ';
+                    // Get best alternative (highest confidence)
+                    const result = event.results[i];
+                    let bestTranscript = result[0].transcript;
+                    let bestConfidence = result[0].confidence;
+                    
+                    // Check other alternatives for better confidence
+                    for (let j = 1; j < result.length; j++) {
+                        if (result[j].confidence > bestConfidence) {
+                            bestTranscript = result[j].transcript;
+                            bestConfidence = result[j].confidence;
+                        }
+                    }
+                    
+                    if (result.isFinal) {
+                        finalTranscript += bestTranscript + ' ';
+                        console.log(`✅ Speech recognized (${currentRecognitionLang}): "${bestTranscript}" (confidence: ${(bestConfidence * 100).toFixed(1)}%)`);
                     } else {
-                        interimTranscript += transcript;
+                        interimTranscript += bestTranscript;
                     }
                 }
+                
                 chatInput.value = (textBeforeRecording + ' ' + finalTranscript + interimTranscript).trim();
                 autoResize(chatInput);
             };
@@ -1897,22 +2010,176 @@
             micBtn.style.pointerEvents = 'none';
         }
 
+        // Change recognition language
+        function changeSpeechLanguage(langCode) {
+            if (!SUPPORTED_LANGUAGES[langCode]) {
+                console.warn('Unsupported language:', langCode);
+                return;
+            }
+            
+            currentRecognitionLang = langCode;
+            localStorage.setItem('jaremis_speech_lang', langCode);
+            
+            if (recognition) {
+                recognition.lang = langCode;
+            }
+            
+            const langInfo = SUPPORTED_LANGUAGES[langCode];
+            micBtn.title = `${langInfo.flag} Ghi giọng nói (${langInfo.name}). Nhấn để bắt đầu/dừng. Chuột phải để chọn ngôn ngữ.`;
+            
+            flashNotice(`🎤 Đã chuyển sang ${langInfo.flag} ${langInfo.name}`, 'success');
+        }
+
+        // Show language selection menu
+        function showLanguageMenu(e) {
+            e?.preventDefault();
+            e?.stopPropagation();
+            
+            // Remove existing menu if any
+            const existingMenu = document.getElementById('lang-menu');
+            if (existingMenu) existingMenu.remove();
+            
+            // Create menu
+            const menu = document.createElement('div');
+            menu.id = 'lang-menu';
+            menu.style.cssText = `
+                position: fixed;
+                background: var(--sidebar-bg);
+                border: 1px solid var(--border-color);
+                border-radius: 8px;
+                padding: 8px;
+                z-index: 9999;
+                box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+                max-height: 400px;
+                overflow-y: auto;
+                min-width: 220px;
+            `;
+            
+            // Add header
+            const header = document.createElement('div');
+            header.style.cssText = `
+                padding: 8px 12px;
+                font-size: 13px;
+                font-weight: 600;
+                color: var(--text-secondary-color);
+                border-bottom: 1px solid var(--border-color);
+                margin-bottom: 8px;
+            `;
+            header.textContent = '🎤 Chọn ngôn ngữ nhận diện';
+            menu.appendChild(header);
+            
+            // Add language options (sorted by priority)
+            const sortedLangs = Object.entries(SUPPORTED_LANGUAGES)
+                .sort((a, b) => a[1].priority - b[1].priority);
+            
+            sortedLangs.forEach(([code, info]) => {
+                const item = document.createElement('div');
+                item.style.cssText = `
+                    padding: 10px 12px;
+                    cursor: pointer;
+                    border-radius: 6px;
+                    font-size: 14px;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    transition: background 0.15s;
+                    ${code === currentRecognitionLang ? 'background: rgba(47,129,247,0.15); border-left: 3px solid var(--accent-color);' : ''}
+                `;
+                
+                item.innerHTML = `
+                    <span style="font-size: 20px;">${info.flag}</span>
+                    <span style="flex: 1;">${info.name}</span>
+                    ${code === currentRecognitionLang ? '<span style="color: var(--accent-color); font-size: 16px;">✓</span>' : ''}
+                `;
+                
+                item.addEventListener('mouseenter', () => {
+                    if (code !== currentRecognitionLang) {
+                        item.style.background = 'rgba(255,255,255,0.05)';
+                    }
+                });
+                
+                item.addEventListener('mouseleave', () => {
+                    if (code !== currentRecognitionLang) {
+                        item.style.background = 'transparent';
+                    }
+                });
+                
+                item.addEventListener('click', () => {
+                    changeSpeechLanguage(code);
+                    menu.remove();
+                });
+                
+                menu.appendChild(item);
+            });
+            
+            // Position menu near mic button
+            const micRect = micBtn.getBoundingClientRect();
+            menu.style.left = `${micRect.left}px`;
+            menu.style.top = `${micRect.top - 410}px`; // Above the button
+            
+            // Adjust if menu goes off screen
+            document.body.appendChild(menu);
+            const menuRect = menu.getBoundingClientRect();
+            if (menuRect.top < 10) {
+                menu.style.top = `${micRect.bottom + 10}px`; // Below the button
+            }
+            if (menuRect.right > window.innerWidth - 10) {
+                menu.style.left = `${window.innerWidth - menuRect.width - 10}px`;
+            }
+            
+            // Close menu when clicking outside
+            setTimeout(() => {
+                document.addEventListener('click', function closeMenu(e) {
+                    if (!menu.contains(e.target)) {
+                        menu.remove();
+                        document.removeEventListener('click', closeMenu);
+                    }
+                });
+            }, 100);
+        }
+
         function toggleMic(e) {
             e?.preventDefault();
+            
             if (!SpeechRecognition) return;
+            
+            // Right-click or long-press to show language menu
+            if (e && (e.button === 2 || e.type === 'contextmenu')) {
+                e.preventDefault();
+                showLanguageMenu(e);
+                return;
+            }
+            
             if (!isRecording) startRecognition();
             else stopRecognition();
+        }
+        
+        // Add right-click context menu for language selection
+        if (micBtn) {
+            micBtn.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                showLanguageMenu(e);
+            });
+            
+            // Update tooltip with current language
+            const langInfo = SUPPORTED_LANGUAGES[currentRecognitionLang];
+            micBtn.title = `${langInfo.flag} Ghi giọng nói (${langInfo.name}). Nhấn để bắt đầu/dừng. Chuột phải để chọn ngôn ngữ.`;
         }
 
         function startRecognition() {
             if (!recognition) return;
            
             try {
+                // Update language before starting
+                recognition.lang = currentRecognitionLang;
                 textBeforeRecording = chatInput.value || '';
                 recognition.start();
+                
+                const langInfo = SUPPORTED_LANGUAGES[currentRecognitionLang];
+                console.log(`🎤 Starting speech recognition in ${langInfo.flag} ${langInfo.name}`);
             } catch (err) {
                 console.warn('Không thể bắt đầu ghi âm:', err);
-                flashNotice('Không thể bắt đầu ghi âm: ' + (err.message || err));
+                flashNotice('Không thể bắt đầu ghi âm: ' + (err.message || err), 'error');
             }
         }
 
@@ -1921,7 +2188,17 @@
             try { recognition.stop(); } catch (e) {}
             isRecording = false;
             micBtn.classList.remove('recording');
-            micBtn.title = 'Ghi giọng nói (Vietnamese). Nhấn để bắt đầu/dừng';
+            
+            // Update tooltip with current language
+            const langInfo = SUPPORTED_LANGUAGES[currentRecognitionLang];
+            micBtn.title = `${langInfo.flag} Ghi giọng nói (${langInfo.name}). Nhấn để bắt đầu/dừng. Chuột phải để chọn ngôn ngữ.`;
+            
+            // Hide language indicator
+            const indicator = document.getElementById('mic-indicator');
+            if (indicator) {
+                indicator.style.display = 'none';
+            }
+            
             if (clearInterim) {
                 chatInput.value = textBeforeRecording || '';
                 autoResize(chatInput);
