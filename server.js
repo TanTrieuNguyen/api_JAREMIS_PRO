@@ -15,6 +15,9 @@ const createDOMPurify = require('dompurify');
 const windowForDOM = new JSDOM('').window;
 const DOMPurify = createDOMPurify(windowForDOM);
 
+// NEW: Severity Assessment & Emergency Guidance
+const severityAssessment = require('./severityAssessment');
+
 const app = express();
 const upload = multer({ dest: 'uploads/' });
 
@@ -1419,6 +1422,7 @@ VÍ DỤ CÁCH TÁCH:
 Đã xảy ra timeout khi kết nối với Gemini AI. Vui lòng thử lại sau.
 
 **Thông tin đã nhận:**
+
 - Triệu chứng: ${symptoms.substring(0, 100)}...
 - Xét nghiệm: ${labResults ? 'Có' : 'Không'}
 - Hình ảnh: ${files.length} file
@@ -1479,6 +1483,154 @@ VÍ DỤ CÁCH TÁCH:
     const citationHtml = diagnosisEngine.formatCitations(medicalCitations);
 
     // ========================================
+    // 8.5. SEVERITY ASSESSMENT & EMERGENCY GUIDANCE
+    // ========================================
+    console.log('🔍 [DIAGNOSE] Assessing severity...');
+    
+    // Extract ICD codes from diagnosis
+    const icdCodes = parsedData.diseases
+      .map(d => d.icd || '')
+      .filter(code => code && code.length > 0);
+    
+    console.log('🔍 [DIAGNOSE] ICD Codes detected:', icdCodes);
+    
+    // Assess severity based on ICD codes
+    const severityInfo = severityAssessment.assessSeverity(icdCodes);
+    console.log('🔍 [DIAGNOSE] Severity level:', severityInfo.level);
+    
+    // Check red flags in symptoms
+    const redFlags = severityAssessment.checkRedFlags(symptoms || '');
+    if (redFlags.length > 0) {
+      console.log('⚠️ [DIAGNOSE] RED FLAGS detected:', redFlags.length);
+      severityInfo.level = 'CRITICAL'; // Override to critical if red flags present
+    }
+    
+    // Check yellow flags
+    const yellowFlags = severityAssessment.checkYellowFlags(symptoms || '');
+    
+    // Generate appropriate guidance
+    let guidanceHtml = '';
+    
+    if (severityInfo.level === 'CRITICAL' || redFlags.length > 0) {
+      // Emergency guidance for critical conditions
+      const primaryCondition = severityInfo.criticalConditions[0] || {
+        name: primaryDiagnosis,
+        mortality: severityInfo.mortality,
+        category: 'general'
+      };
+      
+      const emergencyGuidance = severityAssessment.generateEmergencyGuidance(
+        primaryCondition,
+        symptoms || ''
+      );
+      
+      guidanceHtml = `
+## ${emergencyGuidance.alert}
+
+**🚨 ${primaryCondition.name}**
+- ${emergencyGuidance.mortality}
+- Cần xử trí khẩn cấp NGAY LẬP TỨC!
+
+${redFlags.length > 0 ? `\n### ⚠️ DẤU HIỆU NGUY HIỂM PHÁT HIỆN:\n${redFlags.map(f => `- **${f.symptom.toUpperCase()}** → Nguy cơ: ${f.risk}\n  ${f.action}`).join('\n')}\n` : ''}
+
+### 🚨 XỬ TRÍ KHẨN CẤP NGAY:
+${emergencyGuidance.immediateActions.map(a => `${a}`).join('\n')}
+
+### ⏰ CHĂM SÓC TẠI NHÀ (12-48 giờ đầu):
+${emergencyGuidance.homeCareSurvival.map(a => `${a}`).join('\n')}
+
+### 🏥 KHI NÀO CẦN ĐẾN BỆNH VIỆN NGAY:
+${emergencyGuidance.whenToER.map(a => `${a}`).join('\n')}
+
+---
+
+${emergencyGuidance.emergencyNumber}
+
+**⚠️ ĐẶC BIỆT LƯU Ý:**
+- Đây là tình trạng NGUY HIỂM, có thể đe dọa tính mạng
+- KHÔNG trì hoãn việc đến bệnh viện
+- KHÔNG tự điều trị tại nhà lâu dài
+- Thời gian vàng: 12-48 giờ đầu quyết định sống còn
+`;
+      
+    } else if (severityInfo.level === 'MODERATE' || yellowFlags.length > 0) {
+      // Moderate condition - need medical attention within 24-48h
+      const primaryCondition = severityInfo.moderateConditions[0] || severityInfo.mildConditions[0] || {
+        name: primaryDiagnosis,
+        mortality: severityInfo.mortality,
+        category: 'general'
+      };
+      
+      const homeCareGuidance = severityAssessment.generateHomeCarGuidance(
+        primaryCondition,
+        symptoms || ''
+      );
+      
+      guidanceHtml = `
+## ${homeCareGuidance.alert}
+
+**${primaryCondition.name}**
+
+${yellowFlags.length > 0 ? `\n### ⚠️ DẤU HIỆU CẦN CHÚ Ý:\n${yellowFlags.map(f => `- **${f.symptom}** → ${f.risk}\n  ${f.action}`).join('\n')}\n` : ''}
+
+### 🏠 CHĂM SÓC TẠI NHÀ:
+${homeCareGuidance.homeCare.map(a => `${a}`).join('\n')}
+
+### 💊 THUỐC CÓ THỂ DÙNG:
+${homeCareGuidance.medications.map(a => `${a}`).join('\n')}
+
+### 📅 THEO DÕI & TÁI KHÁM:
+${homeCareGuidance.followUp.map(a => `${a}`).join('\n')}
+
+### ⚠️ KHI NÀO CẦN KHÁM BÁC SĨ:
+${homeCareGuidance.whenToSeeDoctor.map(a => `${a}`).join('\n')}
+
+---
+
+**💡 Lưu ý:** Theo dõi triệu chứng trong 24-48 giờ. Nếu không cải thiện hoặc xấu đi → Khám bác sĩ ngay.
+`;
+      
+    } else {
+      // Mild condition - can treat at home
+      const primaryCondition = severityInfo.mildConditions[0] || {
+        name: primaryDiagnosis,
+        mortality: severityInfo.mortality,
+        category: 'general'
+      };
+      
+      const homeCareGuidance = severityAssessment.generateHomeCarGuidance(
+        primaryCondition,
+        symptoms || ''
+      );
+      
+      guidanceHtml = `
+## ${homeCareGuidance.alert}
+
+**${primaryCondition.name}**
+- Có thể điều trị tại nhà
+- Thường tự khỏi trong 3-7 ngày
+
+### 🏠 CHĂM SÓC TẠI NHÀ:
+${homeCareGuidance.homeCare.map(a => `${a}`).join('\n')}
+
+### 💊 THUỐC CÓ THỂ DÙNG:
+${homeCareGuidance.medications.map(a => `${a}`).join('\n')}
+
+### 📅 THEO DÕI:
+${homeCareGuidance.followUp.map(a => `${a}`).join('\n')}
+
+### ⚠️ KHI NÀO CẦN KHÁM BÁC SĨ:
+${homeCareGuidance.whenToSeeDoctor.map(a => `${a}`).join('\n')}
+
+---
+
+**💡 Lưu ý:** Đây là bệnh thông thường, có thể tự chăm sóc tại nhà. Nếu triệu chứng không giảm sau 5-7 ngày, hãy khám bác sĩ.
+`;
+    }
+    
+    console.log('✅ [DIAGNOSE] Severity assessment completed');
+
+    // ========================================
     // 9. HISTORY & CLEANUP
     // ========================================
     const submittedBy = req.body.submittedBy || null;
@@ -1533,11 +1685,23 @@ VÍ DỤ CÁCH TÁCH:
       citations: medicalCitations,
       citationsHtml: citationHtml,
       
+      // NEW: Severity Assessment & Emergency Guidance
+      severityLevel: severityInfo.level, // CRITICAL, MODERATE, MILD
+      mortalityRate: severityInfo.mortality,
+      isEmergency: severityInfo.isEmergency || redFlags.length > 0,
+      redFlags: redFlags.map(f => ({ symptom: f.symptom, risk: f.risk, action: f.action })),
+      yellowFlags: yellowFlags.map(f => ({ symptom: f.symptom, risk: f.risk, action: f.action })),
+      emergencyGuidance: guidanceHtml,
+      
       // Legacy fields
       references: references.slice(0,3),
       icdDescriptions: parsedData.differentialDiagnosisFull,
       
-      warning: '⚠️ **QUAN TRỌNG:** Kết quả chỉ mang tính tham khảo. LUÔN tham khảo ý kiến bác sĩ chuyên khoa trước khi quyết định điều trị!',
+      warning: severityInfo.level === 'CRITICAL' || redFlags.length > 0
+        ? '🚨 **CẢNH BÁO: TÌNH TRẠNG NGUY HIỂM** - Cần xử trí cấp cứu NGAY LẬP TỨC! Gọi 115 hoặc đến bệnh viện ngay!'
+        : severityInfo.level === 'MODERATE' || yellowFlags.length > 0
+        ? '⚠️ **CHÚ Ý:** Cần theo dõi và khám bác sĩ trong 24-48 giờ nếu triệu chứng không cải thiện.'
+        : '✅ **Bệnh nhẹ** - Có thể chăm sóc tại nhà. Khám bác sĩ nếu triệu chứng kéo dài > 5-7 ngày.',
       
       // Feature flags
       features: {
@@ -1547,10 +1711,12 @@ VÍ DỤ CÁCH TÁCH:
         xai: true,
         treatmentRec: !!treatmentRec.firstLine,
         citations: medicalCitations.length > 0,
-        decisionTree: diagnosisTree.branches.length > 0
+        decisionTree: diagnosisTree.branches.length > 0,
+        severityAssessment: true,
+        emergencyGuidance: true
       }
     });
-    console.log('✅ [DIAGNOSE] Response sent successfully');
+    console.log('✅ [DIAGNOSE] Response sent successfully (Severity: ' + severityInfo.level + ')');
 
   } catch (error) {
     console.error('❌ [DIAGNOSE] Error:', error);
