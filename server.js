@@ -18,6 +18,9 @@ const DOMPurify = createDOMPurify(windowForDOM);
 // NEW: Severity Assessment & Emergency Guidance
 const severityAssessment = require('./severityAssessment');
 
+// NEW: Smart Symptom Search - AI-powered keyword extraction & source selection
+const { smartSymptomSearch } = require('./smartSymptomSearch');
+
 const app = express();
 const upload = multer({ dest: 'uploads/' });
 
@@ -278,9 +281,6 @@ function translateSymptomToEnglish(vietnameseSymptom) {
     'đau khớp': 'arthralgia',
     'phát ban': 'rash',
     'ngứa': 'pruritus',
-    'chóng mặt': 'dizziness',
-    'hoa mắt': 'vertigo',
-    'run': 'tremor',
     'co giật': 'seizure',
     'mất ý thức': 'loss of consciousness',
     'đau lưng': 'back pain',
@@ -980,12 +980,29 @@ app.post('/api/chat', upload.array('images'), async (req, res) => {
       historyBlocks = getRecentSessionChatHistory(sessionId, 60, 45000);
     }
 
-    // Real-time search nếu cần thông tin mới
+    // SMART SYMPTOM SEARCH - AI tách triệu chứng + chọn nguồn phù hợp
     let realtimeData = null;
+    let smartSearchResult = null;
+    
+    // Detect if message is about medical symptoms
+    const isSymptomQuery = /\b(đau|sốt|ho|ngứa|viêm|chảy|khó thở|mệt|buồn nôn|tiêu chảy|bệnh|triệu chứng|pain|fever|cough|symptom|病|症状)\b/i.test(message);
+    
     try {
-      realtimeData = await searchRealTimeInfo(message);
+      if (isSymptomQuery) {
+        // Use smart symptom search for medical queries
+        console.log('🏥 Detected symptom query, using smart search...');
+        smartSearchResult = await smartSymptomSearch(message);
+        
+        if (smartSearchResult && smartSearchResult.sources) {
+          realtimeData = smartSearchResult.sources;
+          console.log(`✅ Smart search: "${smartSearchResult.originalInput}" → "${smartSearchResult.extractedKeyword}" (${smartSearchResult.category})`);
+        }
+      } else {
+        // Use regular real-time search for non-medical queries
+        realtimeData = await searchRealTimeInfo(message);
+      }
     } catch (err) {
-      console.warn('Real-time search failed:', err);
+      console.warn('Search failed:', err);
     }
 
     const realtimeWebSection = realtimeData ? 
@@ -1095,10 +1112,13 @@ ${realtimeWebSection}
 ${memorySection}${historySection}
 User message (${userLang}): ${message}
 
+${smartSearchResult && smartSearchResult.extractedKeyword !== smartSearchResult.originalInput ? 
+  `\n⚡ AI ĐÃ PHÂN TÍCH TRIỆU CHỨNG:\n- Câu gốc: "${smartSearchResult.originalInput}"\n- Triệu chứng chính: "${smartSearchResult.extractedKeyword}"\n- Danh mục: ${smartSearchResult.category}\n- Đã tìm nguồn chuyên khoa phù hợp trong [THÔNG TIN MỚI NHẤT TỪ WEB]\n` : ''}
+
 YÊU CẦU:
 - SỬ DỤNG THÔNG TIN MỚI NHẤT từ web nếu có trong [THÔNG TIN MỚI NHẤT TỪ WEB]
 - Ưu tiên dữ liệu real-time hơn knowledge cũ khi có xung đột
-- Nếu câu hỏi phụ thuộc ngữ cảnh trước đó -> sử dụng cả bộ nhớ & lịch sử.
+${smartSearchResult ? '- ✅ Nguồn web đã được chọn theo CHUYÊN KHOA phù hợp với triệu chứng, ưu tiên trích dẫn các nguồn này\n' : ''}- Nếu câu hỏi phụ thuộc ngữ cảnh trước đó -> sử dụng cả bộ nhớ & lịch sử.
 - Không nhắc lại toàn bộ lịch sử, chỉ tổng hợp tinh gọn.
 - Trả lời bằng đúng ngôn ngữ người dùng (${userLang}).
 
