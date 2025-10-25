@@ -82,8 +82,99 @@
         .history { flex-grow:1; overflow-y:auto; margin-top:10px; }
         .history h3 { font-size:12px; color:var(--text-secondary-color); margin-bottom:8px; text-transform:uppercase; display:flex; justify-content:space-between; align-items:center; }
         .history ul { list-style:none; padding:0; display:flex; flex-direction:column; gap:6px; }
-        .history li { padding:8px; border-radius:6px; cursor:pointer; color:var(--text-color); background:transparent; border:1px solid transparent; font-size:13px; }
+        .history li { 
+          padding:8px; 
+          border-radius:6px; 
+          cursor:pointer; 
+          color:var(--text-color); 
+          background:transparent; 
+          border:1px solid transparent; 
+          font-size:13px; 
+          display:flex; 
+          justify-content:space-between; 
+          align-items:center;
+          position:relative;
+        }
         .history li:hover { background:#111720; border-color:var(--border-color); }
+        .history li .history-title { flex-grow:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .history li .history-menu-btn { 
+          opacity:0; 
+          padding:4px 8px; 
+          background:transparent; 
+          border:none; 
+          color:var(--text-secondary-color); 
+          cursor:pointer; 
+          border-radius:4px;
+          font-size:16px;
+        }
+        .history li:hover .history-menu-btn { opacity:1; }
+        .history li .history-menu-btn:hover { background:#2c313a; color:var(--text-color); }
+        
+        /* Dropdown menu cho history item */
+        .history-dropdown {
+          position:absolute;
+          top:100%;
+          right:0;
+          background:var(--sidebar-bg);
+          border:1px solid var(--border-color);
+          border-radius:6px;
+          padding:4px;
+          display:none;
+          z-index:1000;
+          min-width:160px;
+          box-shadow:0 4px 12px rgba(0,0,0,0.3);
+        }
+        .history-dropdown.show { display:block; }
+        .history-dropdown button {
+          width:100%;
+          padding:8px 12px;
+          background:transparent;
+          border:none;
+          color:var(--text-color);
+          text-align:left;
+          cursor:pointer;
+          border-radius:4px;
+          font-size:13px;
+          display:flex;
+          align-items:center;
+          gap:8px;
+        }
+        .history-dropdown button:hover { background:#2c313a; }
+        .history-dropdown button i { width:16px; }
+        
+        /* Search tabs */
+        .search-tab:hover { background:#2c313a !important; }
+        .search-tab.active { border-bottom-color:var(--accent-color) !important; color:var(--accent-color) !important; }
+        
+        /* Search results */
+        .search-result-item {
+          padding:12px;
+          background:var(--input-bg);
+          border:1px solid var(--border-color);
+          border-radius:6px;
+          margin-bottom:8px;
+          cursor:pointer;
+          transition:all 0.2s;
+        }
+        .search-result-item:hover { background:#2c313a; border-color:var(--accent-color); }
+        .search-result-question {
+          font-size:14px;
+          color:var(--text-color);
+          margin-bottom:4px;
+          font-weight:500;
+        }
+        .search-result-meta {
+          font-size:12px;
+          color:var(--text-secondary-color);
+          display:flex;
+          align-items:center;
+          gap:8px;
+        }
+        .search-highlight {
+          background:rgba(255,255,0,0.3);
+          padding:2px 4px;
+          border-radius:2px;
+        }
         .sidebar-footer { font-size:12px; color:var(--text-secondary-color); text-align:center; margin-top:10px; }
 
         /* Chat area */
@@ -1314,8 +1405,9 @@
                 </div>
                 <div class="form-row">
                     <button class="btn-primary" onclick="submitLogin()">Đăng nhập</button>
-                    <button class="btn-primary" onclick="loginWithGoogle()" style="background-color: #4285F4;"> <i class="fab fa-google"></i> Google</button>
-                    <button class="btn-primary" onclick="loginWithFacebook()" style="background-color: #3b5998;"> <i class="fab fa-facebook"></i> Facebook</button>
+                    <!-- Tạm thời ẩn nút đăng nhập Facebook và Google -->
+                    <!-- <button class="btn-primary" onclick="loginWithGoogle()" style="background-color: #4285F4;"> <i class="fab fa-google"></i> Google</button>
+                    <button class="btn-primary" onclick="loginWithFacebook()" style="background-color: #3b5998;"> <i class="fab fa-facebook"></i> Facebook</button> -->
                 </div>
 
                 <div class="form-actions">
@@ -1348,29 +1440,39 @@
         </div>
     </div>
 
+    <!-- Modal Tìm kiếm mới với 2 chế độ -->
     <div class="modal-backdrop" id="find-backdrop" style="display:none;">
-      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="find-title">
-        <h3 id="find-title" style="display:flex;justify-content:space-between;align-items:center;">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="find-title" style="max-width: 600px; width: 90%;">
+        <h3 id="find-title" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
           <span>Tìm kiếm</span>
           <button class="btn-ghost" style="padding:4px 10px;font-size:14px;" onclick="closeFindModal()" title="Đóng (Esc)">&times;</button>
         </h3>
-        <div class="form-row" style="margin-bottom:10px;">
-          <input id="find-query" placeholder="Nhập từ khóa... (Enter=Tiếp, Shift+Enter=Trước)" style="background:#071018;">
+        
+        <!-- Tab chọn chế độ tìm kiếm -->
+        <div style="display:flex;gap:8px;margin-bottom:16px;border-bottom:1px solid var(--border-color);">
+          <button id="search-tab-questions" class="search-tab active" onclick="switchSearchTab('questions')" style="flex:1;padding:10px;background:transparent;border:none;border-bottom:2px solid var(--accent-color);color:var(--accent-color);cursor:pointer;font-size:14px;">
+            <i class="fas fa-comments"></i> Tìm câu hỏi
+          </button>
+          <button id="search-tab-conversations" class="search-tab" onclick="switchSearchTab('conversations')" style="flex:1;padding:10px;background:transparent;border:none;border-bottom:2px solid transparent;color:var(--text-secondary-color);cursor:pointer;font-size:14px;">
+            <i class="fas fa-history"></i> Tìm cuộc trò chuyện
+          </button>
         </div>
-        <div class="form-row" style="flex-direction:row;align-items:center;gap:14px;margin-bottom:12px;">
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;">
-            <input type="checkbox" id="find-case"> Phân biệt hoa/thường
-          </label>
-          <div id="find-count" style="margin-left:auto;font-size:12px;color:var(--text-secondary-color);">0 / 0</div>
+        
+        <!-- Ô nhập tìm kiếm -->
+        <div class="form-row" style="margin-bottom:16px;">
+          <input id="find-query" placeholder="Nhập từ khóa tìm kiếm..." style="background:#071018;font-size:14px;padding:12px;">
         </div>
-        <div class="form-actions" style="justify-content:flex-start;gap:8px;">
-          <button class="btn-ghost" onclick="findPrev()" title="Trước (Shift+Enter)">Trước</button>
-          <button class="btn-primary" onclick="findNext()" title="Tiếp (Enter)">Tiếp</button>
-          <button class="btn-ghost" onclick="clearFindHighlights()" title="Xóa highlight">Xóa</button>
-          <button class="btn-ghost" onclick="closeFindModal()" title="Đóng (Esc)">Đóng</button>
+        
+        <!-- Kết quả tìm kiếm -->
+        <div id="search-results" style="max-height:400px;overflow-y:auto;margin-bottom:16px;">
+          <div style="text-align:center;color:var(--text-secondary-color);padding:40px 20px;">
+            <i class="fas fa-search" style="font-size:48px;opacity:0.3;margin-bottom:16px;"></i>
+            <div>Nhập từ khóa để tìm kiếm</div>
+          </div>
         </div>
-        <div class="small-muted" style="margin-top:10px;">
-          Ctrl+F mở • Enter=Tiếp • Shift+Enter=Trước • Esc=Đóng
+        
+        <div class="small-muted" style="margin-top:10px;text-align:center;">
+          Ctrl+Shift+F để mở • Esc để đóng
         </div>
       </div>
     </div>
@@ -1810,22 +1912,29 @@
         // ------------------------------
         async function fetchAndRenderHistory(username) {
             if (!username) return;
+            console.log('🔄 Fetching history for user:', username);
             try {
                 const res = await fetch(`/api/history?username=${encodeURIComponent(username)}`);
                 const json = await res.json();
                 if (!res.ok) {
-                    console.warn('Không lấy được lịch sử', json);
+                    console.warn('❌ Không lấy được lịch sử', json);
                     renderHistoryList([]);
                     return;
                 }
                 historyCache = json.history || [];
+                console.log('✅ Fetched history entries:', historyCache.length);
+                console.log('📦 Sample entries:', historyCache.slice(0, 3).map(e => ({ 
+                    id: e.id, 
+                    sessionId: e.sessionId, 
+                    input: e.input?.substring(0, 30) 
+                })));
                 renderHistoryList(historyCache);
             } catch (e) {
-                console.error('fetch history error', e);
+                console.error('❌ fetch history error', e);
             }
         }
 
-        // Group & render history thành LIST CUỘC TRÒ CHUYỆN
+        // Group & render history thành LIST CUỘC TRÒ CHUYỆN với nút 3 chấm
         function renderHistoryList(list) {
           historyListEl.innerHTML = '';
           if (!list || list.length === 0) {
@@ -1834,68 +1943,227 @@
             return;
           }
           // Gom theo sessionId
-
           const sessions = {};
           list.forEach(entry => {
             const sid = entry.sessionId || ('legacy-' + entry.id);
-            if (!sessions[sid]) sessions[sid] = [];
-            sessions[sid].push(entry);
+            if (!sessions[sid]) sessions[sid] = { title: '', entries: [] };
+            sessions[sid].entries.push(entry);
+            // Lưu title nếu có
+            if (entry.conversationTitle) {
+              sessions[sid].title = entry.conversationTitle;
+            }
           });
-          // Sắp xếp session theo newest timestamp (lớn nhất)
-          const sessionArray = Object.entries(sessions).map(([sid, entries]) => {
-            const newestTs = Math.max(...entries.map(e => new Date(e.timestamp).getTime()));
-            return { sid, entries, newestTs };
+          
+          // Sắp xếp session theo newest timestamp
+          const sessionArray = Object.entries(sessions).map(([sid, data]) => {
+            const newestTs = Math.max(...data.entries.map(e => new Date(e.timestamp).getTime()));
+            return { sid, ...data, newestTs };
           }).sort((a,b) => b.newestTs - a.newestTs);
 
           sessionArray.forEach(sess => {
-            // Lấy message user đầu tiên của session (cũ nhất type chat/diagnose có input)
-            const chronological = [...sess.entries].sort((a,b)=> new Date(a.timestamp)-new Date(b.timestamp));
-            const first = chronological.find(e => e.input && e.input.trim()) || chronological[chronological.length-1];
-            const title = (first.input || 'Cuộc trò chuyện').slice(0,60) + (first.input && first.input.length>60 ? '...' : '');
-            const timeLabel = new Date(sess.newestTs).toLocaleString();
+            // Lấy title từ stored hoặc message user đầu tiên
+            let title = sess.title;
+            if (!title) {
+              const chronological = [...sess.entries].sort((a,b)=> new Date(a.timestamp)-new Date(b.timestamp));
+              const first = chronological.find(e => e.input && e.input.trim()) || chronological[0];
+              title = (first?.input || 'Cuộc trò chuyện').slice(0,60);
+              if (first?.input && first.input.length > 60) title += '...';
+            }
+            
+            const timeLabel = new Date(sess.newestTs).toLocaleString('vi-VN');
             const li = document.createElement('li');
             li.dataset.session = sess.sid;
-            li.innerHTML = `<div style="display:flex; flex-direction:column; gap:4px;">
+            li.innerHTML = `
+              <div class="history-title" onclick="openConversation('${sess.sid}')">
                 <div style="font-size:13px; color:var(--text-color); font-weight:600;">${escapeHtml(title)}</div>
-                <div style="font-size:11px; color:var(--text-secondary-color);">${escapeHtml(timeLabel)} • ${sess.entries.length} lượt</div>
-              </div>`;
-            li.onclick = () => openConversation(sess.sid);
+                <div style="font-size:11px; color:var(--text-secondary-color);">${escapeHtml(timeLabel)} • ${sess.entries.length} tin</div>
+              </div>
+              <button class="history-menu-btn" onclick="toggleHistoryMenu(event, '${sess.sid}')" title="Tùy chọn">
+                <i class="fas fa-ellipsis-h"></i>
+              </button>
+              <div class="history-dropdown" id="menu-${sess.sid}">
+                <button onclick="renameConversation('${sess.sid}')">
+                  <i class="fas fa-edit"></i> Đổi tên
+                </button>
+                <button onclick="deleteConversation('${sess.sid}')" style="color:var(--error-color);">
+                  <i class="fas fa-trash"></i> Xóa
+                </button>
+              </div>
+            `;
             historyListEl.appendChild(li);
           });
           historyActionsEl.innerHTML = ''; // bỏ nút cũ
         }
 
-        // Mở toàn bộ cuộc trò chuyện
-        function openConversation(sessionId) {
+        // Toggle menu 3 chấm
+        function toggleHistoryMenu(event, sessionId) {
+          event.stopPropagation();
+          const menu = document.getElementById(`menu-${sessionId}`);
+          const allMenus = document.querySelectorAll('.history-dropdown');
+          allMenus.forEach(m => {
+            if (m.id !== `menu-${sessionId}`) m.classList.remove('show');
+          });
+          menu.classList.toggle('show');
+        }
+
+        // Đóng menu khi click ra ngoài
+        document.addEventListener('click', () => {
+          document.querySelectorAll('.history-dropdown').forEach(m => m.classList.remove('show'));
+        });
+
+        // Rename conversation
+        function renameConversation(sessionId) {
+          const entries = historyCache.filter(e => (e.sessionId || ('legacy-'+e.id)) === sessionId);
+          if (!entries.length) return;
+          
+          const currentTitle = entries.find(e => e.conversationTitle)?.conversationTitle || 
+                              entries.find(e => e.input)?.input?.slice(0,60) || 
+                              'Cuộc trò chuyện';
+          
+          const newTitle = prompt('Nhập tên mới cho cuộc trò chuyện:', currentTitle);
+          if (newTitle && newTitle.trim()) {
+            // Lưu title vào entry đầu tiên của session
+            entries[0].conversationTitle = newTitle.trim();
+            localStorage.setItem('jaremis_history', JSON.stringify(historyCache));
+            renderHistoryList(historyCache);
+          }
+        }
+
+        // Delete conversation
+        function deleteConversation(sessionId) {
+          if (!confirm('Bạn có chắc muốn xóa cuộc trò chuyện này?')) return;
+          
+          // Xóa tất cả entries của session
+          historyCache = historyCache.filter(e => (e.sessionId || ('legacy-'+e.id)) !== sessionId);
+          localStorage.setItem('jaremis_history', JSON.stringify(historyCache));
+          renderHistoryList(historyCache);
+          
+          // Nếu đang xem session này, clear chat
+          if (currentSessionId === sessionId) {
+            chatMessages.innerHTML = '';
+            currentSessionId = null;
+            localStorage.removeItem('jaremis_session');
+          }
+        }
+
+        // Mở toàn bộ cuộc trò chuyện - FIX: đảm bảo hiển thị đầy đủ
+        async function openConversation(sessionId) {
+          console.log('🔍 Opening conversation:', sessionId);
+          console.log('📦 historyCache total entries:', historyCache.length);
+          
+          // 🔥 FIX: Nếu historyCache rỗng, fetch lại từ server
+          if (historyCache.length === 0) {
+            console.warn('⚠️ historyCache is empty, fetching from server...');
+            const user = getLocalUser();
+            if (user) {
+              await fetchAndRenderHistory(user.username);
+              console.log('✅ Re-fetched history, new cache size:', historyCache.length);
+            }
+          }
+          
           const convoEntries = historyCache.filter(e => (e.sessionId || ('legacy-'+e.id)) === sessionId)
             .sort((a,b)=> new Date(a.timestamp)-new Date(b.timestamp));
-          if (!convoEntries.length) return;
+          
+          console.log('✅ Found entries for this session:', convoEntries.length);
+          console.log('📋 Entries:', convoEntries.map(e => ({ input: e.input?.substring(0, 30), timestamp: e.timestamp, reply: e.reply?.substring(0, 30) })));
+          
+          if (!convoEntries.length) {
+            console.warn('❌ Không tìm thấy cuộc trò chuyện:', sessionId);
+            console.warn('❌ Available sessions:', [...new Set(historyCache.map(e => e.sessionId || ('legacy-'+e.id)))]);
+            return;
+          }
+          
           chatMessages.innerHTML = '';
-          convoEntries.forEach(entry => {
-            // User bubble
-            if (entry.input) {
-              chatMessages.innerHTML += `<div class="chat-bubble user-bubble"><div class="user-bubble-content"><p>${escapeHtml(entry.input)}</p></div></div>`;
-            }
-            // Bot / kết quả
-            if (entry.type === 'diagnose') {
-              chatMessages.innerHTML += `<div class="chat-bubble bot-bubble">
-                <div class="diagnosis-details">
-                  <div style="font-size:12px; color:var(--text-secondary-color); margin-bottom:6px;">Diagnose • ${new Date(entry.timestamp).toLocaleString()}</div>
-                  ${convertMarkdown(entry.diagnosis || '')}
-                </div>
-              </div>`;
-            } else {
-              chatMessages.innerHTML += `<div class="chat-bubble bot-bubble">
-                <div class="diagnosis-details">
-                  <div style="font-size:12px; color:var(--text-secondary-color); margin-bottom:6px;">Chat • ${new Date(entry.timestamp).toLocaleString()}</div>
-                  ${convertMarkdown(entry.reply || '')}
-                </div>
-              </div>`;
+          let successCount = 0;
+          let errorCount = 0;
+          
+          convoEntries.forEach((entry, idx) => {
+            try {
+              console.log(`📨 Rendering entry ${idx + 1}/${convoEntries.length}:`, {
+                input: entry.input?.substring(0, 30),
+                hasReply: !!entry.reply,
+                replyLength: entry.reply?.length || 0,
+                type: entry.type
+              });
+              
+              // User bubble
+              if (entry.input && entry.input.trim()) {
+                const userBubble = document.createElement('div');
+                userBubble.className = 'chat-bubble user-bubble';
+                userBubble.innerHTML = `<div class="user-bubble-content"><p>${escapeHtml(entry.input)}</p></div>`;
+                chatMessages.appendChild(userBubble);
+                console.log(`  ✅ Added user bubble for: "${entry.input.substring(0, 20)}"`);
+                successCount++;
+              }
+              
+              // Bot reply
+              let botContent = '';
+              if (entry.type === 'diagnose' && entry.diagnosis) {
+                botContent = entry.diagnosis;
+              } else if (entry.reply) {
+                botContent = entry.reply;
+              }
+              
+              if (botContent && botContent.trim()) {
+                try {
+                  const botBubble = document.createElement('div');
+                  botBubble.className = 'chat-bubble bot-bubble';
+                  
+                  // 🔥 FIX: Safely convert markdown with fallback
+                  let renderedContent = botContent;
+                  try {
+                    if (typeof convertMarkdown === 'function') {
+                      renderedContent = convertMarkdown(botContent);
+                    }
+                  } catch (mdError) {
+                    console.error(`  ❌ Markdown conversion error for entry ${idx + 1}:`, mdError);
+                    // Fallback: Use plain text with line breaks
+                    renderedContent = botContent.replace(/\n/g, '<br>');
+                  }
+                  
+                  botBubble.innerHTML = `
+                    <div class="diagnosis-details">
+                      <div style="font-size:12px; color:var(--text-secondary-color); margin-bottom:6px;">
+                        ${entry.type === 'diagnose' ? 'Chẩn đoán' : 'Trả lời'} • ${new Date(entry.timestamp).toLocaleString('vi-VN')}
+                      </div>
+                      ${renderedContent}
+                    </div>
+                  `;
+                  chatMessages.appendChild(botBubble);
+                  console.log(`  ✅ Added bot bubble (${botContent.length} chars)`);
+                  successCount++;
+                } catch (bubbleError) {
+                  console.error(`  ❌ Error creating bot bubble for entry ${idx + 1}:`, bubbleError);
+                  errorCount++;
+                }
+              } else {
+                console.warn(`  ⚠️ No bot reply for entry ${idx + 1}`);
+              }
+            } catch (entryError) {
+              console.error(`❌ Error rendering entry ${idx + 1}:`, entryError);
+              errorCount++;
             }
           });
+          
+          console.log(`\n📊 Render Summary:`);
+          console.log(`  ✅ Successfully rendered: ${successCount} bubbles`);
+          console.log(`  ❌ Errors: ${errorCount}`);
+          console.log(`  📦 Expected: ${convoEntries.length * 2} bubbles (${convoEntries.length} user + ${convoEntries.length} bot)`);
+          
           chatMessages.scrollTop = chatMessages.scrollHeight;
-          currentSessionId = sessionId; // tiếp tục vào phiên này nếu người dùng muốn
+          currentSessionId = sessionId;
           localStorage.setItem('jaremis_session', currentSessionId);
+          
+          // 🔍 DEBUG: Kiểm tra số lượng chat bubbles đã render
+          const totalBubbles = chatMessages.querySelectorAll('.chat-bubble').length;
+          console.log(`✅ Rendered ${totalBubbles} chat bubbles in DOM`);
+          console.log(`📊 Expected: ${convoEntries.length} user bubbles + ${convoEntries.filter(e => e.reply || e.diagnosis).length} bot bubbles = ${convoEntries.length + convoEntries.filter(e => e.reply || e.diagnosis).length} total`);
+          
+          // Đánh dấu active trong history list
+          document.querySelectorAll('.history li').forEach(li => {
+            li.style.background = li.dataset.session === sessionId ? '#111720' : 'transparent';
+            li.style.borderColor = li.dataset.session === sessionId ? 'var(--border-color)' : 'transparent';
+          });
         }
 
         // ------------------------------
@@ -2565,6 +2833,27 @@
                 
                 // Show send button again
                 showSendButton();
+
+                // ========================================
+                // 🔥 FIX: ĐỒNG BỘ LỊCH SỬ TỪ SERVER REAL-TIME
+                // ========================================
+                const user = getLocalUser();
+                if (user) {
+                    // Fetch lại history từ server để đảm bảo đồng bộ
+                    // (Backend đã lưu vào users.json, giờ cần pull về frontend)
+                    await fetchAndRenderHistory(user.username);
+                    console.log('✅ Đã đồng bộ lịch sử từ server');
+                    
+                    // Đánh dấu session hiện tại là active trong history list
+                    setTimeout(() => {
+                        document.querySelectorAll('.history li').forEach(li => {
+                            if (li.dataset.session === currentSessionId) {
+                                li.style.background = '#111720';
+                                li.style.borderColor = 'var(--border-color)';
+                            }
+                        });
+                    }, 100);
+                }
 
                 // Render response
                 if (diagnosticMode) {
@@ -3737,6 +4026,334 @@ async function renderBotReplyAnimated(bubbleElement, htmlContent) {
     
     return { finish: () => {}, replace: (html) => { wrapper.innerHTML = html; } };
 }
+</script>
+
+<script>
+// ==== FIX 1: NEW CONVERSATION FUNCTION ====
+function startNewConversation() {
+  // Tạo session ID mới
+  currentSessionId = 'session-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+  localStorage.setItem('jaremis_session', currentSessionId);
+  
+  // Clear chat messages
+  chatMessages.innerHTML = '';
+  
+  // Bỏ highlight tất cả history items
+  document.querySelectorAll('.history li').forEach(li => {
+    li.style.background = 'transparent';
+    li.style.borderColor = 'transparent';
+  });
+  
+  // Focus vào input
+  chatInput.focus();
+  
+  console.log('🆕 Bắt đầu cuộc trò chuyện mới:', currentSessionId);
+}
+
+// ==== FIX 3: ADVANCED SEARCH MODAL (2 MODES) ====
+let currentSearchMode = 'questions'; // 'questions' or 'conversations'
+let searchCacheData = [];
+
+// Override openFindModal
+const originalOpenFindModal = window.openFindModal;
+window.openFindModal = function(){
+  const b = document.getElementById('find-backdrop');
+  if(!b) return;
+  b.style.display='flex';
+  const inp = document.getElementById('find-query');
+  setTimeout(()=>inp.focus(),30);
+  
+  // Build search cache
+  buildSearchCacheData();
+}
+
+// Override closeFindModal
+const originalCloseFindModal = window.closeFindModal;
+window.closeFindModal = function(){
+  const b = document.getElementById('find-backdrop');
+  if(b) b.style.display='none';
+  const inp = document.getElementById('find-query');
+  if(inp) inp.value = '';
+  const resultsDiv = document.getElementById('search-results');
+  if(resultsDiv) {
+    resultsDiv.innerHTML = `
+      <div style="text-align:center;color:var(--text-secondary-color);padding:40px 20px;">
+        <i class="fas fa-search" style="font-size:48px;opacity:0.3;margin-bottom:16px;"></i>
+        <div>Nhập từ khóa để tìm kiếm</div>
+      </div>
+    `;
+  }
+}
+
+function switchSearchTab(mode) {
+  currentSearchMode = mode;
+  document.querySelectorAll('.search-tab').forEach(tab => {
+    tab.classList.remove('active');
+    tab.style.borderBottomColor = 'transparent';
+    tab.style.color = 'var(--text-secondary-color)';
+  });
+  
+  const activeTab = document.getElementById(`search-tab-${mode}`);
+  if(activeTab) {
+    activeTab.classList.add('active');
+    activeTab.style.borderBottomColor = 'var(--accent-color)';
+    activeTab.style.color = 'var(--accent-color)';
+  }
+  
+  // Re-search với mode mới
+  const query = document.getElementById('find-query')?.value;
+  if (query) performSearchAdvanced(query);
+}
+
+function buildSearchCacheData() {
+  searchCacheData = [];
+  const sessions = {};
+  
+  // Group by session
+  if(!historyCache || !historyCache.length) return;
+  
+  historyCache.forEach(entry => {
+    const sid = entry.sessionId || ('legacy-' + entry.id);
+    if (!sessions[sid]) {
+      sessions[sid] = {
+        id: sid,
+        title: entry.conversationTitle || '',
+        messages: []
+      };
+    }
+    
+    if (entry.input && entry.input.trim()) {
+      sessions[sid].messages.push({
+        type: 'user',
+        text: entry.input,
+        timestamp: entry.timestamp,
+        fullEntry: entry
+      });
+    }
+    
+    const reply = entry.type === 'diagnose' ? entry.diagnosis : entry.reply;
+    if (reply && reply.trim()) {
+      sessions[sid].messages.push({
+        type: 'bot',
+        text: reply,
+        timestamp: entry.timestamp,
+        fullEntry: entry
+      });
+    }
+  });
+  
+  // Generate search cache
+  Object.values(sessions).forEach(session => {
+    // Set title if not exists
+    if (!session.title && session.messages.length > 0) {
+      const firstUserMsg = session.messages.find(m => m.type === 'user');
+      session.title = firstUserMsg ? firstUserMsg.text.slice(0, 60) : 'Cuộc trò chuyện';
+    }
+    
+    session.messages.forEach((msg, idx) => {
+      searchCacheData.push({
+        sessionId: session.id,
+        sessionTitle: session.title,
+        messageIndex: idx,
+        messageType: msg.type,
+        messageText: msg.text,
+        timestamp: msg.timestamp,
+        fullEntry: msg.fullEntry
+      });
+    });
+  });
+}
+
+function performSearchAdvanced(query) {
+  const resultsDiv = document.getElementById('search-results');
+  if(!resultsDiv) return;
+  
+  if (!query || !query.trim()) {
+    resultsDiv.innerHTML = `
+      <div style="text-align:center;color:var(--text-secondary-color);padding:40px 20px;">
+        <i class="fas fa-search" style="font-size:48px;opacity:0.3;margin-bottom:16px;"></i>
+        <div>Nhập từ khóa để tìm kiếm</div>
+      </div>
+    `;
+    return;
+  }
+  
+  const q = query.toLowerCase();
+  let results = [];
+  
+  if (currentSearchMode === 'questions') {
+    // Tìm câu hỏi
+    results = searchCacheData.filter(item => 
+      item.messageType === 'user' && item.messageText.toLowerCase().includes(q)
+    );
+    
+    if (results.length === 0) {
+      resultsDiv.innerHTML = `
+        <div style="text-align:center;color:var(--text-secondary-color);padding:40px 20px;">
+          <i class="fas fa-search" style="font-size:48px;opacity:0.3;margin-bottom:16px;"></i>
+          <div>Không tìm thấy câu hỏi nào</div>
+        </div>
+      `;
+    } else {
+      resultsDiv.innerHTML = results.map(r => {
+        const highlighted = highlightSearchText(r.messageText, query);
+        return `
+          <div class="search-result-item" onclick="goToMessageAdvanced('${r.sessionId}', ${r.messageIndex})">
+            <div class="search-result-question">${highlighted}</div>
+            <div class="search-result-meta">
+              <i class="fas fa-comments"></i>
+              <span>${escapeHtml(r.sessionTitle)}</span>
+              <span>•</span>
+              <span>${new Date(r.timestamp).toLocaleString('vi-VN')}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  } else {
+    // Tìm cuộc trò chuyện
+    const sessions = {};
+    historyCache.forEach(entry => {
+      const sid = entry.sessionId || ('legacy-' + entry.id);
+      if (!sessions[sid]) {
+        const title = entry.conversationTitle || 
+                     entry.input?.slice(0, 60) || 
+                     'Cuộc trò chuyện';
+        sessions[sid] = { id: sid, title, count: 0 };
+      }
+      sessions[sid].count++;
+    });
+    
+    results = Object.values(sessions).filter(s => 
+      s.title.toLowerCase().includes(q)
+    );
+    
+    if (results.length === 0) {
+      resultsDiv.innerHTML = `
+        <div style="text-align:center;color:var(--text-secondary-color);padding:40px 20px;">
+          <i class="fas fa-search" style="font-size:48px;opacity:0.3;margin-bottom:16px;"></i>
+          <div>Không tìm thấy cuộc trò chuyện nào</div>
+        </div>
+      `;
+    } else {
+      resultsDiv.innerHTML = results.map(r => {
+        const highlighted = highlightSearchText(r.title, query);
+        return `
+          <div class="search-result-item" onclick="openConversation('${r.id}'); closeFindModal();">
+            <div class="search-result-question">${highlighted}</div>
+            <div class="search-result-meta">
+              <i class="fas fa-history"></i>
+              <span>${r.count} tin nhắn</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+}
+
+function highlightSearchText(text, query) {
+  const regex = new RegExp(`(${escapeRegExp(query)})`, 'gi');
+  return escapeHtml(text).replace(regex, '<span class="search-highlight">$1</span>');
+}
+
+function goToMessageAdvanced(sessionId, messageIndex) {
+  openConversation(sessionId);
+  closeFindModal();
+  
+  // Scroll to message
+  setTimeout(() => {
+    const bubbles = chatMessages.querySelectorAll('.chat-bubble');
+    if (bubbles[messageIndex]) {
+      bubbles[messageIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+      bubbles[messageIndex].style.animation = 'pulse-highlight 1s';
+    }
+  }, 200);
+}
+
+// Add pulse animation
+if(!document.getElementById('search-pulse-animation')) {
+  const style = document.createElement('style');
+  style.id = 'search-pulse-animation';
+  style.textContent = `
+    @keyframes pulse-highlight {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(47, 129, 247, 0.4); }
+      50% { transform: scale(1.02); box-shadow: 0 0 20px 10px rgba(47, 129, 247, 0.2); }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+// Listen to search input with debounce
+let searchTimeout;
+setTimeout(() => {
+  const searchInput = document.getElementById('find-query');
+  if(searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        performSearchAdvanced(e.target.value);
+      }, 300);
+    });
+  }
+}, 1000);
+
+// ==== FIX 4: HISTORY MENU (3 chấm) ====
+function toggleHistoryMenu(event, sessionId) {
+  event.stopPropagation();
+  const menu = document.getElementById(`menu-${sessionId}`);
+  if(!menu) return;
+  
+  const allMenus = document.querySelectorAll('.history-dropdown');
+  allMenus.forEach(m => {
+    if (m.id !== `menu-${sessionId}`) m.classList.remove('show');
+  });
+  menu.classList.toggle('show');
+}
+
+// Đóng menu khi click ra ngoài
+document.addEventListener('click', (e) => {
+  if(!e.target.closest('.history-menu-btn')) {
+    document.querySelectorAll('.history-dropdown').forEach(m => m.classList.remove('show'));
+  }
+});
+
+// Rename conversation
+function renameConversation(sessionId) {
+  const entries = historyCache.filter(e => (e.sessionId || ('legacy-'+e.id)) === sessionId);
+  if (!entries.length) return;
+  
+  const currentTitle = entries.find(e => e.conversationTitle)?.conversationTitle || 
+                      entries.find(e => e.input)?.input?.slice(0,60) || 
+                      'Cuộc trò chuyện';
+  
+  const newTitle = prompt('Nhập tên mới cho cuộc trò chuyện:', currentTitle);
+  if (newTitle && newTitle.trim()) {
+    // Lưu title vào entry đầu tiên của session
+    entries[0].conversationTitle = newTitle.trim();
+    localStorage.setItem('jaremis_history', JSON.stringify(historyCache));
+    renderHistoryList(historyCache);
+  }
+}
+
+// Delete conversation
+function deleteConversation(sessionId) {
+  if (!confirm('Bạn có chắc muốn xóa cuộc trò chuyện này?')) return;
+  
+  // Xóa tất cả entries của session
+  historyCache = historyCache.filter(e => (e.sessionId || ('legacy-'+e.id)) !== sessionId);
+  localStorage.setItem('jaremis_history', JSON.stringify(historyCache));
+  renderHistoryList(historyCache);
+  
+  // Nếu đang xem session này, clear chat
+  if (currentSessionId === sessionId) {
+    chatMessages.innerHTML = '';
+    currentSessionId = null;
+    localStorage.removeItem('jaremis_session');
+  }
+}
+
+console.log('✅ JAREMIS: All fixes loaded successfully!');
 </script>
 </body>
 </html>
