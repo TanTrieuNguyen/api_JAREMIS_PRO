@@ -21,6 +21,9 @@ const severityAssessment = require('./severityAssessment');
 // NEW: Smart Symptom Search - AI-powered keyword extraction & source selection
 const { smartSymptomSearch } = require('./smartSymptomSearch');
 
+// NEW: Medical Image Analysis - X-ray, MRI, CT, PET scan, Ultrasound, ECG
+const medicalImageAnalysis = require('./medicalImageAnalysis');
+
 const app = express();
 const upload = multer({ dest: 'uploads/' });
 
@@ -125,72 +128,50 @@ function ensureUsersFile() {
 }
 ensureUsersFile();
 
-// === Google Drive sync for users.json ===
-const { readUsersData, updateUsersData } = require('./driveJsonService');
-const DRIVE_USERS_FILE_ID = process.env.DRIVE_USERS_FILE_ID || '1ame57YNTu-GADOjVxeUtoK7cy0VZmvDj';
+// === LOCAL FILE STORAGE FOR USERS (NO GOOGLE DRIVE) ===
+// Đã tắt Google Drive sync để dễ deploy lên Render
 
-// === Google Drive client helper ===
-async function getDriveClient() {
-  const auth = new google.auth.GoogleAuth({
-    keyFile: process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH, // Đường dẫn file JSON
-    scopes: ['https://www.googleapis.com/auth/drive'],
-  });
-  return google.drive({ version: 'v3', auth });
-}
-
-// Đọc users từ Google Drive (nếu có fileId), fallback về file local nếu lỗi
-async function readUsers() {
+// Đọc users từ file cục bộ users.json
+function readUsers() {
     try {
-        const data = await readUsersData(); // đọc từ Drive
-        const users = JSON.parse(data);
+        const localData = fs.readFileSync(usersPath, 'utf8');
+        const users = JSON.parse(localData);
         if (Array.isArray(users)) return users;
         return [];
-    } catch (err) {
-        // fallback về file local
-        try {
-            const localData = fs.readFileSync('users.json', 'utf8');
-            const users = JSON.parse(localData);
-            if (Array.isArray(users)) return users;
-            return [];
-        } catch (e) {
-            return [];
-        }
+    } catch (e) {
+        console.warn('⚠️ Không đọc được users.json:', e.message);
+        return [];
     }
 }
 
-// Ghi users lên Google Drive (nếu có fileId), đồng thời ghi file local
-async function saveUsers(users) {
+// Ghi users vào file cục bộ users.json
+function saveUsers(users) {
   const data = JSON.stringify(users, null, 2);
   fs.writeFileSync(usersPath, data, 'utf8');
-  if (DRIVE_USERS_FILE_ID) {
-    try {
-      const auth = await getDriveClient();
-      await updateUsersData(auth, DRIVE_USERS_FILE_ID, users);
-    } catch(e) { console.error('Lỗi ghi users lên Drive:', e); }
-  }
+  console.log('✅ Đã lưu users.json (local file)');
 }
-async function findUserByUsername(username) {
+function findUserByUsername(username) {
   if (!username) return null;
-  const users = await readUsers();
+  const users = readUsers();
   return users.find(u => u.username && u.username.toLowerCase() === username.toLowerCase()) || null;
 }
-async function pushUserHistory(username, historyEntry, maxItems = 500) {
+function pushUserHistory(username, historyEntry, maxItems = 500) {
   try {
-    const users = await readUsers();
+    const users = readUsers();
     const idx = users.findIndex(u => u.username && u.username.toLowerCase() === username.toLowerCase());
     if (idx === -1) return false;
     if (!Array.isArray(users[idx].history)) users[idx].history = [];
     users[idx].history.unshift(historyEntry);
     if (users[idx].history.length > maxItems) users[idx].history = users[idx].history.slice(0, maxItems);
-    await saveUsers(users);
+    saveUsers(users);
     return true;
   } catch (e) {
     console.error('Lỗi khi lưu lịch sử người dùng', e);
     return false;
   }
 }
-async function getRecentChatHistory(username, limit = 360, maxChars = 360000) {
-  const user = await findUserByUsername(username);
+function getRecentChatHistory(username, limit = 360, maxChars = 360000) {
+  const user = findUserByUsername(username);
   if (!user || !Array.isArray(user.history)) return [];
   const chats = user.history.filter(h => h.type === 'chat');
   const recent = chats.slice(0, limit).reverse();
@@ -702,26 +683,27 @@ async function getCandidateModels(requested = 'flash', needVision = false) {
 /* --------------------------
    Auth endpoints (unchanged)
    -------------------------- */
-app.post('/api/register', async (req, res) => {
+app.post('/api/register', (req, res) => {
   try {
     const { username, email, password } = req.body || {};
     if (!username || !email || !password) return res.status(400).json({ error: 'Vui lòng gửi username, email và password' });
-    let users = await readUsers();
+    let users = readUsers();
     if (users.find(u => u.username.toLowerCase() === username.toLowerCase())) return res.status(400).json({ error: 'Tên đăng nhập đã tồn tại' });
     if (users.find(u => u.email.toLowerCase() === email.toLowerCase())) return res.status(400).json({ error: 'Email đã được sử dụng' });
     const salt = bcrypt.genSaltSync(10);
     const hash = bcrypt.hashSync(password, salt);
     const newUser = { id: Date.now(), username, email, passwordHash: hash, createdAt: new Date().toISOString(), history: [] };
-    users.push(newUser); await saveUsers(users);
+    users.push(newUser); 
+    saveUsers(users);
     return res.json({ success: true, user: { username: newUser.username, email: newUser.email } });
   } catch (e) { console.error('Register error:', e); return res.status(500).json({ error: 'Lỗi server khi đăng ký' }); }
 });
 
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', (req, res) => {
   try {
     const { usernameOrEmail, password } = req.body || {};
     if (!usernameOrEmail || !password) return res.status(400).json({ error: 'Vui lòng gửi username/email và password' });
-    const users = await readUsers();
+    const users = readUsers();
     const user = users.find(u => u.username.toLowerCase() === usernameOrEmail.toLowerCase() || u.email.toLowerCase() === usernameOrEmail.toLowerCase());
     if (!user) return res.status(401).json({ error: 'Không tìm thấy tài khoản' });
     const match = bcrypt.compareSync(password, user.passwordHash);
@@ -733,25 +715,40 @@ app.post('/api/login', async (req, res) => {
 /* --------------------------
    History endpoints (unchanged)
    -------------------------- */
-app.get('/api/history', async (req, res) => {
+app.get('/api/history', (req, res) => {
   try {
     const username = req.query.username;
+    console.log('📋 [GET /api/history] Username:', username);
     if (!username) return res.status(400).json({ error: 'Thiếu tham số username' });
-    const user = await findUserByUsername(username);
-    if (!user) return res.json({ history: [] });
+    const user = findUserByUsername(username);
+    if (!user) {
+      console.log('❌ [GET /api/history] User not found');
+      return res.json({ history: [] });
+    }
+    console.log('✅ [GET /api/history] Found user, history entries:', user.history?.length || 0);
+    if (user.history && user.history.length > 0) {
+      console.log('📦 [GET /api/history] Sample entries:', user.history.slice(0, 3).map(e => ({
+        id: e.id,
+        sessionId: e.sessionId,
+        input: e.input?.substring(0, 30)
+      })));
+    }
     return res.json({ history: user.history || [] });
-  } catch (e) { console.error('Get history error', e); return res.status(500).json({ error: 'Lỗi server khi lấy lịch sử' }); }
+  } catch (e) { 
+    console.error('❌ [GET /api/history] Error:', e); 
+    return res.status(500).json({ error: 'Lỗi server khi lấy lịch sử' }); 
+  }
 });
 
-app.delete('/api/history', async (req, res) => {
+app.delete('/api/history', (req, res) => {
   try {
     const username = req.query.username;
     if (!username) return res.status(400).json({ error: 'Thiếu tham số username' });
-    const users = await readUsers();
+    const users = readUsers();
     const idx = users.findIndex(u => u.username && u.username.toLowerCase() === username.toLowerCase());
     if (idx === -1) return res.status(404).json({ error: 'Không tìm thấy user' });
     users[idx].history = [];
-    await saveUsers(users);
+    saveUsers(users);
     return res.json({ success: true });
   } catch (e) { console.error('Delete history error', e); return res.status(500).json({ error: 'Lỗi server khi xóa lịch sử' }); }
 });
@@ -1035,7 +1032,7 @@ app.post('/api/chat', upload.array('images'), async (req, res) => {
 **ĐẠO ĐỨC & GIỚI HẠN:**
 - Y khoa: KHÔNG chẩn đoán chi tiết → Gợi ý dùng chế độ "Diagnose" + tham khảo bác sĩ
 - Nội dung nhạy cảm (tự tử, bạo lực, thù hằn): Trấn an, khuyến khích giúp đỡ chuyên nghiệp
-- Tuân thủ pháp luật Việt Nam, từ chối nội dung vi phạm/độc hại
+- Tuân thủ pháp luật Thế Giới, từ chối nội dung vi phạm/độc hại. Tuy nhiên khi người dùng đưa ảnh Xquang, MRI, CT, PED scan hay các loại tương tự, bạn có thể phân tích hình ảnh đó một cách bình thường mà không vi phạm bất kỳ quy định nào của pháp luật.
 - Không bịa đặt, không đưa phác đồ thuốc chi tiết
 
 **NGUYÊN TẮC TRẢ LỜI:**
@@ -1044,6 +1041,7 @@ app.post('/api/chat', upload.array('images'), async (req, res) => {
 - Dùng markdown heading (##, ###), bảng, bullet points
 - Ưu tiên [THÔNG TIN MỚI NHẤT TỪ WEB] nếu có
 - Thân thiện, đồng cảm, tôn trọng người dùng
+
 
 **FORMAT BẮT BUỘC:**
 ## 🔍 Heading
@@ -1135,8 +1133,31 @@ Nếu thấy "DATA_TABLE_FORECAST:" hoặc "DATA_TABLE_CURRENT:" trong thông ti
 
     // Process images if any (for multi-modal chat)
     const imageParts = [];
+    let imageAnalysisSection = '';
+    
     if (files.length > 0) {
       console.log(`📷 Processing ${files.length} images in chat mode...`);
+      
+      // Detect if images are medical (X-ray, CT, MRI, etc.)
+      const medicalImagePatterns = /(xray|x-ray|ct|mri|pet|ultrasound|ecg|ekg|scan|medical|mammogram|derma)/i;
+      const hasMedicalImages = files.some(f => 
+        medicalImagePatterns.test(f.originalname || '') || isSymptomQuery
+      );
+      
+      if (hasMedicalImages) {
+        console.log('🏥 Detected medical images, performing specialized analysis...');
+        try {
+          const patientContext = `Câu hỏi của bệnh nhân: ${message}`;
+          const imageAnalyses = await medicalImageAnalysis.analyzeMedicalImages(files, genAI, patientContext);
+          imageAnalysisSection = medicalImageAnalysis.formatImageAnalysisReport(imageAnalyses);
+          console.log('✅ Medical image analysis completed');
+        } catch (err) {
+          console.error('❌ Medical image analysis failed:', err);
+          imageAnalysisSection = '\n⚠️ Không thể phân tích ảnh y tế. Vui lòng thử lại.\n';
+        }
+      }
+      
+      // Prepare images for AI (always include for multi-modal understanding)
       for (const file of files) {
         try {
           const imageBase64 = fs.readFileSync(file.path).toString('base64');
@@ -1150,6 +1171,11 @@ Nếu thấy "DATA_TABLE_FORECAST:" hoặc "DATA_TABLE_CURRENT:" trong thông ti
         }
       }
     }
+    
+    // Update prompt with image analysis if available
+    const finalPrompt = imageAnalysisSection 
+      ? `${fullPrompt}\n${imageAnalysisSection}\n\nDựa trên phân tích hình ảnh y tế ở trên, hãy trả lời câu hỏi của người dùng.`
+      : fullPrompt;
 
     // Strict timeout for flash
     const doGenerate = async (id) => {
@@ -1159,8 +1185,8 @@ Nếu thấy "DATA_TABLE_FORECAST:" hoặc "DATA_TABLE_CURRENT:" trong thông ti
       
       // Combine prompt with images if any
       const contentParts = imageParts.length > 0 
-        ? [fullPrompt, ...imageParts]
-        : [fullPrompt];
+        ? [finalPrompt, ...imageParts]
+        : [finalPrompt];
       
       return Promise.race([
         model.generateContent(contentParts),
@@ -1189,7 +1215,7 @@ Nếu thấy "DATA_TABLE_FORECAST:" hoặc "DATA_TABLE_CURRENT:" trong thông ti
           const entry = { id: Date.now(), sessionId, type: 'chat', timestamp: new Date().toISOString(), input: message, reply: fallback, modelUsed: `${displayModel}-timeout`, detectedLang: userLang, langScore: detected.score };
           pushSessionHistory(sessionId, entry);
         }
-        return res.json({ success: true, reply: fallback, replyHtml: renderLatexInText(fallback), modelUsed: `${displayModel}-timeout`, detectedLang: userLang, detectionScore: detected.score, detectionReasons: detected.reasons });
+        return res.json({ success: true, reply: fallback, modelUsed: `${displayModel}-timeout`, detectedLang: userLang, detectionScore: detected.score });
       }
       // Try fallback model on other errors
       try {
@@ -1320,25 +1346,23 @@ app.post('/api/diagnose', upload.array('images'), async (req, res) => {
     }
 
     // ========================================
-    // 3. IMAGE ANALYSIS (Multi-modal AI)
+    // 3. IMAGE ANALYSIS (Multi-modal AI) - ENHANCED
     // ========================================
     const imageParts = [];
-    const imageAnalyses = [];
+    let imageAnalyses = [];
     
-    for (const file of files) {
-      const imageBase64 = fs.readFileSync(file.path).toString('base64');
-      imageParts.push({
-        inlineData: { data: imageBase64, mimeType: file.mimetype }
-      });
+    if (files.length > 0) {
+      // Use new medical image analysis module
+      const patientContext = `Triệu chứng: ${symptoms}\nXét nghiệm: ${labResults}`;
+      imageAnalyses = await medicalImageAnalysis.analyzeMedicalImages(files, genAI, patientContext);
       
-      // Detect image type from filename or use default
-      const imageType = file.originalname.toLowerCase().includes('xray') ? 'xray' :
-                       file.originalname.toLowerCase().includes('ct') ? 'ct' :
-                       file.originalname.toLowerCase().includes('ecg') ? 'ecg' :
-                       file.originalname.toLowerCase().includes('skin') ? 'dermatology' : 'xray';
-      
-      const analysis = await diagnosisEngine.analyzeMedialImage(imageBase64, imageType, genAI);
-      imageAnalyses.push({ filename: file.originalname, type: imageType, analysis });
+      // Prepare image parts for AI
+      for (const file of files) {
+        const imageBase64 = fs.readFileSync(file.path).toString('base64');
+        imageParts.push({
+          inlineData: { data: imageBase64, mimeType: file.mimetype }
+        });
+      }
     }
 
     // ========================================
@@ -1355,7 +1379,7 @@ ${labResults ? `\n**Kết quả xét nghiệm:**\n${labResults}\n` : ''}
 ${labAnalysis && labAnalysis.abnormal.length > 0 ? `\n**Chỉ số bất thường:**\n${labAnalysis.abnormal.map(a => `- ${a.name}: ${a.value} (${a.status}) - ${a.severity}`).join('\n')}\n` : ''}
 ${news2Score ? `\n**NEWS2 Score:** ${news2Score.score}/20 - ${news2Score.risk} RISK\n` : ''}
 ${vitalSigns ? `\n**Sinh hiệu:** HR=${vitalSigns.heartRate}, RR=${vitalSigns.respiratoryRate}, BP=${vitalSigns.systolicBP}/${vitalSigns.diastolicBP}, Temp=${vitalSigns.temperature}°C, SpO2=${vitalSigns.oxygenSaturation}%\n` : ''}
-${imageAnalyses.length > 0 ? `\n**Phân tích hình ảnh y tế:**\n${imageAnalyses.map((img, i) => `\n📷 **${img.filename}** (${img.type}):\n${img.analysis}\n`).join('\n')}\n` : ''}
+${imageAnalyses.length > 0 ? medicalImageAnalysis.formatImageAnalysisReport(imageAnalyses) : ''}
 
 **YÊU CẦU PHÂN TÍCH:**
 1. **Chẩn đoán phân biệt** với ICD-10 codes (tối đa 5 bệnh)
@@ -1769,23 +1793,20 @@ function getUserMemory(username) {
 
 function updateUserMemory(username, mutatorFn) {
   if (!username || typeof mutatorFn !== 'function') return;
-  // Đảm bảo luôn dùng async/await với Drive
-  (async () => {
-    const users = await readUsers();
-    const idx = users.findIndex(u => u.username &&
-      u.username.toLowerCase() === username.toLowerCase());
-    if (idx === -1) return;
-    if (!users[idx].memory) {
-      users[idx].memory = { summary: '', lastUpdated: null };
-    }
-    mutatorFn(users[idx].memory);
-    users[idx].memory.lastUpdated = new Date().toISOString();
-    // Giới hạn kích thước summary
-    if (users[idx].memory.summary.length > 1500) {
-      users[idx].memory.summary = users[idx].memory.summary.slice(-1500);
-    }
-    await saveUsers(users);
-  })();
+  const users = readUsers();
+  const idx = users.findIndex(u => u.username &&
+    u.username.toLowerCase() === username.toLowerCase());
+  if (idx === -1) return;
+  if (!users[idx].memory) {
+    users[idx].memory = { summary: '', lastUpdated: null };
+  }
+  mutatorFn(users[idx].memory);
+  users[idx].memory.lastUpdated = new Date().toISOString();
+  // Giới hạn kích thước summary
+  if (users[idx].memory.summary.length > 1500) {
+    users[idx].memory.summary = users[idx].memory.summary.slice(-1500);
+  }
+  saveUsers(users);
 }
 
 function extractFactsFromMessage(msg = '') {
