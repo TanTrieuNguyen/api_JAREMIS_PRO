@@ -2112,8 +2112,11 @@
                   // 🔥 FIX: Safely convert markdown with fallback
                   let renderedContent = botContent;
                   try {
-                    if (typeof convertMarkdown === 'function') {
-                      renderedContent = convertMarkdown(botContent);
+                    if (typeof marked !== 'undefined' && marked.parse) {
+                      renderedContent = marked.parse(botContent);
+                    } else {
+                      // Fallback: Use plain text with line breaks
+                      renderedContent = botContent.replace(/\n/g, '<br>');
                     }
                   } catch (mdError) {
                     console.error(`  ❌ Markdown conversion error for entry ${idx + 1}:`, mdError);
