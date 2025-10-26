@@ -1387,7 +1387,8 @@ ${imageAnalyses.length > 0 ? medicalImageAnalysis.formatImageAnalysisReport(imag
 3. **Độ tin cậy tổng thể** AI (0-100%)
 4. **Cơ sở y khoa:** Giải thích dựa trên triệu chứng, xét nghiệm, hình ảnh
 5. **Khuyến nghị tiếp theo:** Xét nghiệm thêm, can thiệp
-6. **Nguồn tham khảo:** WHO Guidelines, CDC, AHA/ACC, ESC, etc.
+6. **⚠️ KHI NÀO CẦN ĐI KHÁM BÁC SĨ:** Liệt kê các triệu chứng nguy hiểm cần đi khám GẤP
+7. **Nguồn tham khảo:** WHO Guidelines, CDC, AHA/ACC, ESC, etc.
 
 **ĐỊNH DẠNG BẮT BUỘC (Markdown table):**
 
@@ -1411,6 +1412,25 @@ ${imageAnalyses.length > 0 ? medicalImageAnalysis.formatImageAnalysisReport(imag
 - Xét nghiệm 1
 - Xét nghiệm 2
 - Can thiệp 3
+
+### ⚠️ KHI NÀO CẦN ĐI KHÁM BÁC SĨ GẤP:
+
+**Đi khám NGAY hoặc gọi cấp cứu 115 nếu xuất hiện bất kỳ dấu hiệu sau:**
+
+- **[Triệu chứng nguy hiểm 1]** - (Ví dụ: Khó thở nặng, thở gấp > 30 lần/phút)
+- **[Triệu chứng nguy hiểm 2]** - (Ví dụ: Đau ngực dữ dội, lan ra tay/hàm)
+- **[Triệu chứng nguy hiểm 3]** - (Ví dụ: Sốt cao > 39.5°C không hạ sau dùng thuốc)
+- **[Triệu chứng nguy hiểm 4]** - (Ví dụ: Lơ mơ, li bì, không tỉnh táo)
+- **[Triệu chứng nguy hiểm 5]** - (Ví dụ: Nôn ra máu, đi cầu phân đen sền)
+
+**Nếu KHÔNG có các dấu hiệu trên:**
+- ✅ Hiện tại chưa nguy hiểm, có thể theo dõi tại nhà
+- 🏠 Nghỉ ngơi đầy đủ, uống nhiều nước (2-3 lít/ngày)
+- 💊 Dùng thuốc hạ sốt (Paracetamol) nếu sốt ≥ 38°C
+- 📊 Theo dõi nhiệt độ và triệu chứng mỗi 3-4 giờ
+- 📅 Tái khám nếu không cải thiện sau 2-3 ngày
+
+**LƯU Ý:** Danh sách triệu chứng nguy hiểm trên phải CỤ THỂ, LIÊN QUAN TRỰC TIẾP đến bệnh đang chẩn đoán, KHÔNG chung chung.
 
 ### 📖 NGUỒN THAM KHẢO:
 ${references.map((ref, i) => `<a href="${ref.url}" class="citation-btn" target="_blank" rel="noopener">${ref.source}: ${ref.title.substring(0, 60)}...</a>`).join(' ')}
