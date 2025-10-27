@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4CAF50;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2E7D32;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- White background -->
+  <rect width="512" height="512" fill="white"/>
+  
+  <!-- Medical cross - recreate exact JAREMIS logo shape -->
+  <!-- Horizontal bar -->
+  <rect x="106" y="206" width="300" height="100" rx="50" ry="50" fill="url(#greenGrad)" stroke="#2E7D32" stroke-width="8"/>
+  
+  <!-- Vertical bar -->
+  <rect x="206" y="106" width="100" height="300" rx="50" ry="50" fill="url(#greenGrad)" stroke="#2E7D32" stroke-width="8"/>
+  
+  <!-- Center circle for smooth intersection -->
+  <circle cx="256" cy="256" r="58" fill="#4CAF50"/>
+</svg>
+
