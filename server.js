@@ -560,8 +560,8 @@ function selectModelIds(requested) {
   // Prefer stable, widely supported defaults on v1beta
   // Use -latest variants to match ListModels results and avoid 404
   return {
-    primary: 'gemini-1.5-flash-latest',
-    fallback: 'gemini-1.5-pro-latest'
+    primary: 'gemini-2.5-flash',
+    fallback: 'gemini-2.5-pro'
   };
 }
 
@@ -2629,6 +2629,7 @@ process.on('SIGINT', () => {
   console.log('\n💤 SIGINT received (Ctrl+C), shutting down gracefully...');
   process.exit(0);
 });
+
 
 
 
