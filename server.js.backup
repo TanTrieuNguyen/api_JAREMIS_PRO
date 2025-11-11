@@ -594,6 +594,7 @@ const MODEL_PREFS = {
   flash: [
     'gemini-2.5-flash-latest',
     'gemini-2.5-flash',
+    'gemini-2.0-flash-exp',
     'gemini-2.0-flash',
     'gemini-1.5-flash-8b-latest',
     'gemini-1.5-flash-8b',
@@ -613,6 +614,7 @@ const MODEL_PREFS = {
   vision: [
     'gemini-2.5-flash-latest',
     'gemini-2.5-flash',
+    'gemini-2.0-flash-exp',
     'gemini-2.0-flash',
     'gemini-1.5-flash-8b-latest',
     'gemini-1.5-flash-8b',
@@ -1512,7 +1514,7 @@ VÍ DỤ CÁCH TÁCH:
       {
         symptoms: symptoms ? symptoms.split(',').map(s => s.trim()) : [],
         labResults: labAnalysis ? labAnalysis.abnormal.map(a => a.name) : [],
-        imaging: imageAnalyses.filter(img => img.status === 'success').map(img => `${img.type}: ${img.filename}`)
+        imaging: imageAnalyses.map(img => `${img.type}: ${img.filename}`)
       }
     );
 
@@ -1531,7 +1533,7 @@ VÍ DỤ CÁCH TÁCH:
     const diagnosisTree = diagnosisEngine.generateDiagnosisTree(
       symptoms || '',
       labResults || '',
-      imageAnalyses.filter(img => img.status === 'success').map(img => img.type).join(', ')
+      imageAnalyses.map(img => img.type).join(', ')
     );
 
     // ========================================
@@ -1736,48 +1738,23 @@ ${homeCareGuidance.whenToSeeDoctor.map(a => `${a}`).join('\n')}
       // Advanced features
       labAnalysis,
       news2Score,
+      imageAnalyses: imageAnalyses.map(img => ({ 
+        filename: img.filename, 
+        type: img.type, 
+        summary: img.analysis.substring(0, 200) + '...' 
+      })),
       xaiExplanation: xaiExplanation.reasoning,
       treatmentRecommendations: treatmentRec,
       diagnosisTree,
       citations: medicalCitations,
       citationsHtml: citationHtml,
       
-      // FIXED: Add filter to prevent undefined errors
-      severityLevel: severityInfo.level,
+      // NEW: Severity Assessment & Emergency Guidance
+      severityLevel: severityInfo.level, // CRITICAL, MODERATE, MILD
       mortalityRate: severityInfo.mortality,
       isEmergency: severityInfo.isEmergency || redFlags.length > 0,
-      redFlags: (redFlags || []).filter(f => f && f.symptom).map(f => ({ symptom: f.symptom, risk: f.risk || "", action: f.action || "" })),
-      yellowFlags: (yellowFlags || []).filter(f => f && f.symptom).map(f => ({ symptom: f.symptom, risk: f.risk || "", action: f.action || "" })),
-      // FIXED: Add filter to prevent undefined errors
-      severityLevel: severityInfo.level,
-      mortalityRate: severityInfo.mortality,
-      isEmergency: severityInfo.isEmergency || redFlags.length > 0,
-      redFlags: (redFlags || []).filter(f => f && f.symptom).map(f => ({ symptom: f.symptom, risk: f.risk || "", action: f.action || "" })),
-      yellowFlags: (yellowFlags || []).filter(f => f && f.symptom).map(f => ({ symptom: f.symptom, risk: f.risk || "", action: f.action || "" })),
-      // FIXED: Add filter to prevent undefined errors
-      severityLevel: severityInfo.level,
-      mortalityRate: severityInfo.mortality,
-      isEmergency: severityInfo.isEmergency || redFlags.length > 0,
-      redFlags: (redFlags || []).filter(f => f && f.symptom).map(f => ({ symptom: f.symptom, risk: f.risk || "", action: f.action || "" })),
-      yellowFlags: (yellowFlags || []).filter(f => f && f.symptom).map(f => ({ symptom: f.symptom, risk: f.risk || "", action: f.action || "" })),
-      // FIXED: Add filter to prevent undefined errors
-      severityLevel: severityInfo.level,
-      mortalityRate: severityInfo.mortality,
-      isEmergency: severityInfo.isEmergency || redFlags.length > 0,
-      redFlags: (redFlags || []).filter(f => f && f.symptom).map(f => ({ symptom: f.symptom, risk: f.risk || "", action: f.action || "" })),
-      yellowFlags: (yellowFlags || []).filter(f => f && f.symptom).map(f => ({ symptom: f.symptom, risk: f.risk || "", action: f.action || "" })),
-      // FIXED: Add filter to prevent undefined errors
-      severityLevel: severityInfo.level,
-      mortalityRate: severityInfo.mortality,
-      isEmergency: severityInfo.isEmergency || redFlags.length > 0,
-      redFlags: (redFlags || []).filter(f => f && f.symptom).map(f => ({ symptom: f.symptom, risk: f.risk || "", action: f.action || "" })),
-      yellowFlags: (yellowFlags || []).filter(f => f && f.symptom).map(f => ({ symptom: f.symptom, risk: f.risk || "", action: f.action || "" })),
-      // FIXED: Add filter to prevent undefined errors
-      severityLevel: severityInfo.level,
-      mortalityRate: severityInfo.mortality,
-      isEmergency: severityInfo.isEmergency || redFlags.length > 0,
-      redFlags: (redFlags || []).filter(f => f && f.symptom).map(f => ({ symptom: f.symptom, risk: f.risk || "", action: f.action || "" })),
-      yellowFlags: (yellowFlags || []).filter(f => f && f.symptom).map(f => ({ symptom: f.symptom, risk: f.risk || "", action: f.action || "" })),
+      redFlags: redFlags.map(f => ({ symptom: f.symptom, risk: f.risk, action: f.action })),
+      yellowFlags: yellowFlags.map(f => ({ symptom: f.symptom, risk: f.risk, action: f.action })),
       emergencyGuidance: guidanceHtml,
       
       // Legacy fields

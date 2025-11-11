@@ -60,7 +60,7 @@ async function analyzeMedicalImages(files, genAI, patientContext = '') {
   console.log(`🔬 Analyzing ${files.length} medical image(s) with Gemini AI...`);
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     for (const file of files) {
       try {
