@@ -196,6 +196,253 @@
         }
         .sidebar-footer { font-size:12px; color:var(--text-secondary-color); text-align:center; margin-top:10px; }
 
+        /* Account Section */
+        .account-section {
+            margin-top: auto;
+            padding-top: 16px;
+            border-top: 1px solid var(--border-color);
+        }
+        .account-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+            position: relative;
+        }
+        .account-info:hover {
+            background: #2c313a;
+        }
+        .account-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 2px solid var(--border-color);
+            object-fit: cover;
+        }
+        .account-details {
+            flex-grow: 1;
+            min-width: 0;
+        }
+        .account-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-color);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .account-role {
+            font-size: 12px;
+            color: var(--text-secondary-color);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        #account-chevron {
+            color: var(--text-secondary-color);
+            font-size: 12px;
+            transition: transform 0.2s;
+        }
+        .account-info.open #account-chevron {
+            transform: rotate(180deg);
+        }
+        .account-dropdown {
+            display: none;
+            flex-direction: column;
+            gap: 4px;
+            margin-top: 8px;
+            padding: 4px;
+            background: var(--input-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+        }
+        .account-dropdown.show {
+            display: flex;
+        }
+        .account-dropdown button {
+            width: 100%;
+            padding: 10px 12px;
+            background: transparent;
+            border: none;
+            color: var(--text-color);
+            text-align: left;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: background 0.2s;
+        }
+        .account-dropdown button:hover {
+            background: #2c313a;
+        }
+        .account-dropdown button i {
+            width: 18px;
+            text-align: center;
+        }
+
+        /* Mode Selection Menu */
+        .mode-menu-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 150;
+            animation: fadeIn 0.2s;
+        }
+        .mode-menu-backdrop.show {
+            display: flex;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .mode-menu {
+            background: var(--sidebar-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            min-width: 320px;
+            max-width: 90%;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+            animation: slideUp 0.3s ease-out;
+        }
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .mode-menu h3 {
+            margin-bottom: 16px;
+            font-size: 18px;
+            color: var(--text-color);
+            text-align: center;
+        }
+        .mode-options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .mode-option {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px;
+            background: var(--input-bg);
+            border: 2px solid transparent;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .mode-option:hover {
+            background: #2c313a;
+            border-color: var(--border-color);
+        }
+        .mode-option.active {
+            border-color: var(--accent-color);
+            background: rgba(47,129,247,0.1);
+        }
+        .mode-icon {
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(47,129,247,0.15);
+            border-radius: 10px;
+            font-size: 24px;
+            color: var(--accent-color);
+        }
+        .mode-option.active .mode-icon {
+            background: var(--accent-color);
+            color: white;
+        }
+        .mode-info {
+            flex-grow: 1;
+        }
+        .mode-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-color);
+            margin-bottom: 4px;
+        }
+        .mode-desc {
+            font-size: 13px;
+            color: var(--text-secondary-color);
+            line-height: 1.4;
+        }
+        .mode-check {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 2px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: transparent;
+            transition: all 0.2s;
+        }
+        .mode-option.active .mode-check {
+            border-color: var(--accent-color);
+            background: var(--accent-color);
+            color: white;
+        }
+
+        /* Professional Mode - Patient Records */
+        .professional-records {
+            display: none;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 16px;
+            max-height: 40vh;
+            overflow-y: auto;
+        }
+        .professional-records.show {
+            display: flex;
+        }
+        .record-item {
+            padding: 12px;
+            background: var(--input-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .record-item:hover {
+            background: #2c313a;
+            border-color: var(--accent-color);
+        }
+        .record-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+        .record-patient {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-color);
+        }
+        .record-date {
+            font-size: 12px;
+            color: var(--text-secondary-color);
+        }
+        .record-summary {
+            font-size: 13px;
+            color: var(--text-secondary-color);
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
         /* Chat area */
         .chat-area {
             position: relative; /* Đảm bảo lớp nền phủ đúng */
@@ -240,6 +487,116 @@
         .chat-bubble { max-width:80%; padding:16px; border-radius:12px; line-height:1.6; word-wrap:break-word; }
         .bot-bubble { background-color:var(--bot-bubble-bg); align-self:flex-start; border:1px solid var(--border-color); }
         .user-bubble { background-color:var(--user-bubble-bg); align-self:flex-end; color:#fff; }
+
+        /* Professional Consultation Styling */
+        .professional-consultation {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.8;
+            color: var(--text-color);
+        }
+        
+        .professional-consultation h1,
+        .professional-consultation h2,
+        .professional-consultation h3 {
+            color: var(--accent-color);
+            margin-top: 24px;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+        
+        .professional-consultation h1 { font-size: 24px; border-bottom: 2px solid var(--border-color); padding-bottom: 8px; }
+        .professional-consultation h2 { font-size: 20px; }
+        .professional-consultation h3 { font-size: 18px; }
+        
+        .professional-consultation p {
+            margin-bottom: 12px;
+            color: var(--text-color);
+        }
+        
+        .professional-consultation table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+            background: rgba(255,255,255,0.02);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .professional-consultation table th {
+            background: rgba(47,129,247,0.15);
+            color: var(--accent-color);
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid var(--border-color);
+        }
+        
+        .professional-consultation table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .professional-consultation table tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .professional-consultation table tr:hover {
+            background: rgba(255,255,255,0.03);
+        }
+        
+        .professional-consultation ul,
+        .professional-consultation ol {
+            margin: 12px 0;
+            padding-left: 24px;
+        }
+        
+        .professional-consultation li {
+            margin-bottom: 8px;
+        }
+        
+        .professional-consultation code {
+            background: rgba(110,118,129,0.2);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+        
+        .professional-consultation pre {
+            background: rgba(110,118,129,0.15);
+            padding: 16px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 12px 0;
+        }
+        
+        .professional-consultation pre code {
+            background: none;
+            padding: 0;
+        }
+        
+        .professional-consultation blockquote {
+            border-left: 4px solid var(--accent-color);
+            padding-left: 16px;
+            margin: 16px 0;
+            color: var(--text-secondary-color);
+            font-style: italic;
+        }
+        
+        .professional-consultation strong {
+            color: var(--text-color);
+            font-weight: 600;
+        }
+        
+        .professional-consultation em {
+            color: var(--text-secondary-color);
+        }
+        
+        .professional-consultation hr {
+            border: none;
+            border-top: 1px solid var(--border-color);
+            margin: 24px 0;
+        }
 
         .user-bubble-content p { margin-bottom:12px; }
         .user-images-preview { display:flex; gap:10px; flex-wrap:wrap; }
@@ -415,6 +772,9 @@
             justify-content: center;
             z-index: 60;
         }
+        .modal-backdrop.show {
+            display: flex;
+        }
         .modal {
             background: #0b1116;
             border: 1px solid var(--border-color);
@@ -474,6 +834,19 @@
             .sidebar { display:none; }
             .resizer { display:none; }
             .auth-controls { right: 8px; top: 8px; }
+            
+            /* Table responsive on tablet */
+            .bot-bubble table {
+                font-size: 12px;
+            }
+            .bot-bubble table th {
+                padding: 12px 10px;
+                font-size: 12px;
+            }
+            .bot-bubble table td {
+                padding: 10px 8px;
+                font-size: 12px;
+            }
         }
 
         /* Mobile-specific overrides */
@@ -503,6 +876,25 @@
             .auth-controls { position:fixed; right:10px; bottom:110px; top:auto; z-index:69; display:flex; flex-direction:column; gap:8px; }
             /* Slightly reduce bubble max-width for narrow screens */
             .chat-bubble { max-width:94%; }
+            
+            /* Table responsive on mobile */
+            .bot-bubble table {
+                font-size: 12px; /* Smaller font on mobile */
+                display: block;
+                overflow-x: auto; /* Allow horizontal scroll if needed */
+                -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+            }
+            .bot-bubble table th {
+                padding: 10px 8px;
+                font-size: 11px;
+                line-height: 1.3;
+            }
+            .bot-bubble table td {
+                padding: 8px 6px;
+                font-size: 11px;
+                line-height: 1.4;
+                min-width: 80px; /* Minimum width per column */
+            }
         }
 
         /* Even smaller devices: compact spacing & font sizes */
@@ -911,9 +1303,10 @@
     font-size: 13px;
     letter-spacing: 0.3px;
     border-bottom: 2px solid rgba(47, 129, 247, 0.3);
-    white-space: nowrap; /* No wrap for headers */
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal; /* Allow text wrapping */
+    overflow: visible;
+    word-wrap: break-word;
+    hyphens: auto;
 }
 
 .bot-bubble table td {
@@ -921,11 +1314,13 @@
     border-bottom: 1px solid var(--border-color);
     color: var(--text-color);
     font-size: 13px;
-    line-height: 1.4;
+    line-height: 1.5;
     text-align: center; /* Center align data */
-    white-space: nowrap; /* No wrap for better alignment */
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal; /* Allow text wrapping for full content */
+    overflow: visible;
+    word-wrap: break-word;
+    hyphens: auto;
+    vertical-align: top; /* Align content to top when multi-line */
 }
 
 /* First column (usually time/label) - left align */
@@ -1320,7 +1715,33 @@
                 </h3>
                 <ul id="history-list"></ul>
             </nav>
-            <div class="sidebar-footer">Made ❤️ by TT1403 & Ant.</div>
+            
+            <!-- Professional Mode - Patient Records (hidden by default) -->
+            <div class="professional-records" id="professional-records"></div>
+            
+            <!-- Account management & professional history -->
+            <div class="account-section" id="account-section">
+                <div class="account-info" id="account-info" onclick="toggleAccountMenu()">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=default" id="user-avatar" class="account-avatar" alt="Avatar">
+                    <div class="account-details">
+                        <div class="account-name" id="account-name">Guest User</div>
+                        <div class="account-role" id="account-role">Chế độ: Chat</div>
+                    </div>
+                    <i class="fas fa-chevron-down" id="account-chevron"></i>
+                </div>
+                
+                <div class="account-dropdown" id="account-dropdown">
+                    <button onclick="openProfileModal()">
+                        <i class="fas fa-user-edit"></i> Chỉnh sửa hồ sơ
+                    </button>
+                    <button onclick="showProfessionalHistory()" id="professional-history-btn">
+                        <i class="fas fa-folder-open"></i> Hồ sơ bệnh nhân
+                    </button>
+                    <button onclick="logout()">
+                        <i class="fas fa-sign-out-alt"></i> Đăng xuất
+                    </button>
+                </div>
+            </div>
         </aside>
 
         <div class="resizer" id="resizer"></div>
@@ -1373,16 +1794,16 @@
                             <button class="action-btn" id="attach-btn" onclick="document.getElementById('images').click()" title="Đính kèm ảnh (Ctrl+Shift+U)">
                                 <i class="fas fa-paperclip"></i>
                             </button>
-                            <button id="mode-btn" class="action-btn" title="Chế độ: Chat (Ctrl+Shift+K)" onclick="toggleMode(event)">
+                            <button id="mode-btn" class="action-btn" title="Chế độ: Chat (Ctrl+Shift+K)" onclick="openModeMenu(event)">
                                 <i class="fas fa-comments"></i>
                             </button>
                             <button id="mic-btn" class="action-btn" title="Ghi giọng nói (Ctrl+M). Nhấn để bắt đầu/dừng" onclick="toggleMic(event)">
                                 <i class="fas fa-microphone"></i>
                                 <span id="mic-indicator"></span>
                             </button>
-                                                    </div>
+                        </div>
 
-                        <button id="send-btn" class="action-btn" onclick="submitData()" title="Gửi (Enter)">
+                        <button id="send-btn" class="action-btn" title="Gửi (Enter)">
                             <i class="fas fa-paper-plane"></i>
                         </button>
                         
@@ -1492,6 +1913,165 @@
         
         <div class="small-muted" style="margin-top:10px;text-align:center;">
           Ctrl+Shift+F để mở • Esc để đóng
+        </div>
+      </div>
+    </div>
+
+    <!-- Mode Selection Menu -->
+    <div class="mode-menu-backdrop" id="mode-menu-backdrop">
+      <div class="mode-menu">
+        <h3>Chọn chế độ hoạt động</h3>
+        <div class="mode-options">
+          <div class="mode-option" data-mode="chat" onclick="selectMode('chat')">
+            <div class="mode-icon">
+              <i class="fas fa-comments"></i>
+            </div>
+            <div class="mode-info">
+              <div class="mode-title">Chat</div>
+              <div class="mode-desc">Trò chuyện thông thường, hỏi đáp chung</div>
+            </div>
+            <div class="mode-check">
+              <i class="fas fa-check"></i>
+            </div>
+          </div>
+          
+          <div class="mode-option" data-mode="diagnose" onclick="selectMode('diagnose')">
+            <div class="mode-icon">
+              <i class="fas fa-stethoscope"></i>
+            </div>
+            <div class="mode-info">
+              <div class="mode-title">Diagnose</div>
+              <div class="mode-desc">Chẩn đoán y khoa cơ bản, phân tích triệu chứng</div>
+            </div>
+            <div class="mode-check">
+              <i class="fas fa-check"></i>
+            </div>
+          </div>
+          
+          <div class="mode-option" data-mode="professional" onclick="selectMode('professional')">
+            <div class="mode-icon">
+              <i class="fas fa-user-md"></i>
+            </div>
+            <div class="mode-info">
+              <div class="mode-title">Professional</div>
+              <div class="mode-desc">Dành cho bác sĩ: phân tích ảnh y tế, gợi ý thuốc, quản lý hồ sơ bệnh nhân</div>
+            </div>
+            <div class="mode-check">
+              <i class="fas fa-check"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Profile Edit Modal -->
+    <div class="modal-backdrop" id="profile-modal-backdrop">
+      <div class="modal" style="max-width:480px;">
+        <h3>Chỉnh sửa hồ sơ</h3>
+        
+        <!-- Avatar Preview with Camera Icon -->
+        <div style="text-align:center;margin-bottom:20px;">
+          <div style="position:relative;display:inline-block;">
+            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=default" 
+                 id="profile-avatar-preview" 
+                 style="width:120px;height:120px;border-radius:50%;border:3px solid var(--border-color);object-fit:cover;cursor:pointer;"
+                 onclick="document.getElementById('avatar-upload').click()">
+            <div onclick="document.getElementById('avatar-upload').click()" 
+                 style="position:absolute;bottom:0;right:0;width:36px;height:36px;background:var(--accent-color);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;border:3px solid var(--sidebar-bg);box-shadow:0 2px 8px rgba(0,0,0,0.3);">
+              <i class="fas fa-camera" style="color:white;font-size:16px;"></i>
+            </div>
+          </div>
+          <input type="file" id="avatar-upload" accept="image/*" hidden onchange="handleAvatarUpload(event)">
+          <div style="margin-top:12px;">
+            <button type="button" class="btn-ghost" onclick="removeAvatar()" style="font-size:13px;padding:6px 16px;">
+              <i class="fas fa-trash"></i> Xóa ảnh
+            </button>
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <label style="color:var(--text-secondary-color);font-size:13px;">Tên hiển thị</label>
+          <input type="text" id="profile-name" placeholder="Nhập tên của bạn">
+        </div>
+        
+        <div class="form-row">
+          <label style="color:var(--text-secondary-color);font-size:13px;">Tên người dùng</label>
+          <input type="text" id="profile-username" placeholder="username" style="background:var(--input-bg);border:1px solid var(--border-color);color:var(--text-secondary-color);padding:8px 12px;border-radius:6px;">
+          <div style="font-size:11px;color:var(--text-secondary-color);margin-top:4px;">
+            Hồ sơ của bạn giúp người khác nhận ra bạn. Tên và tên người dùng của bạn cùng được sử dụng trong ứng dụng Sora.
+          </div>
+        </div>
+        
+        <div class="form-actions">
+          <button class="btn-ghost" onclick="closeProfileModal()">Hủy</button>
+          <button class="btn-primary" onclick="saveProfile()">Lưu</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Patient Info Modal (for Professional Mode) -->
+    <div class="modal-backdrop" id="patient-info-modal-backdrop">
+      <div class="modal" style="max-width:600px;max-height:90vh;overflow-y:auto;">
+        <h3>📋 Thông tin bệnh nhân</h3>
+        <p style="font-size:13px;color:var(--text-secondary-color);margin-bottom:16px;">
+          Vui lòng nhập thông tin bệnh nhân trước khi gửi yêu cầu chẩn đoán
+        </p>
+        
+        <div class="form-row">
+          <label style="color:var(--text-secondary-color);font-size:13px;">Họ và tên <span style="color:var(--error-color);">*</span></label>
+          <input type="text" id="patient-name" placeholder="Nguyễn Văn A" required>
+        </div>
+        
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">
+          <div class="form-row" style="margin-bottom:0;">
+            <label style="color:var(--text-secondary-color);font-size:13px;">Tuổi</label>
+            <input type="number" id="patient-age" placeholder="30">
+          </div>
+          <div class="form-row" style="margin-bottom:0;">
+            <label style="color:var(--text-secondary-color);font-size:13px;">Giới tính</label>
+            <select id="patient-gender" style="background:var(--input-bg);border:1px solid var(--border-color);color:var(--text-color);padding:8px 10px;border-radius:6px;">
+              <option value="">Chọn</option>
+              <option value="Nam">Nam</option>
+              <option value="Nữ">Nữ</option>
+              <option value="Khác">Khác</option>
+            </select>
+          </div>
+        </div>
+        
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">
+          <div class="form-row" style="margin-bottom:0;">
+            <label style="color:var(--text-secondary-color);font-size:13px;">Cân nặng (kg)</label>
+            <input type="number" id="patient-weight" placeholder="65">
+          </div>
+          <div class="form-row" style="margin-bottom:0;">
+            <label style="color:var(--text-secondary-color);font-size:13px;">Chiều cao (cm)</label>
+            <input type="number" id="patient-height" placeholder="170">
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <label style="color:var(--text-secondary-color);font-size:13px;">Ngày bắt đầu có triệu chứng</label>
+          <input type="date" id="symptoms-start-date" style="background:var(--input-bg);border:1px solid var(--border-color);color:var(--text-color);padding:8px 10px;border-radius:6px;">
+        </div>
+        
+        <div class="form-row">
+          <label style="color:var(--text-secondary-color);font-size:13px;">Tiền sử bệnh</label>
+          <textarea id="patient-medical-history" placeholder="Ví dụ: Tiểu đường type 2, tăng huyết áp..." style="background:var(--input-bg);border:1px solid var(--border-color);color:var(--text-color);padding:8px 10px;border-radius:6px;min-height:60px;resize:vertical;"></textarea>
+        </div>
+        
+        <div class="form-row">
+          <label style="color:var(--text-secondary-color);font-size:13px;">Dị ứng thuốc</label>
+          <input type="text" id="patient-allergies" placeholder="Ví dụ: Penicillin, Aspirin...">
+        </div>
+        
+        <div class="form-row">
+          <label style="color:var(--text-secondary-color);font-size:13px;">Thuốc đang dùng</label>
+          <textarea id="patient-medications" placeholder="Ví dụ: Metformin 500mg x 2 lần/ngày..." style="background:var(--input-bg);border:1px solid var(--border-color);color:var(--text-color);padding:8px 10px;border-radius:6px;min-height:60px;resize:vertical;"></textarea>
+        </div>
+        
+        <div class="form-actions">
+          <button class="btn-ghost" onclick="closePatientInfoModal()">Hủy</button>
+          <button id="submit-patient-info-btn" class="btn-primary">Gửi chẩn đoán</button>
         </div>
       </div>
     </div>
@@ -1675,20 +2255,8 @@
         }
 
         // ------------------------------
-        function toggleMode(e) {
-            e?.preventDefault();
-            diagnosticMode = !diagnosticMode;
-            if (diagnosticMode) {
-                modeBtn.classList.add('active');
-                modeBtn.title = 'Chế độ: Diagnose (chẩn đoán y khoa)';
-                modeBtn.innerHTML = '<i class="fas fa-stethoscope"></i>';
-            } else {
-                modeBtn.classList.remove('active');
-                modeBtn.title = 'Chế độ: Chat';
-                modeBtn.innerHTML = '<i class="fas fa-comments"></i>';
-            }
-        }
-
+        // Removed old toggleMode - now using 3-mode menu via openModeMenu()
+        
         function toggleThink(e) {
             e?.preventDefault();
             useProModel = !useProModel;
@@ -2098,6 +2666,12 @@
           
           convoEntries.forEach((entry, idx) => {
             try {
+              // Safe check: ensure entry exists
+              if (!entry || typeof entry !== 'object') {
+                console.warn(`⚠️ Invalid entry at index ${idx}:`, entry);
+                return;
+              }
+              
               console.log(`📨 Rendering entry ${idx + 1}/${convoEntries.length}:`, {
                 input: entry.input?.substring(0, 30),
                 hasReply: !!entry.reply,
@@ -2736,7 +3310,112 @@
         // ========================================
         // SUBMIT DATA - Enhanced with Pasted Images
         // ========================================
+        
+        // Store pending submit data when opening patient info modal
+        let pendingSubmitData = null;
+        
         async function submitData() {
+            console.log('🚀 submitData called'); // DEBUG
+            console.log('📍 Current mode:', currentMode); // DEBUG MODE
+            
+            const message = chatInput.value.trim();
+            const allImages = getAllImages();
+            
+            console.log('📝 Message:', message, 'Images:', allImages.length); // DEBUG
+            
+            if (!message && allImages.length === 0) {
+                flashNotice('Vui lòng nhập tin nhắn hoặc đính kèm ảnh', 'error');
+                return;
+            }
+            
+            // If Professional mode, show patient info modal first
+            if (currentMode === 'professional') {
+                console.log('🏥 Professional mode detected - opening patient info modal'); // DEBUG
+                // Ensure pendingSubmitData is properly structured
+                pendingSubmitData = { 
+                    message: message,
+                    allImages: allImages || []
+                };
+                console.log('💾 Saved pendingSubmitData:', pendingSubmitData); // DEBUG
+                openPatientInfoModal();
+                return;
+            }
+            
+            // Otherwise, proceed with normal submit
+            await performSubmit(message, allImages, null);
+        }
+        
+        function openPatientInfoModal() {
+            console.log('📂 Opening patient modal, pendingSubmitData:', pendingSubmitData); // DEBUG
+            const backdrop = document.getElementById('patient-info-modal-backdrop');
+            if (backdrop) {
+                backdrop.classList.add('show');
+                // Reset form
+                document.getElementById('patient-name').value = '';
+                document.getElementById('patient-age').value = '';
+                document.getElementById('patient-gender').value = '';
+                document.getElementById('patient-weight').value = '';
+                document.getElementById('patient-height').value = '';
+                document.getElementById('symptoms-start-date').value = '';
+                document.getElementById('patient-medical-history').value = '';
+                document.getElementById('patient-allergies').value = '';
+                document.getElementById('patient-medications').value = '';
+            }
+        }
+        
+        function closePatientInfoModal() {
+            const backdrop = document.getElementById('patient-info-modal-backdrop');
+            if (backdrop) {
+                backdrop.classList.remove('show');
+            }
+            // Don't reset pendingSubmitData here - it's needed after modal closes
+        }
+        
+        async function submitProfessionalWithPatientInfo() {
+            console.log('🔍 submitProfessionalWithPatientInfo called'); // DEBUG
+            console.log('📦 Current pendingSubmitData:', pendingSubmitData); // DEBUG
+            
+            const patientName = document.getElementById('patient-name').value.trim();
+            
+            if (!patientName) {
+                flashNotice('Vui lòng nhập tên bệnh nhân!', 'error');
+                return;
+            }
+            
+            const patientInfo = {
+                name: patientName,
+                age: document.getElementById('patient-age').value || null,
+                gender: document.getElementById('patient-gender').value || null,
+                weight: document.getElementById('patient-weight').value || null,
+                height: document.getElementById('patient-height').value || null,
+                medicalHistory: document.getElementById('patient-medical-history').value.trim() || '',
+                allergies: document.getElementById('patient-allergies').value.trim() || '',
+                currentMedications: document.getElementById('patient-medications').value.trim() || '',
+                symptomsStartDate: document.getElementById('symptoms-start-date').value || null
+            };
+            
+            console.log('👤 Patient info:', patientInfo); // DEBUG
+            
+            // IMPORTANT: Save pendingSubmitData to temp variable BEFORE closing modal
+            const savedData = pendingSubmitData;
+            
+            // Close modal first
+            closePatientInfoModal();
+            
+            // Reset pendingSubmitData after saving to temp variable
+            pendingSubmitData = null;
+            
+            // Safe check for savedData
+            if (savedData && typeof savedData === 'object') {
+                console.log('✅ Valid savedData, calling performSubmit'); // DEBUG
+                await performSubmit(savedData.message || '', savedData.allImages || [], patientInfo);
+            } else {
+                console.error('❌ savedData is invalid:', savedData);
+                flashNotice('Lỗi: Dữ liệu tin nhắn không hợp lệ. Vui lòng thử lại.', 'error');
+            }
+        }
+        
+        async function performSubmit(message, allImages, patientInfo) {
             // Prevent double-submit
             if (window._currentAbortController) {
                 try {
@@ -2746,12 +3425,12 @@
                     if (sig && sig.aborted) {
                         window._currentAbortController = null;
                         window._currentAbortStartedAt = 0;
-                        showSendButton(); // Reset to send button
+                        showSendButton();
                     } else if (tooLong) {
                         try { window._currentAbortController.abort(); } catch(e) {}
                         window._currentAbortController = null;
                         window._currentAbortStartedAt = 0;
-                        showSendButton(); // Reset to send button
+                        showSendButton();
                     } else {
                         flashNotice('Đang xử lý phản hồi trước, hãy đợi hoặc nhấn nút dừng.', 'error');
                         return;
@@ -2759,37 +3438,41 @@
                 } catch (e) {
                     window._currentAbortController = null;
                     window._currentAbortStartedAt = 0;
-                    showSendButton(); // Reset to send button
+                    showSendButton();
                 }
             }
 
-            const message = chatInput.value.trim();
-            const allImages = getAllImages(); // Get both file input + pasted images
-            
-            if (!message && allImages.length === 0) {
-                flashNotice('Vui lòng nhập tin nhắn hoặc đính kèm ảnh', 'error');
-                return;
+            // Choose endpoint based on currentMode
+            let endpoint = '/api/chat';
+            if (currentMode === 'diagnose' || diagnosticMode) {
+                endpoint = '/api/diagnose';
+            } else if (currentMode === 'professional') {
+                endpoint = '/api/professional';
             }
-
-            // Choose endpoint based on diagnosticMode
-            const endpoint = diagnosticMode ? '/api/diagnose' : '/api/chat';
             
             // Prepare FormData
             const formData = new FormData();
             formData.append('message', message);
-            formData.append('labResults', message); // For diagnose mode
-            formData.append('symptoms', message); // For diagnose mode
+            formData.append('labResults', message);
+            formData.append('symptoms', message);
             formData.append('model', useProModel ? 'pro' : 'flash');
             formData.append('sessionId', currentSessionId || generateSessionId());
             
             const user = getLocalUser();
             if (user) {
                 formData.append('submittedBy', user.username);
+                formData.append('doctorUsername', user.username);
+            }
+            
+            // Professional mode - add patient info
+            if (currentMode === 'professional' && patientInfo) {
+                formData.append('patientInfo', JSON.stringify(patientInfo));
+                formData.append('patientId', 'P' + Date.now());
+                formData.append('symptomsStartDate', patientInfo.symptomsStartDate || '');
             }
 
-            // Append all images (file input + pasted)
+            // Append all images
             allImages.forEach((file, index) => {
-                // Rename pasted images for clarity
                 const filename = file.name || `pasted-image-${index + 1}.png`;
                 formData.append('images', file, filename);
             });
@@ -2818,8 +3501,10 @@
             chatMessages.scrollTop = chatMessages.scrollHeight;
 
             // Show thinking animation
-            if (diagnosticMode) {
+            if (currentMode === 'diagnose' || diagnosticMode) {
                 await animateAnalysisSteps(botBubble);
+            } else if (currentMode === 'professional') {
+                await animateProfessionalAnalysis(botBubble, allImages.length > 0);
             } else {
                 showThinking(botBubble);
             }
@@ -2840,14 +3525,36 @@
                 });
 
                 if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.error || 'Lỗi server');
+                    let errorMsg = 'Lỗi server';
+                    try {
+                        const error = await response.json();
+                        errorMsg = error.error || error.message || 'Lỗi server';
+                    } catch (e) {
+                        errorMsg = `Lỗi ${response.status}: ${response.statusText}`;
+                    }
+                    throw new Error(errorMsg);
                 }
 
                 const result = await response.json();
                 
-                // Debug: log response
-                console.log('📦 Diagnosis Response:', result);
+                // Debug: log response with safe access
+                console.log('📦 Response received:', result);
+                console.log('📦 Response keys:', result ? Object.keys(result) : 'null');
+                console.log('📦 Has reply?', result?.reply);
+                console.log('📦 Has replyHtml?', result?.replyHtml);
+                
+                // Validate response structure
+                if (!result || typeof result !== 'object') {
+                    console.error('❌ Invalid response type:', typeof result);
+                    throw new Error('Response không hợp lệ từ server');
+                }
+                
+                // Additional safety check for required fields based on mode
+                const hasContent = result.reply || result.replyHtml || result.diagnosis || result.consultation || result.consultationHtml;
+                if (!hasContent) {
+                    console.warn('⚠️ Response missing content:', result);
+                    throw new Error('Server không trả về nội dung phản hồi');
+                }
                 
                 // Clear abort controller
                 window._currentAbortController = null;
@@ -2878,8 +3585,10 @@
                 }
 
                 // Render response
-                if (diagnosticMode) {
+                if (currentMode === 'diagnose' || diagnosticMode) {
                     renderDiagnosisResponse(result, botBubble);
+                } else if (currentMode === 'professional') {
+                    renderProfessionalResponse(result, botBubble);
                 } else {
                     // Render chat response with animated typing
                     const replyHtml = result.replyHtml || result.reply || 'Không có phản hồi';
@@ -2900,9 +3609,12 @@
                 console.error('Submit error:', error);
                 
                 stopThinking(botBubble);
+                
+                // Safe error message handling
+                const errorMessage = error?.message || error?.error || String(error) || 'Lỗi không xác định';
                 botBubble.innerHTML = `
                     <div style="color:var(--error-color);">
-                        ❌ <strong>Lỗi:</strong> ${escapeHtml(error.message)}
+                        ❌ <strong>Lỗi:</strong> ${escapeHtml(errorMessage)}
                     </div>
                 `;
 
@@ -3046,6 +3758,9 @@
             // diagnosisHtml doesn't parse markdown tables, so use diagnosis (raw markdown) instead
             if (result.diagnosis) {
                 console.log('✅ Using diagnosis (converting markdown with GFM tables)');
+                console.log('📝 Raw diagnosis (first 500 chars):', result.diagnosis.substring(0, 500));
+                console.log('🔧 marked.js available?', typeof marked !== 'undefined');
+                
                 // Convert markdown to HTML
                 if (typeof marked !== 'undefined') {
                     try {
@@ -3057,12 +3772,17 @@
                             headerIds: false,
                             mangle: false
                         });
+                        console.log('✅ Markdown parsed successfully');
+                        console.log('📄 Parsed HTML (first 500 chars):', parsedHtml.substring(0, 500));
                         html += parsedHtml;
                     } catch (e) {
-                        console.warn('Markdown parse error:', e);
+                        console.warn('❌ Markdown parse error:', e);
                         html += result.diagnosis.replace(/\n/g, '<br>');
                     }
                 } else {
+                    console.warn('⚠️ marked.js not loaded, using fallback');
+                    html += result.diagnosis.replace(/\n/g, '<br>');
+                } {
                     html += result.diagnosis.replace(/\n/g, '<br>');
                 }
             } else if (result.diagnosisHtml) {
@@ -3224,6 +3944,73 @@
             }
         }
 
+        function renderProfessionalResponse(result, bubbleElement) {
+            stopThinking(bubbleElement);
+            
+            console.log('🩺 Rendering professional response:', result);
+            
+            // ALWAYS use consultation (raw markdown) instead of consultationHtml for proper rendering
+            const consultationText = result.consultation || result.analysis || result.reply || '';
+            
+            if (!consultationText) {
+                bubbleElement.innerHTML = '<div class="error-message">Không nhận được phản hồi từ server</div>';
+                return;
+            }
+            
+            // Parse markdown
+            let renderedHtml = consultationText;
+            
+            if (typeof marked !== 'undefined') {
+                try {
+                    // Configure marked options
+                    marked.setOptions({
+                        breaks: true,  // Convert \n to <br>
+                        gfm: true,     // GitHub Flavored Markdown
+                        tables: true,  // Support tables
+                        sanitize: false // Allow HTML in markdown
+                    });
+                    renderedHtml = marked.parse(consultationText);
+                } catch (e) {
+                    console.warn('Markdown parse error:', e);
+                    renderedHtml = consultationText.replace(/\n/g, '<br>');
+                }
+            } else {
+                console.warn('marked library not loaded, using fallback');
+                renderedHtml = consultationText.replace(/\n/g, '<br>');
+            }
+            
+            // Apply professional styling
+            bubbleElement.innerHTML = `
+                <div class="professional-consultation">
+                    ${renderedHtml}
+                </div>
+            `;
+            
+            // Render LaTeX if available
+            if (typeof renderMathInElement !== 'undefined') {
+                try {
+                    renderMathInElement(bubbleElement, {
+                        delimiters: [
+                            {left: '$$', right: '$$', display: true},
+                            {left: '$', right: '$', display: false},
+                            {left: '\\[', right: '\\]', display: true},
+                            {left: '\\(', right: '\\)', display: false}
+                        ],
+                        throwOnError: false
+                    });
+                } catch (e) {
+                    console.warn('LaTeX render error:', e);
+                }
+            }
+            
+            // Apply syntax highlighting if available
+            if (typeof hljs !== 'undefined') {
+                bubbleElement.querySelectorAll('pre code').forEach((block) => {
+                    hljs.highlightElement(block);
+                });
+            }
+        }
+
         function showThinking(bubble) {
             bubble.innerHTML = '<div class="thinking-dots"><span></span><span></span><span></span></div>';
         }
@@ -3244,6 +4031,25 @@
                     submitData();
                 }
             });
+
+            // Send button click (backup for onclick)
+            const sendBtn = document.getElementById('send-btn');
+            if (sendBtn) {
+                sendBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    console.log('🔘 Send button clicked via event listener');
+                    submitData();
+                });
+            }
+
+            // Patient info modal submit button
+            const submitPatientBtn = document.getElementById('submit-patient-info-btn');
+            if (submitPatientBtn) {
+                submitPatientBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    submitProfessionalWithPatientInfo();
+                });
+            }
 
             // Generate session ID on load
             if (!currentSessionId) {
@@ -3287,6 +4093,52 @@
                 <div class="step-item completed">
                     <div class="icon"><i class="fas fa-thumbs-up"></i></div>
                     <div class="text">Phân tích hoàn tất! Xem kết quả bên dưới.</div>
+                </div>
+            `;
+            bubbleElement.scrollTop = bubbleElement.scrollHeight;
+        }
+
+        async function animateProfessionalAnalysis(bubbleElement, hasImages = false) {
+            stopThinking(bubbleElement);
+            
+            // Clear previous content
+            bubbleElement.innerHTML = '';
+
+            const steps = [
+                { text: 'Đang phân tích hồ sơ bệnh nhân...', delay: 1000 }
+            ];
+            
+            // Only add image processing step if there are images
+            if (hasImages) {
+                steps.push({ text: 'Đang xử lý ảnh y tế (X-ray/MRI/CT)...', delay: 1500 });
+            }
+            
+            steps.push(
+                { text: 'Đang tra cứu cơ sở dữ liệu thuốc...', delay: 1200 },
+                { text: 'Đang tạo chẩn đoán học thuật...', delay: 1300 },
+                { text: 'Đang lập kế hoạch chăm sóc & dinh dưỡng...', delay: 1100 },
+                { text: 'Đang lưu hồ sơ bệnh nhân...', delay: 900 },
+                { text: 'Hoàn tất!', delay: 800 }
+            );
+
+            for (const step of steps) {
+                const stepEl = document.createElement('div');
+                stepEl.className = 'step-item';
+                stepEl.innerHTML = `
+                    <div class="icon"><i class="fas fa-check-circle"></i></div>
+                    <div class="text">${step.text}</div>
+                `;
+                bubbleElement.appendChild(stepEl);
+                bubbleElement.scrollTop = bubbleElement.scrollHeight;
+
+                await new Promise(resolve => setTimeout(resolve, step.delay));
+            }
+
+            // Final message
+            bubbleElement.innerHTML += `
+                <div class="step-item completed">
+                    <div class="icon"><i class="fas fa-user-md"></i></div>
+                    <div class="text">Phân tích chuyên môn hoàn tất! Xem kết quả bên dưới.</div>
                 </div>
             `;
             bubbleElement.scrollTop = bubbleElement.scrollHeight;
@@ -3400,18 +4252,25 @@
             // Auto-wrap math expressions in LaTeX delimiters
             htmlContent = autoWrapMathExpressions(htmlContent);
             
-            // Parse markdown to HTML if content looks like markdown
+            // Parse markdown to HTML - ALWAYS parse if marked is available
             let finalHtml = htmlContent;
-            if (typeof marked !== 'undefined' && (htmlContent.includes('##') || htmlContent.includes('|') || htmlContent.includes('-'))) {
+            if (typeof marked !== 'undefined' && marked.parse) {
                 try {
                     // Enable GFM (GitHub Flavored Markdown) for tables
                     finalHtml = marked.parse(htmlContent, {
                         breaks: true,
                         gfm: true, // Support tables, strikethrough, etc.
-                        tables: true
+                        tables: true,
+                        smartLists: true,
+                        smartypants: false,
+                        headerIds: false,
+                        mangle: false
                     });
+                    console.log('✅ Markdown parsed successfully');
                 } catch (e) {
-                    console.warn('Markdown parse error:', e);
+                    console.warn('❌ Markdown parse error:', e);
+                    // Fallback to plain HTML
+                    finalHtml = htmlContent;
                 }
             }
             
@@ -3777,7 +4636,10 @@ function clearFindHighlights(keepObs){
   updateFindCount();
 }
 
-function escapeRegExp(str){ return str.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
+function escapeRegExp(str){ 
+  if (!str) return '';
+  return String(str).replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); 
+}
 
 document.addEventListener('DOMContentLoaded', ()=>{
   const q=document.getElementById('find-query');
@@ -3841,8 +4703,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
       if (!shift && k === 'm') { e.preventDefault(); tryClick('mic-btn'); flashNotice && flashNotice('Mic toggled (Ctrl+M)'); return; }
       // Attach: Ctrl+Shift+U
       if (shift && k === 'u') { e.preventDefault(); tryClick('attach-btn') || document.getElementById('images')?.click(); flashNotice && flashNotice('Attach file (Ctrl+Shift+U)'); return; }
-      // Diagnose: Ctrl+Shift+K
-      if (shift && k === 'k') { e.preventDefault(); tryClick('mode-btn'); flashNotice && flashNotice('Toggle Diagnose (Ctrl+Shift+K)'); return; }
+      // Mode Menu: Ctrl+Shift+K
+      if (shift && k === 'k') { e.preventDefault(); openModeMenu(); flashNotice && flashNotice('Mở menu chế độ (Ctrl+Shift+K)'); return; }
       // Model switch: Ctrl+Shift+Y
       if (shift && k === 'y') { e.preventDefault(); tryClick('think-btn'); flashNotice && flashNotice('Switch model (Ctrl+Shift+Y)'); return; }
       // New chat: Ctrl+Shift+X
@@ -4135,6 +4997,12 @@ function buildSearchCacheData() {
   if(!historyCache || !historyCache.length) return;
   
   historyCache.forEach(entry => {
+    // Safe check: ensure entry exists and is valid
+    if (!entry || typeof entry !== 'object') {
+      console.warn('⚠️ Invalid history entry:', entry);
+      return;
+    }
+    
     const sid = entry.sessionId || ('legacy-' + entry.id);
     if (!sessions[sid]) {
       sessions[sid] = {
@@ -4148,7 +5016,7 @@ function buildSearchCacheData() {
       sessions[sid].messages.push({
         type: 'user',
         text: entry.input,
-        timestamp: entry.timestamp,
+        timestamp: entry.timestamp || Date.now(),
         fullEntry: entry
       });
     }
@@ -4158,7 +5026,7 @@ function buildSearchCacheData() {
       sessions[sid].messages.push({
         type: 'bot',
         text: reply,
-        timestamp: entry.timestamp,
+        timestamp: entry.timestamp || Date.now(),
         fullEntry: entry
       });
     }
@@ -4167,22 +5035,27 @@ function buildSearchCacheData() {
   // Generate search cache
   Object.values(sessions).forEach(session => {
     // Set title if not exists
-    if (!session.title && session.messages.length > 0) {
-      const firstUserMsg = session.messages.find(m => m.type === 'user');
-      session.title = firstUserMsg ? firstUserMsg.text.slice(0, 60) : 'Cuộc trò chuyện';
+    if (!session.title && session.messages && session.messages.length > 0) {
+      const firstUserMsg = session.messages.find(m => m && m.type === 'user');
+      session.title = (firstUserMsg && firstUserMsg.text) ? firstUserMsg.text.slice(0, 60) : 'Cuộc trò chuyện';
     }
     
-    session.messages.forEach((msg, idx) => {
-      searchCacheData.push({
-        sessionId: session.id,
-        sessionTitle: session.title,
-        messageIndex: idx,
-        messageType: msg.type,
-        messageText: msg.text,
-        timestamp: msg.timestamp,
-        fullEntry: msg.fullEntry
+    if (session.messages && Array.isArray(session.messages)) {
+      session.messages.forEach((msg, idx) => {
+        // Safe check: ensure msg exists and has required properties
+        if (msg && typeof msg === 'object') {
+          searchCacheData.push({
+            sessionId: session.id,
+            sessionTitle: session.title || 'Cuộc trò chuyện',
+            messageIndex: idx,
+            messageType: msg.type || 'unknown',
+            messageText: msg.text || msg.input || msg.reply || '',
+            timestamp: msg.timestamp || Date.now(),
+            fullEntry: msg.fullEntry || msg
+          });
+        }
       });
-    });
+    }
   });
 }
 
@@ -4204,9 +5077,12 @@ function performSearchAdvanced(query) {
   let results = [];
   
   if (currentSearchMode === 'questions') {
-    // Tìm câu hỏi
+    // Tìm câu hỏi - with safe checks
     results = searchCacheData.filter(item => 
-      item.messageType === 'user' && item.messageText.toLowerCase().includes(q)
+      item && 
+      item.messageType === 'user' && 
+      item.messageText && 
+      item.messageText.toLowerCase().includes(q)
     );
     
     if (results.length === 0) {
@@ -4236,6 +5112,9 @@ function performSearchAdvanced(query) {
     // Tìm cuộc trò chuyện
     const sessions = {};
     historyCache.forEach(entry => {
+      // Safe check for entry
+      if (!entry || typeof entry !== 'object') return;
+      
       const sid = entry.sessionId || ('legacy-' + entry.id);
       if (!sessions[sid]) {
         const title = entry.conversationTitle || 
@@ -4275,6 +5154,7 @@ function performSearchAdvanced(query) {
 }
 
 function highlightSearchText(text, query) {
+  if (!text) return '';
   const regex = new RegExp(`(${escapeRegExp(query)})`, 'gi');
   return escapeHtml(text).replace(regex, '<span class="search-highlight">$1</span>');
 }
@@ -4376,6 +5256,967 @@ function deleteConversation(sessionId) {
 }
 
 console.log('✅ JAREMIS: All fixes loaded successfully!');
+
+// ==== MODE MENU FUNCTIONS ====
+let currentMode = 'chat'; // 'chat', 'diagnose', 'professional'
+
+function openModeMenu(e) {
+  e?.preventDefault();
+  e?.stopPropagation();
+  const backdrop = document.getElementById('mode-menu-backdrop');
+  if (backdrop) {
+    backdrop.classList.add('show');
+    updateModeMenuUI();
+  }
+}
+
+function closeModeMenu() {
+  const backdrop = document.getElementById('mode-menu-backdrop');
+  if (backdrop) {
+    backdrop.classList.remove('show');
+  }
+}
+
+function selectMode(mode) {
+  currentMode = mode;
+  
+  // Update diagnosticMode for backward compatibility
+  if (mode === 'diagnose') {
+    diagnosticMode = true;
+  } else {
+    diagnosticMode = false;
+  }
+  
+  // Update UI
+  updateModeButton();
+  updateAccountRole();
+  closeModeMenu();
+  
+  // Removed: Professional history button is now always visible
+  
+  console.log('Mode switched to:', mode);
+}
+
+function updateModeButton() {
+  const modeBtn = document.getElementById('mode-btn');
+  if (!modeBtn) return;
+  
+  if (currentMode === 'chat') {
+    modeBtn.innerHTML = '<i class="fas fa-comments"></i>';
+    modeBtn.title = 'Chế độ: Chat';
+    modeBtn.classList.remove('active');
+  } else if (currentMode === 'diagnose') {
+    modeBtn.innerHTML = '<i class="fas fa-stethoscope"></i>';
+    modeBtn.title = 'Chế độ: Diagnose';
+    modeBtn.classList.add('active');
+  } else if (currentMode === 'professional') {
+    modeBtn.innerHTML = '<i class="fas fa-user-md"></i>';
+    modeBtn.title = 'Chế độ: Professional';
+    modeBtn.classList.add('active');
+  }
+}
+
+function updateModeMenuUI() {
+  const options = document.querySelectorAll('.mode-option');
+  options.forEach(option => {
+    const optionMode = option.dataset.mode;
+    if (optionMode === currentMode) {
+      option.classList.add('active');
+    } else {
+      option.classList.remove('active');
+    }
+  });
+}
+
+function updateAccountRole() {
+  const accountRole = document.getElementById('account-role');
+  if (!accountRole) return;
+  
+  const roleText = {
+    'chat': 'Chế độ: Chat',
+    'diagnose': 'Chế độ: Diagnose',
+    'professional': 'Chế độ: Professional'
+  };
+  
+  accountRole.textContent = roleText[currentMode] || 'Chế độ: Chat';
+}
+
+// ==== ACCOUNT MENU FUNCTIONS ====
+function toggleAccountMenu() {
+  const accountInfo = document.getElementById('account-info');
+  const accountDropdown = document.getElementById('account-dropdown');
+  
+  if (accountInfo && accountDropdown) {
+    accountInfo.classList.toggle('open');
+    accountDropdown.classList.toggle('show');
+  }
+}
+
+// Close account menu when clicking outside
+document.addEventListener('click', (e) => {
+  const accountSection = document.getElementById('account-section');
+  if (accountSection && !accountSection.contains(e.target)) {
+    const accountInfo = document.getElementById('account-info');
+    const accountDropdown = document.getElementById('account-dropdown');
+    if (accountInfo) accountInfo.classList.remove('open');
+    if (accountDropdown) accountDropdown.classList.remove('show');
+  }
+});
+
+function openProfileModal() {
+  const backdrop = document.getElementById('profile-modal-backdrop');
+  if (backdrop) {
+    backdrop.classList.add('show');
+    // Load current user data
+    const userData = JSON.parse(localStorage.getItem('jaremis_user') || '{}');
+    const nameInput = document.getElementById('profile-name');
+    const usernameInput = document.getElementById('profile-username');
+    const avatarPreview = document.getElementById('profile-avatar-preview');
+    
+    if (nameInput) nameInput.value = userData.displayName || userData.username || 'Guest User';
+    if (usernameInput) usernameInput.value = userData.username || '';
+    if (avatarPreview) {
+      avatarPreview.src = userData.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userData.username || 'default'}`;
+    }
+  }
+}
+
+function handleAvatarUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  // Check file type
+  if (!file.type.startsWith('image/')) {
+    alert('Vui lòng chọn file ảnh hợp lệ!');
+    return;
+  }
+  
+  // Check file size (max 2MB)
+  if (file.size > 2 * 1024 * 1024) {
+    alert('Kích thước ảnh tối đa là 2MB!');
+    return;
+  }
+  
+  // Read file and convert to base64
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const avatarPreview = document.getElementById('profile-avatar-preview');
+    if (avatarPreview) {
+      avatarPreview.src = e.target.result;
+    }
+    // Clear URL input when uploading file
+    const avatarUrlInput = document.getElementById('profile-avatar-url');
+    if (avatarUrlInput) avatarUrlInput.value = '';
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeAvatar() {
+  const userData = JSON.parse(localStorage.getItem('jaremis_user') || '{}');
+  const defaultAvatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${userData.username || 'default'}`;
+  
+  const avatarPreview = document.getElementById('profile-avatar-preview');
+  const avatarUrlInput = document.getElementById('profile-avatar-url');
+  const avatarUpload = document.getElementById('avatar-upload');
+  
+  if (avatarPreview) avatarPreview.src = defaultAvatar;
+  if (avatarUrlInput) avatarUrlInput.value = '';
+  if (avatarUpload) avatarUpload.value = '';
+}
+
+function updateAvatarPreview() {
+  const avatarUrlInput = document.getElementById('profile-avatar-url');
+  const avatarPreview = document.getElementById('profile-avatar-preview');
+  
+  if (avatarUrlInput && avatarPreview && avatarUrlInput.value.trim()) {
+    avatarPreview.src = avatarUrlInput.value.trim();
+  }
+}
+
+function closeProfileModal() {
+  const backdrop = document.getElementById('profile-modal-backdrop');
+  if (backdrop) {
+    backdrop.classList.remove('show');
+  }
+}
+
+async function saveProfile() {
+  const nameInput = document.getElementById('profile-name');
+  const usernameInput = document.getElementById('profile-username');
+  const avatarPreview = document.getElementById('profile-avatar-preview');
+  
+  if (nameInput && usernameInput) {
+    const displayName = nameInput.value.trim();
+    const newUsername = usernameInput.value.trim();
+    
+    // Validation
+    if (!displayName) {
+      flashNotice && flashNotice('Vui lòng nhập tên hiển thị!', 'error');
+      return;
+    }
+    
+    if (!newUsername) {
+      flashNotice && flashNotice('Vui lòng nhập tên người dùng!', 'error');
+      return;
+    }
+    
+    // Validate username format (chỉ cho phép chữ cái, số, dấu gạch dưới, gạch ngang)
+    if (!/^[a-zA-Z0-9_-]+$/.test(newUsername)) {
+      flashNotice && flashNotice('Tên người dùng chỉ được chứa chữ cái, số, _ và -', 'error');
+      return;
+    }
+    
+    // Get current user data
+    const userData = JSON.parse(localStorage.getItem('jaremis_user') || '{}');
+    const oldUsername = userData.username;
+    
+    // If username changed, check if it's available
+    if (newUsername !== oldUsername) {
+      try {
+        const response = await fetch(`/api/check-username?username=${encodeURIComponent(newUsername)}`);
+        const data = await response.json();
+        
+        if (!data.available) {
+          flashNotice && flashNotice('Tên người dùng đã được sử dụng! Vui lòng chọn tên khác.', 'error');
+          return;
+        }
+      } catch (error) {
+        console.error('Error checking username:', error);
+        flashNotice && flashNotice('Lỗi khi kiểm tra tên người dùng', 'error');
+        return;
+      }
+    }
+    
+    // Get avatar from preview (could be base64 or URL)
+    const avatar = avatarPreview?.src || `https://api.dicebear.com/7.x/avataaars/svg?seed=${newUsername}`;
+    
+    // Save to localStorage
+    userData.displayName = displayName;
+    userData.username = newUsername;
+    userData.avatar = avatar;
+    localStorage.setItem('jaremis_user', JSON.stringify(userData));
+    
+    // Update UI
+    updateAccountUI();
+    closeProfileModal();
+    
+    flashNotice && flashNotice('✅ Đã lưu hồ sơ thành công!', 'success');
+  }
+}
+
+function updateAccountUI() {
+  const userData = JSON.parse(localStorage.getItem('jaremis_user') || '{}');
+  const displayName = userData.displayName || userData.username || 'Guest User';
+  const username = userData.username || 'guest';
+  const avatarUrl = userData.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`;
+  
+  const accountName = document.getElementById('account-name');
+  const userAvatar = document.getElementById('user-avatar');
+  
+  if (accountName) accountName.textContent = displayName;
+  if (userAvatar) userAvatar.src = avatarUrl;
+}
+
+function logout() {
+  if (confirm('Bạn có chắc muốn đăng xuất?')) {
+    localStorage.removeItem('jaremis_user');
+    localStorage.removeItem('jaremis_token');
+    updateAccountUI();
+    currentMode = 'chat';
+    updateModeButton();
+    updateAccountRole();
+  }
+}
+
+// ==== PROFESSIONAL MODE - PATIENT RECORDS ====
+async function showProfessionalHistory() {
+  // Show medical records modal
+  showMedicalRecordsModal();
+}
+
+async function showMedicalRecordsModal() {
+  const userData = JSON.parse(localStorage.getItem('jaremis_user') || '{}');
+  const doctorId = userData.username;
+  
+  if (!doctorId) {
+    alert('Vui lòng đăng nhập để xem hồ sơ bệnh nhân');
+    return;
+  }
+  
+  // Create modal backdrop
+  let backdrop = document.getElementById('medical-records-backdrop');
+  if (!backdrop) {
+    backdrop = document.createElement('div');
+    backdrop.id = 'medical-records-backdrop';
+    backdrop.className = 'mode-menu-backdrop';
+    backdrop.innerHTML = `
+      <div class="mode-menu" style="max-width: 900px; max-height: 85vh;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h3 style="margin: 0;">📋 Hồ sơ bệnh nhân</h3>
+          <button onclick="closeMedicalRecordsModal()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-color);">×</button>
+        </div>
+        <div id="medical-records-content" style="overflow-y: auto; max-height: calc(85vh - 80px);">
+          <div style="text-align: center; padding: 20px;">
+            <i class="fas fa-spinner fa-spin" style="font-size: 24px;"></i>
+            <p>Đang tải hồ sơ...</p>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(backdrop);
+    
+    backdrop.addEventListener('click', (e) => {
+      if (e.target.id === 'medical-records-backdrop') {
+        closeMedicalRecordsModal();
+      }
+    });
+  }
+  
+  backdrop.classList.add('show');
+  
+  // Fetch patient records
+  try {
+    const response = await fetch(`/api/patient-records?doctor=${encodeURIComponent(doctorId)}`);
+    const data = await response.json();
+    
+    const content = document.getElementById('medical-records-content');
+    
+    if (!data.success || data.records.length === 0) {
+      content.innerHTML = `
+        <div style="text-align: center; padding: 40px; color: var(--text-secondary-color);">
+          <i class="fas fa-folder-open" style="font-size: 48px; margin-bottom: 16px;"></i>
+          <p>Chưa có hồ sơ bệnh nhân nào</p>
+        </div>
+      `;
+    } else {
+      content.innerHTML = `
+        <div style="display: grid; gap: 12px;">
+          ${data.records.map(record => `
+            <div class="record-card" style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; cursor: pointer; transition: all 0.2s;" 
+                 onclick="viewPatientRecord('${record.patientId}')"
+                 onmouseenter="this.style.borderColor='var(--accent-color)'; this.style.background='#2c313a'"
+                 onmouseleave="this.style.borderColor='var(--border-color)'; this.style.background='var(--input-bg)'">
+              <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+                <div>
+                  <div style="font-weight: 600; font-size: 16px; color: var(--text-color); margin-bottom: 4px;">
+                    <i class="fas fa-user-injured"></i> ${escapeHtml(record.patientName || record.patientId)}
+                  </div>
+                  <div style="font-size: 12px; color: var(--text-secondary-color);">
+                    Mã BN: ${record.patientId}
+                  </div>
+                </div>
+                <div style="text-align: right;">
+                  <div style="background: var(--accent-color); color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">
+                    ${record.totalVisits} lần khám
+                  </div>
+                </div>
+              </div>
+              ${record.latestVisit ? `
+                <div style="font-size: 13px; color: var(--text-secondary-color); margin-bottom: 8px;">
+                  <i class="fas fa-clock"></i> Lần cuối: ${new Date(record.latestVisit.consultationDate).toLocaleDateString('vi-VN', {year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'})}
+                </div>
+                <div style="font-size: 13px; color: var(--text-color); background: var(--chat-bg); padding: 8px; border-radius: 4px; border-left: 3px solid var(--accent-color);">
+                  ${escapeHtml(record.latestVisit.chiefComplaint || 'Không có thông tin')}
+                </div>
+              ` : ''}
+              <div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+                <button onclick="event.stopPropagation(); viewMedicalReport('${record.patientId}')" 
+                        style="flex: 1; min-width: 140px; padding: 8px; background: var(--success-color); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">
+                  <i class="fas fa-file-medical"></i> Xem giấy khám
+                </button>
+                <button onclick="event.stopPropagation(); downloadMedicalReportPDF('${record.patientId}')" 
+                        style="flex: 1; min-width: 120px; padding: 8px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">
+                  <i class="fas fa-file-pdf"></i> Xuất PDF
+                </button>
+                <button onclick="event.stopPropagation(); downloadMedicalReportWord('${record.patientId}')" 
+                        style="flex: 1; min-width: 120px; padding: 8px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">
+                  <i class="fas fa-file-word"></i> Xuất Word
+                </button>
+                <button onclick="event.stopPropagation(); editPatientProfile('${record.patientId}')" 
+                        style="flex: 1; min-width: 140px; padding: 8px; background: var(--accent-color); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">
+                  <i class="fas fa-edit"></i> Chỉnh sửa hồ sơ
+                </button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+  } catch (error) {
+    console.error('Error fetching patient records:', error);
+    document.getElementById('medical-records-content').innerHTML = `
+      <div style="text-align: center; padding: 40px; color: var(--error-color);">
+        <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 16px;"></i>
+        <p>Lỗi khi tải hồ sơ bệnh nhân</p>
+        <p style="font-size: 14px;">${error.message}</p>
+      </div>
+    `;
+  }
+}
+
+function closeMedicalRecordsModal() {
+  const backdrop = document.getElementById('medical-records-backdrop');
+  if (backdrop) {
+    backdrop.classList.remove('show');
+  }
+}
+
+async function viewPatientRecord(patientId) {
+  const userData = JSON.parse(localStorage.getItem('jaremis_user') || '{}');
+  const doctorId = userData.username;
+  
+  try {
+    const response = await fetch(`/api/patient-record/${patientId}?doctor=${encodeURIComponent(doctorId)}`);
+    const data = await response.json();
+    
+    if (!data.success) {
+      alert('Lỗi: ' + data.error);
+      return;
+    }
+    
+    // Show detailed record modal
+    showPatientRecordDetail(data.record);
+  } catch (error) {
+    console.error('Error fetching patient record:', error);
+    alert('Lỗi khi tải hồ sơ chi tiết');
+  }
+}
+
+function showPatientRecordDetail(record) {
+  let detailBackdrop = document.getElementById('patient-detail-backdrop');
+  if (!detailBackdrop) {
+    detailBackdrop = document.createElement('div');
+    detailBackdrop.id = 'patient-detail-backdrop';
+    detailBackdrop.className = 'mode-menu-backdrop';
+    document.body.appendChild(detailBackdrop);
+    
+    detailBackdrop.addEventListener('click', (e) => {
+      if (e.target.id === 'patient-detail-backdrop') {
+        detailBackdrop.classList.remove('show');
+      }
+    });
+  }
+  
+  const sortedConsultations = [...record.consultations].sort((a, b) => 
+    new Date(b.consultationDate) - new Date(a.consultationDate)
+  );
+  
+  detailBackdrop.innerHTML = `
+    <div class="mode-menu" style="max-width: 1000px; max-height: 90vh;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h3 style="margin: 0;">📋 Chi tiết hồ sơ: ${escapeHtml(record.patientName || record.patientId)}</h3>
+        <button onclick="document.getElementById('patient-detail-backdrop').classList.remove('show')" 
+                style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-color);">×</button>
+      </div>
+      <div style="overflow-y: auto; max-height: calc(90vh - 80px);">
+        <div style="background: var(--input-bg); padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+          <h4 style="margin: 0 0 12px 0;">Thông tin chung</h4>
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; font-size: 14px;">
+            <div><strong>Mã bệnh nhân:</strong> ${record.patientId}</div>
+            <div><strong>Tổng số lần khám:</strong> ${record.totalVisits}</div>
+            <div><strong>Ngày tạo hồ sơ:</strong> ${new Date(record.createdAt).toLocaleDateString('vi-VN')}</div>
+            <div><strong>Cập nhật cuối:</strong> ${new Date(record.lastUpdatedAt).toLocaleDateString('vi-VN')}</div>
+          </div>
+        </div>
+        
+        <h4 style="margin: 20px 0 12px 0;">Lịch sử khám bệnh (${sortedConsultations.length} lần)</h4>
+        ${sortedConsultations.map((visit, index) => {
+          try {
+            return `
+              <div style="background: var(--input-bg); padding: 16px; border-radius: 8px; margin-bottom: 12px; border-left: 4px solid var(--accent-color);">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                  <strong style="color: var(--accent-color);">Lần ${sortedConsultations.length - index} - ${new Date(visit.consultationDate).toLocaleDateString('vi-VN', {year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'})}</strong>
+                  <span style="font-size: 12px; color: var(--text-secondary-color);">BS. ${escapeHtml(visit.doctor || 'N/A')}</span>
+                </div>
+                <div style="margin-bottom: 8px;">
+                  <strong>Lý do khám:</strong>
+                  <div style="margin-top: 4px; padding: 8px; background: var(--chat-bg); border-radius: 4px; font-size: 13px;">
+                    ${escapeHtml(visit.chiefComplaint || visit.symptoms || 'N/A')}
+                  </div>
+                </div>
+                ${visit.imageCount > 0 ? `
+                  <div style="margin-bottom: 8px; padding: 8px; background: #e7f3ff; border-radius: 4px; color: #003666;">
+                    <i class="fas fa-images"></i> <strong>${visit.imageCount} hình ảnh y khoa đính kèm</strong>
+                  </div>
+                ` : ''}
+                ${(() => {
+                  try {
+                    let meds = visit.prescribedMedications;
+                    if (typeof meds === 'string') {
+                      meds = JSON.parse(meds);
+                    }
+                    if (meds && Array.isArray(meds) && meds.length > 0) {
+                      return `
+                        <div style="margin-top: 12px;">
+                          <strong>💊 Đơn thuốc:</strong>
+                          <ul style="margin: 8px 0; padding-left: 20px;">
+                            ${meds.map(med => `
+                              <li style="margin-bottom: 4px;">
+                                ${escapeHtml(med.name || 'N/A')} - ${escapeHtml(med.dosage || 'N/A')} 
+                                ${med.instructions ? `<br><span style="font-size: 12px; color: var(--text-secondary-color);">${escapeHtml(med.instructions)}</span>` : ''}
+                              </li>
+                            `).join('')}
+                          </ul>
+                        </div>
+                      `;
+                    }
+                    return '';
+                  } catch (e) {
+                    console.warn('Error parsing prescribedMedications:', e);
+                    return '';
+                  }
+                })()}
+                <div style="margin-top: 12px; font-size: 12px; color: var(--text-secondary-color);">
+                  Phân tích bởi: ${escapeHtml(visit.modelUsed || 'JAREMIS')}
+                </div>
+              </div>
+            `;
+          } catch (e) {
+            console.error('Error rendering visit:', e);
+            return `<div style="padding: 12px; background: rgba(255,0,0,0.1); border-radius: 4px; margin-bottom: 8px;">Lỗi hiển thị lần khám này</div>`;
+          }
+        }).join('')}
+      </div>
+    </div>
+  `;
+  
+  detailBackdrop.classList.add('show');
+}
+
+function viewMedicalReport(patientId) {
+  const userData = JSON.parse(localStorage.getItem('jaremis_user') || '{}');
+  const doctorId = userData.username;
+  
+  // Open medical report in new window with export buttons
+  const url = `/api/patient-record/${patientId}/medical-report?doctor=${encodeURIComponent(doctorId)}`;
+  const reportWindow = window.open(url, '_blank', 'width=1000,height=900,scrollbars=yes');
+  
+  // Add export buttons when window loads
+  if (reportWindow) {
+    reportWindow.addEventListener('load', () => {
+      addExportButtons(reportWindow, patientId, doctorId);
+    });
+  }
+}
+
+function addExportButtons(reportWindow, patientId, doctorId) {
+  try {
+    const doc = reportWindow.document;
+    const body = doc.querySelector('.medical-certificate') || doc.body;
+    
+    // Create floating action buttons
+    const buttonContainer = doc.createElement('div');
+    buttonContainer.innerHTML = `
+      <div style="position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; gap: 10px; flex-direction: column; print:hidden;">
+        <button onclick="window.print()" 
+                style="padding: 12px 20px; background: #4CAF50; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 8px;">
+          <i class="fas fa-print"></i> In
+        </button>
+        <button onclick="exportToPDF()" 
+                style="padding: 12px 20px; background: #f44336; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 8px;">
+          <i class="fas fa-file-pdf"></i> Xuất PDF
+        </button>
+        <button onclick="downloadAsWord('${patientId}', '${doctorId}')" 
+                style="padding: 12px 20px; background: #2196F3; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 8px;">
+          <i class="fas fa-file-word"></i> Xuất Word
+        </button>
+        <button onclick="editMedicalReport()" 
+                style="padding: 12px 20px; background: #FF9800; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 8px;">
+          <i class="fas fa-edit"></i> Chỉnh sửa
+        </button>
+      </div>
+    `;
+    body.insertBefore(buttonContainer, body.firstChild);
+    
+    // Add html2pdf library if not already loaded
+    if (!reportWindow.html2pdf) {
+      const script = doc.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+      doc.head.appendChild(script);
+    }
+    
+    // Add PDF export function
+    reportWindow.exportToPDF = function() {
+      const element = doc.querySelector('.medical-certificate');
+      const opt = {
+        margin: [10, 10, 10, 10],
+        filename: 'GiayKhamBenh_' + patientId + '_' + new Date().getTime() + '.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { 
+          scale: 2,
+          useCORS: true,
+          letterRendering: true,
+          scrollY: 0,
+          scrollX: 0
+        },
+        jsPDF: { 
+          unit: 'mm', 
+          format: 'a4', 
+          orientation: 'portrait',
+          compress: true
+        },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+      };
+      
+      // Hide buttons before export
+      const buttons = doc.querySelector('[style*="position: fixed"]');
+      if (buttons) buttons.style.display = 'none';
+      
+      html2pdf().set(opt).from(element).save().then(() => {
+        if (buttons) buttons.style.display = 'flex';
+      }).catch(err => {
+        console.error('Error exporting PDF:', err);
+        if (buttons) buttons.style.display = 'flex';
+        alert('Lỗi khi xuất PDF. Vui lòng thử lại.');
+      });
+    };
+    
+    // Add download function to window
+    reportWindow.downloadAsWord = async function(patientId, doctorId) {
+      try {
+        const response = await fetch('/api/patient-record/' + patientId + '/export-word?doctor=' + encodeURIComponent(doctorId));
+        if (!response.ok) throw new Error('Export failed');
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'GiayKhamBenh_' + patientId + '_' + new Date().getTime() + '.doc';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      } catch (error) {
+        alert('Lỗi khi xuất file Word: ' + error.message);
+      }
+    };
+    
+    // Add edit function
+    reportWindow.editMedicalReport = function() {
+      const editable = doc.querySelectorAll('.info-value, .subsection, .bullet-item, .editable-field');
+      const editBtn = doc.querySelector('button[onclick="editMedicalReport()"]');
+      
+      if (editBtn.textContent.includes('Chỉnh sửa')) {
+        // Enable editing
+        editable.forEach(el => {
+          el.contentEditable = true;
+          el.style.backgroundColor = '#fffacd';
+          el.style.padding = '4px';
+          el.style.border = '1px dashed #999';
+        });
+        
+        // Enable editable fields
+        if (typeof reportWindow.enableEditMode === 'function') {
+          reportWindow.enableEditMode();
+        }
+        
+        editBtn.innerHTML = '<i class="fas fa-save"></i> Lưu';
+        editBtn.style.background = '#4CAF50';
+      } else {
+        // Save changes
+        editable.forEach(el => {
+          el.contentEditable = false;
+          el.style.backgroundColor = '';
+          el.style.padding = '';
+          el.style.border = '';
+        });
+        
+        // Disable editable fields
+        if (typeof reportWindow.disableEditMode === 'function') {
+          reportWindow.disableEditMode();
+        }
+        
+        editBtn.innerHTML = '<i class="fas fa-edit"></i> Chỉnh sửa';
+        editBtn.style.background = '#FF9800';
+        alert('Đã lưu thay đổi! (Chỉ áp dụng cho phiên hiện tại)');
+      }
+    };
+  } catch (error) {
+    console.error('Error adding export buttons:', error);
+  }
+}
+
+function downloadMedicalReportPDF(patientId) {
+  const userData = JSON.parse(localStorage.getItem('jaremis_user') || '{}');
+  const doctorId = userData.username;
+  
+  // Open print dialog
+  const url = `/api/patient-record/${patientId}/medical-report?doctor=${encodeURIComponent(doctorId)}`;
+  const printWindow = window.open(url, '_blank');
+  
+  if (printWindow) {
+    printWindow.addEventListener('load', () => {
+      setTimeout(() => {
+        printWindow.print();
+      }, 500);
+    });
+  }
+}
+
+async function downloadMedicalReportWord(patientId) {
+  const userData = JSON.parse(localStorage.getItem('jaremis_user') || '{}');
+  const doctorId = userData.username;
+  
+  try {
+    const response = await fetch(`/api/patient-record/${patientId}/export-word?doctor=${encodeURIComponent(doctorId)}`);
+    if (!response.ok) throw new Error('Export failed');
+    
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `GiayKhamBenh_${patientId}_${new Date().getTime()}.doc`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    alert('Lỗi khi xuất file Word: ' + error.message);
+  }
+}
+
+
+async function editPatientProfile(patientId) {
+  const userData = JSON.parse(localStorage.getItem('jaremis_user') || '{}');
+  const doctorId = userData.username;
+  
+  try {
+    const response = await fetch(`/api/patient-record/${patientId}?doctor=${encodeURIComponent(doctorId)}`);
+    const data = await response.json();
+    
+    if (!data.success) {
+      alert('Lỗi: ' + data.error);
+      return;
+    }
+    
+    const record = data.record;
+    const latestVisit = record.consultations[record.consultations.length - 1];
+    const patientInfo = latestVisit.patientInfo || {};
+    
+    // Show edit modal
+    showPatientProfileEditModal(record, patientInfo);
+  } catch (error) {
+    console.error('Error:', error);
+    alert('Lỗi khi tải thông tin bệnh nhân');
+  }
+}
+
+function showPatientProfileEditModal(record, patientInfo) {
+  let editBackdrop = document.getElementById('edit-profile-backdrop');
+  if (!editBackdrop) {
+    editBackdrop = document.createElement('div');
+    editBackdrop.id = 'edit-profile-backdrop';
+    editBackdrop.className = 'mode-menu-backdrop';
+    document.body.appendChild(editBackdrop);
+    
+    editBackdrop.addEventListener('click', (e) => {
+      if (e.target.id === 'edit-profile-backdrop') {
+        editBackdrop.classList.remove('show');
+      }
+    });
+  }
+  
+  editBackdrop.innerHTML = `
+    <div class="mode-menu" style="max-width: 600px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h3 style="margin: 0;">✏️ Chỉnh sửa hồ sơ bệnh nhân</h3>
+        <button onclick="document.getElementById('edit-profile-backdrop').classList.remove('show')" 
+                style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-color);">×</button>
+      </div>
+      <form id="edit-patient-form" onsubmit="savePatientProfile(event, '${record.patientId}')">
+        <div style="display: grid; gap: 16px;">
+          <div>
+            <label style="display: block; margin-bottom: 4px; font-weight: 600;">Họ và tên:</label>
+            <input type="text" name="name" value="${escapeHtml(patientInfo.name || '')}" 
+                   style="width: 100%; padding: 10px; background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-color);">
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div>
+              <label style="display: block; margin-bottom: 4px; font-weight: 600;">Tuổi:</label>
+              <input type="number" name="age" value="${patientInfo.age || ''}" 
+                     style="width: 100%; padding: 10px; background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-color);">
+            </div>
+            <div>
+              <label style="display: block; margin-bottom: 4px; font-weight: 600;">Giới tính:</label>
+              <select name="gender" style="width: 100%; padding: 10px; background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-color);">
+                <option value="">--Chọn--</option>
+                <option value="Nam" ${patientInfo.gender === 'Nam' ? 'selected' : ''}>Nam</option>
+                <option value="Nữ" ${patientInfo.gender === 'Nữ' ? 'selected' : ''}>Nữ</option>
+                <option value="Khác" ${patientInfo.gender === 'Khác' ? 'selected' : ''}>Khác</option>
+              </select>
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div>
+              <label style="display: block; margin-bottom: 4px; font-weight: 600;">Cân nặng (kg):</label>
+              <input type="number" step="0.1" name="weight" value="${patientInfo.weight || ''}" 
+                     style="width: 100%; padding: 10px; background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-color);">
+            </div>
+            <div>
+              <label style="display: block; margin-bottom: 4px; font-weight: 600;">Chiều cao (cm):</label>
+              <input type="number" step="0.1" name="height" value="${patientInfo.height || ''}" 
+                     style="width: 100%; padding: 10px; background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-color);">
+            </div>
+          </div>
+          <div>
+            <label style="display: block; margin-bottom: 4px; font-weight: 600;">Huyết áp:</label>
+            <input type="text" name="bloodPressure" value="${patientInfo.bloodPressure || ''}" placeholder="Ví dụ: 120/80" 
+                   style="width: 100%; padding: 10px; background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-color);">
+          </div>
+          <div>
+            <label style="display: block; margin-bottom: 4px; font-weight: 600;">Tiền sử bệnh:</label>
+            <textarea name="medicalHistory" rows="3" 
+                      style="width: 100%; padding: 10px; background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-color); resize: vertical;">${patientInfo.medicalHistory || ''}</textarea>
+          </div>
+          <div>
+            <label style="display: block; margin-bottom: 4px; font-weight: 600;">Dị ứng:</label>
+            <textarea name="allergies" rows="2" 
+                      style="width: 100%; padding: 10px; background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-color); resize: vertical;">${patientInfo.allergies || ''}</textarea>
+          </div>
+        </div>
+        <div style="margin-top: 24px; display: flex; gap: 12px;">
+          <button type="submit" style="flex: 1; padding: 12px; background: var(--success-color); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+            <i class="fas fa-save"></i> Lưu thay đổi
+          </button>
+          <button type="button" onclick="document.getElementById('edit-profile-backdrop').classList.remove('show')" 
+                  style="flex: 1; padding: 12px; background: var(--border-color); color: var(--text-color); border: none; border-radius: 6px; cursor: pointer;">
+            Hủy
+          </button>
+        </div>
+      </form>
+    </div>
+  `;
+  
+  editBackdrop.classList.add('show');
+}
+
+async function savePatientProfile(event, patientId) {
+  event.preventDefault();
+  
+  const form = event.target;
+  const formData = new FormData(form);
+  
+  const patientInfo = {
+    name: formData.get('name'),
+    age: formData.get('age') ? parseInt(formData.get('age')) : null,
+    gender: formData.get('gender'),
+    weight: formData.get('weight') ? parseFloat(formData.get('weight')) : null,
+    height: formData.get('height') ? parseFloat(formData.get('height')) : null,
+    bloodPressure: formData.get('bloodPressure'),
+    medicalHistory: formData.get('medicalHistory'),
+    allergies: formData.get('allergies')
+  };
+  
+  const userData = JSON.parse(localStorage.getItem('jaremis_user') || '{}');
+  const doctorId = userData.username;
+  
+  try {
+    const response = await fetch(`/api/patient-record/${patientId}/profile`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        doctor: doctorId,
+        patientInfo
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      alert('✅ Cập nhật hồ sơ thành công!');
+      document.getElementById('edit-profile-backdrop').classList.remove('show');
+      // Refresh records list
+      showMedicalRecordsModal();
+    } else {
+      alert('❌ Lỗi: ' + data.error);
+    }
+  } catch (error) {
+    console.error('Error saving profile:', error);
+    alert('❌ Lỗi khi lưu hồ sơ');
+  }
+}
+
+// Initialize on load
+document.addEventListener('DOMContentLoaded', () => {
+  updateAccountUI();
+  updateModeButton();
+  updateAccountRole();
+});
+
+// Close mode menu when clicking backdrop
+document.getElementById('mode-menu-backdrop')?.addEventListener('click', (e) => {
+  if (e.target.id === 'mode-menu-backdrop') {
+    closeModeMenu();
+  }
+});
+
+// Close profile modal when clicking backdrop
+document.getElementById('profile-modal-backdrop')?.addEventListener('click', (e) => {
+  if (e.target.id === 'profile-modal-backdrop') {
+    closeProfileModal();
+  }
+});
+
 </script>
+
+<!-- Mode Selection Menu -->
+<div class="mode-menu-backdrop" id="mode-menu-backdrop">
+  <div class="mode-menu">
+    <h3>Chọn chế độ hoạt động</h3>
+    <div class="mode-options">
+      <div class="mode-option" data-mode="chat" onclick="selectMode('chat')">
+        <div class="mode-icon">
+          <i class="fas fa-comments"></i>
+        </div>
+        <div class="mode-info">
+          <div class="mode-title">Chat</div>
+          <div class="mode-desc">Trò chuyện thông thường, hỏi đáp chung</div>
+        </div>
+        <div class="mode-check">
+          <i class="fas fa-check"></i>
+        </div>
+      </div>
+      
+      <div class="mode-option" data-mode="diagnose" onclick="selectMode('diagnose')">
+        <div class="mode-icon">
+          <i class="fas fa-stethoscope"></i>
+        </div>
+        <div class="mode-info">
+          <div class="mode-title">Diagnose</div>
+          <div class="mode-desc">Chẩn đoán y khoa cơ bản, phân tích triệu chứng</div>
+        </div>
+        <div class="mode-check">
+          <i class="fas fa-check"></i>
+        </div>
+      </div>
+      
+      <div class="mode-option" data-mode="professional" onclick="selectMode('professional')">
+        <div class="mode-icon">
+          <i class="fas fa-user-md"></i>
+        </div>
+        <div class="mode-info">
+          <div class="mode-title">Professional</div>
+          <div class="mode-desc">Dành cho bác sĩ: phân tích ảnh y tế, gợi ý thuốc, quản lý hồ sơ bệnh nhân</div>
+        </div>
+        <div class="mode-check">
+          <i class="fas fa-check"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Close modal backdrops on click -->
+<script>
+// Close patient info modal when clicking backdrop
+document.getElementById('patient-info-modal-backdrop')?.addEventListener('click', (e) => {
+  if (e.target.id === 'patient-info-modal-backdrop') {
+    closePatientInfoModal();
+  }
+});
+</script>
+
 </body>
 </html>

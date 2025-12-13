@@ -1,0 +1,76 @@
+
+// Patient Medical Records Endpoints
+app.get('/api/patient-records', (req, res) => {
+  try {
+    const doctor = req.query.doctor;
+    if (!doctor) return res.status(401).json({ error: 'Login required' });
+    const allRecords = readPatientRecords();
+    const doctorRecords = allRecords.filter(r => r.createdBy === doctor);
+    const summary = doctorRecords.map(r => ({
+      patientId: r.patientId,
+      patientName: r.patientName,
+      createdAt: r.createdAt,
+      lastUpdatedAt: r.lastUpdatedAt,
+      totalVisits: r.totalVisits,
+      latestVisit: r.consultations && r.consultations.length > 0 
+        ? { consultationDate: r.consultations[r.consultations.length - 1].consultationDate,
+            chiefComplaint: r.consultations[r.consultations.length - 1].chiefComplaint?.substring(0, 100) + '...' }
+        : null
+    }));
+    res.json({ success: true, records: summary });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/patient-record/:patientId', (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const doctor = req.query.doctor;
+    if (!doctor) return res.status(401).json({ error: 'Login required' });
+    const record = findPatientRecord(patientId);
+    if (!record) return res.status(404).json({ error: 'Patient record not found' });
+    if (record.createdBy !== doctor) return res.status(403).json({ error: 'Access denied' });
+    res.json({ success: true, record });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/patient-record/:patientId/medical-report', (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const doctor = req.query.doctor;
+    if (!doctor) return res.status(401).send('<h1>Login required</h1>');
+    const record = findPatientRecord(patientId);
+    if (!record) return res.status(404).send('<h1>Patient record not found</h1>');
+    if (record.createdBy !== doctor) return res.status(403).send('<h1>Access denied</h1>');
+    const htmlReport = generateMedicalRecordHTML(record);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(htmlReport);
+  } catch (error) {
+    res.status(500).send(`<h1>Error</h1><p>${error.message}</p>`);
+  }
+});
+
+app.put('/api/patient-record/:patientId/profile', express.json(), (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const { doctor, patientInfo } = req.body;
+    if (!doctor) return res.status(401).json({ error: 'Login required' });
+    const records = readPatientRecords();
+    const record = records.find(r => r.patientId === patientId);
+    if (!record) return res.status(404).json({ error: 'Patient record not found' });
+    if (record.createdBy !== doctor) return res.status(403).json({ error: 'Access denied' });
+    if (patientInfo.name) record.patientName = patientInfo.name;
+    if (record.consultations && record.consultations.length > 0) {
+      const latestConsultation = record.consultations[record.consultations.length - 1];
+      latestConsultation.patientInfo = { ...latestConsultation.patientInfo, ...patientInfo };
+    }
+    record.lastUpdatedAt = new Date().toISOString();
+    savePatientRecords(records);
+    res.json({ success: true, record });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});

@@ -7,6 +7,7 @@ const axios = require('axios');
 const bcrypt = require('bcryptjs');
 const { google } = require('googleapis');
 const path = require('path');
+const { generateMedicalRecordHTML } = require('./medicalRecordTemplate');
 
 // NEW: Server-side LaTeX rendering utilities
 const katex = require('katex');
@@ -14,15 +15,6 @@ const { JSDOM } = require('jsdom');
 const createDOMPurify = require('dompurify');
 const windowForDOM = new JSDOM('').window;
 const DOMPurify = createDOMPurify(windowForDOM);
-
-// NEW: Severity Assessment & Emergency Guidance
-const severityAssessment = require('./severityAssessment');
-
-// NEW: Smart Symptom Search - AI-powered keyword extraction & source selection
-const { smartSymptomSearch } = require('./smartSymptomSearch');
-
-// NEW: Medical Image Analysis - X-ray, MRI, CT, PET scan, Ultrasound, ECG
-const medicalImageAnalysis = require('./medicalImageAnalysis');
 
 const app = express();
 const upload = multer({ dest: 'uploads/' });
@@ -37,31 +29,6 @@ function isInvalidApiKeyError(err){
 }
 // Optional: customize birth year shown in self-introduction
 const APP_BIRTH_YEAR = process.env.APP_BIRTH_YEAR || '2025';
-
-// ========================================
-// GLOBAL ERROR HANDLERS - Prevent Server Crash
-// ========================================
-process.on('uncaughtException', (err) => {
-  console.error('❌ UNCAUGHT EXCEPTION:', err);
-  console.error('Stack:', err.stack);
-  // Don't exit - keep server running
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ UNHANDLED REJECTION at:', promise);
-  console.error('Reason:', reason);
-  // Don't exit - keep server running
-});
-
-process.on('SIGTERM', () => {
-  console.log('👋 SIGTERM received. Shutting down gracefully...');
-  process.exit(0);
-});
-
-process.on('SIGINT', () => {
-  console.log('\n👋 SIGINT received. Shutting down gracefully...');
-  process.exit(0);
-});
 
 // Ephemeral session history for non-logged users
 const sessionHistories = new Map(); // sessionId -> [{input, reply, ...}]
@@ -104,14 +71,14 @@ function computeHardLimitMs(modelId, message){
   const weather = isWeatherQuery(message);
   
   if (/flash/i.test(modelId)) {
-    if (math) return 360000; // 6 phút cho toán phức tạp
-    if (weather) return 45000; // 45s cho thời tiết
-    return 60000; // 1 phút mặc định
+    if (math) return 25000;
+    if (weather) return 25000; // Timeout cao cho câu hỏi thời tiết
+    return 20000; // Tăng timeout chung cho flash
   }
   
-  if (math) return 300000; // 5 phút cho toán phức tạp với Pro model
-  if (weather) return 90000; // 1.5 phút cho thời tiết
-  return 120000; // 2 phút mặc định
+  if (math) return 40000;
+  if (weather) return 35000;
+  return 35000; // Tăng timeout chung cho pro models
 }
 
 app.use(express.static('public'));
@@ -128,50 +95,72 @@ function ensureUsersFile() {
 }
 ensureUsersFile();
 
-// === LOCAL FILE STORAGE FOR USERS (NO GOOGLE DRIVE) ===
-// Đã tắt Google Drive sync để dễ deploy lên Render
+// === Google Drive sync for users.json ===
+const { readUsersData, updateUsersData } = require('./driveJsonService');
+const DRIVE_USERS_FILE_ID = process.env.DRIVE_USERS_FILE_ID || '1ame57YNTu-GADOjVxeUtoK7cy0VZmvDj';
 
-// Đọc users từ file cục bộ users.json
-function readUsers() {
+// === Google Drive client helper ===
+async function getDriveClient() {
+  const auth = new google.auth.GoogleAuth({
+    keyFile: process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH, // Đường dẫn file JSON
+    scopes: ['https://www.googleapis.com/auth/drive'],
+  });
+  return google.drive({ version: 'v3', auth });
+}
+
+// Đọc users từ Google Drive (nếu có fileId), fallback về file local nếu lỗi
+async function readUsers() {
     try {
-        const localData = fs.readFileSync(usersPath, 'utf8');
-        const users = JSON.parse(localData);
+        const data = await readUsersData(); // đọc từ Drive
+        const users = JSON.parse(data);
         if (Array.isArray(users)) return users;
         return [];
-    } catch (e) {
-        console.warn('⚠️ Không đọc được users.json:', e.message);
-        return [];
+    } catch (err) {
+        // fallback về file local
+        try {
+            const localData = fs.readFileSync('users.json', 'utf8');
+            const users = JSON.parse(localData);
+            if (Array.isArray(users)) return users;
+            return [];
+        } catch (e) {
+            return [];
+        }
     }
 }
 
-// Ghi users vào file cục bộ users.json
-function saveUsers(users) {
+// Ghi users lên Google Drive (nếu có fileId), đồng thời ghi file local
+async function saveUsers(users) {
   const data = JSON.stringify(users, null, 2);
   fs.writeFileSync(usersPath, data, 'utf8');
-  console.log('✅ Đã lưu users.json (local file)');
+  if (DRIVE_USERS_FILE_ID) {
+    try {
+      const auth = await getDriveClient();
+      await updateUsersData(auth, DRIVE_USERS_FILE_ID, users);
+    } catch(e) { console.error('Lỗi ghi users lên Drive:', e); }
+  }
 }
-function findUserByUsername(username) {
+async function findUserByUsername(username) {
   if (!username) return null;
-  const users = readUsers();
+  const users = await readUsers();
   return users.find(u => u.username && u.username.toLowerCase() === username.toLowerCase()) || null;
 }
-function pushUserHistory(username, historyEntry, maxItems = 500) {
+async function pushUserHistory(username, historyEntry, maxItems = 500) {
   try {
-    const users = readUsers();
+    const users = await readUsers();
     const idx = users.findIndex(u => u.username && u.username.toLowerCase() === username.toLowerCase());
     if (idx === -1) return false;
     if (!Array.isArray(users[idx].history)) users[idx].history = [];
     users[idx].history.unshift(historyEntry);
     if (users[idx].history.length > maxItems) users[idx].history = users[idx].history.slice(0, maxItems);
-    saveUsers(users);
+    await saveUsers(users);
     return true;
   } catch (e) {
     console.error('Lỗi khi lưu lịch sử người dùng', e);
     return false;
   }
 }
-function getRecentChatHistory(username, limit = 360, maxChars = 360000) {
-  const user = findUserByUsername(username);
+async function getRecentChatHistory(username, limit = 360, maxChars = 180000) {
+  const user = await findUserByUsername(username);
   if (!user || !Array.isArray(user.history)) return [];
   const chats = user.history.filter(h => h.type === 'chat');
   const recent = chats.slice(0, limit).reverse();
@@ -186,242 +175,95 @@ function getRecentChatHistory(username, limit = 360, maxChars = 360000) {
   return result;
 }
 
-/**
- * Extract symptoms from natural language (Vietnamese)
- * Remove noise: age, time, question words, connectors
- * Return clean symptom keywords
- */
-function extractSymptoms(text) {
-  if (!text || typeof text !== 'string') return [];
-  
-  // Common noise patterns to remove
-  const noisePatterns = [
-    /bệnh nhân\s+\d+\s+tuổi/gi,           // "bệnh nhân 35 tuổi"
-    /\d+\s+tuổi/gi,                        // "35 tuổi"
-    /nam|nữ|giới/gi,                       // "nam", "nữ", "giới"
-    /từ\s+\d+\s+ngày/gi,                   // "từ 3 ngày"
-    /kéo dài\s+\d+/gi,                     // "kéo dài 5 ngày"
-    /hiện tại|bây giờ|lúc này/gi,          // time words
-    /tôi|mình|em|anh|chị/gi,               // pronouns
-    /đang|đã|sẽ|vẫn|còn|đang bị/gi,        // auxiliary verbs
-    /có|bị|thấy|cảm thấy/gi,               // common verbs
-    /và|hoặc|với|cùng/gi,                  // connectors (keep in final join)
-    /nay|qua|trước/gi,                     // time refs
-    /của tôi|của em|của bạn/gi             // possessive
-  ];
-  
-  let cleaned = text;
-  noisePatterns.forEach(pattern => {
-    cleaned = cleaned.replace(pattern, ' ');
-  });
-  
-  // Split by common delimiters
-  const parts = cleaned.split(/[,;.\n]+/).map(s => s.trim()).filter(s => s.length > 0);
-  
-  // Extract symptom keywords (2-5 words phrases)
-  const symptoms = [];
-  parts.forEach(part => {
-    // Remove extra spaces
-    const normalized = part.replace(/\s+/g, ' ').trim();
-    if (normalized.length > 2 && normalized.length < 100) {
-      symptoms.push(normalized);
-    }
-  });
-  
-  // Deduplicate
-  return [...new Set(symptoms)];
-}
-
-/**
- * Translate Vietnamese symptoms to English using simple dictionary
- * For better PubMed/NIH search results
- */
-function translateSymptomToEnglish(vietnameseSymptom) {
-  const dictionary = {
-    // Common symptoms
-    'ho': 'cough',
-    'ho khan': 'dry cough',
-    'ho có đờm': 'productive cough',
-    'sốt': 'fever',
-    'sốt cao': 'high fever',
-    'đau đầu': 'headache',
-    'đau ngực': 'chest pain',
-    'tức ngực': 'chest tightness',
-    'khó thở': 'dyspnea',
-    'thở nhanh': 'tachypnea',
-    'mệt mỏi': 'fatigue',
-    'chán ăn': 'anorexia',
-    'buồn nôn': 'nausea',
-    'nôn': 'vomiting',
-    'tiêu chảy': 'diarrhea',
-    'đau bụng': 'abdominal pain',
-    'đau họng': 'sore throat',
-    'chảy nước mũi': 'rhinorrhea',
-    'nghẹt mũi': 'nasal congestion',
-    'đau cơ': 'myalgia',
-    'đau khớp': 'arthralgia',
-    'phát ban': 'rash',
-    'ngứa': 'pruritus',
-    'co giật': 'seizure',
-    'mất ý thức': 'loss of consciousness',
-    'đau lưng': 'back pain',
-    'tiểu buồi': 'dysuria',
-    'tiểu máu': 'hematuria',
-    'phù': 'edema',
-    'vàng da': 'jaundice',
-    'ho ra máu': 'hemoptysis',
-    'nôn ra máu': 'hematemesis',
-    'đại tiện phân đen': 'melena',
-    'đại tiện ra máu': 'hematochezia',
-    'sụt cân': 'weight loss',
-    'tăng cân': 'weight gain',
-    'đổ mồ hôi đêm': 'night sweats',
-    'tim đập nhanh': 'palpitation',
-    'khó nuốt': 'dysphagia'
-  };
-  
-  const symptom = vietnameseSymptom.toLowerCase().trim();
-  
-  // Exact match
-  if (dictionary[symptom]) {
-    return dictionary[symptom];
-  }
-  
-  // Partial match (contains key symptom)
-  for (const [vi, en] of Object.entries(dictionary)) {
-    if (symptom.includes(vi)) {
-      return en;
-    }
-  }
-  
-  // Fallback: return original (might be already in English or proper noun)
-  return symptom;
-}
-
-/**
- * Smart search for medical guidelines
- * Extract symptoms → Translate → Search individually
- */
 async function searchMedicalGuidelines(query) {
   try {
-    console.log('🔍 [SEARCH] Original query:', query);
-    
-    // Step 1: Extract symptoms from natural language
-    const symptoms = extractSymptoms(query);
-    console.log('🔍 [SEARCH] Extracted symptoms:', symptoms);
-    
-    if (symptoms.length === 0) {
-      console.warn('⚠️ [SEARCH] No symptoms extracted, using original query');
-      return await searchSingleQuery(query);
+    const [clinicalResponse, pubmedResponse] = await Promise.allSettled([
+      axios.get('https://clinicaltrials.gov/api/query/study_fields', {
+        params: { expr: query, fields: 'NCTId,BriefTitle,Condition', fmt: 'json', max_rnk: 3 }, timeout: 5000
+      }),
+      axios.get('https://api.ncbi.nlm.nih.gov/lit/ctx/v1/pubmed/', {
+        params: { q: query, format: 'json', retmax: 2 }, timeout: 5000
+      })
+    ]);
+
+    const references = [];
+    if (clinicalResponse.status === 'fulfilled') {
+      const trials = clinicalResponse.value.data?.StudyFieldsResponse?.StudyFields || [];
+      trials.forEach(trial => references.push({ title: trial.BriefTitle?.[0] || 'Nghiên cứu lâm sàng', url: trial.NCTId?.[0] ? `https://clinicaltrials.gov/ct2/show/${trial.NCTId?.[0]}` : 'https://clinicaltrials.gov', source: 'ClinicalTrials.gov' }));
     }
-    
-    // Step 2: Translate each symptom to English
-    const englishSymptoms = symptoms.map(s => translateSymptomToEnglish(s));
-    console.log('🔍 [SEARCH] Translated symptoms:', englishSymptoms);
-    
-    // Step 3: Search each symptom individually
-    const allReferences = [];
-    for (const symptom of englishSymptoms) {
-      try {
-        const refs = await searchSingleQuery(symptom);
-        allReferences.push(...refs);
-      } catch (err) {
-        console.error(`❌ [SEARCH] Error searching "${symptom}":`, err.message);
-      }
+    if (pubmedResponse.status === 'fulfilled') {
+      const articles = pubmedResponse.value.data?.articles || [];
+      articles.forEach(article => references.push({ title: article.title || 'Bài báo y khoa', url: article.pmid ? `https://pubmed.ncbi.nlm.nih.gov/${article.pmid}/` : 'https://pubmed.ncbi.nlm.nih.gov/', source: 'PubMed' }));
     }
-    
-    // Step 4: Deduplicate by URL
-    const uniqueRefs = [];
-    const seenUrls = new Set();
-    for (const ref of allReferences) {
-      if (!seenUrls.has(ref.url)) {
-        seenUrls.add(ref.url);
-        uniqueRefs.push(ref);
-      }
-    }
-    
-    console.log('🔍 [SEARCH] Found', uniqueRefs.length, 'unique references');
-    return uniqueRefs.slice(0, 5); // Top 5 references
-    
-  } catch (err) {
-    console.error('❌ [SEARCH] Error:', err);
-    return [];
-  }
+    return references.slice(0,4);
+  } catch (err) { console.error('Lỗi tìm kiếm tài liệu:', err); return []; }
 }
 
-/**
- * Search a single query on PubMed and ClinicalTrials.gov
- */
-async function searchSingleQuery(query) {
-  const references = [];
+// === USER MEMORY SYSTEM ===
+// Bộ nhớ người dùng lưu trữ thông tin đã chia sẻ
+const userMemories = new Map(); // username -> { summary: string, facts: [] }
+
+function getUserMemory(username) {
+  if (!username) return null;
+  return userMemories.get(username) || null;
+}
+
+function mergeFactsIntoMemory(username, newMessage) {
+  if (!username) return;
   
-  try {
-    // PubMed search (National Library of Medicine)
-    const pubmedResponse = await axios.get('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi', {
-      params: {
-        db: 'pubmed',
-        term: query,
-        retmax: 2,
-        retmode: 'json',
-        sort: 'relevance'
-      },
-      timeout: 5000
-    });
-    
-    const pmids = pubmedResponse.data?.esearchresult?.idlist || [];
-    
-    // Fetch article details
-    if (pmids.length > 0) {
-      const detailsResponse = await axios.get('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi', {
-        params: {
-          db: 'pubmed',
-          id: pmids.join(','),
-          retmode: 'json'
-        },
-        timeout: 5000
-      });
-      
-      const articles = detailsResponse.data?.result || {};
-      pmids.forEach(pmid => {
-        const article = articles[pmid];
-        if (article && article.title) {
-          references.push({
-            title: article.title,
-            url: `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`,
-            source: 'PubMed'
-          });
-        }
-      });
+  const current = userMemories.get(username) || { summary: '', facts: [] };
+  
+  // Trích xuất thông tin quan trọng từ tin nhắn
+  const importantPatterns = [
+    /tên (?:của )?tôi là ([^\.,]+)/i,
+    /(?:tôi|mình) (?:là|tên) ([^\.,]+)/i,
+    /(?:tôi|mình) (?:thích|yêu|quan tâm) ([^\.,]+)/i,
+    /(?:tôi|mình) (?:bị|mắc|có) (?:bệnh |triệu chứng )?([^\.,]+)/i,
+  ];
+  
+  for (const pattern of importantPatterns) {
+    const match = newMessage.match(pattern);
+    if (match && match[1]) {
+      const fact = match[0].trim();
+      if (!current.facts.includes(fact)) {
+        current.facts.push(fact);
+      }
     }
-  } catch (err) {
-    console.error('PubMed search error:', err.message);
   }
   
+  // Giới hạn số lượng facts
+  if (current.facts.length > 20) {
+    current.facts = current.facts.slice(-20);
+  }
+  
+  // Tạo summary từ facts
+  if (current.facts.length > 0) {
+    current.summary = 'Thông tin đã biết về người dùng:\n' + current.facts.join('\n');
+  }
+  
+  userMemories.set(username, current);
+}
+
+// === REAL-TIME SEARCH SYSTEM ===
+async function searchRealTimeInfo(query) {
+  // Placeholder function - có thể tích hợp với Google Search API hoặc SerpAPI
+  // Hiện tại trả về empty để tránh lỗi
   try {
-    // ClinicalTrials.gov search
-    const clinicalResponse = await axios.get('https://clinicaltrials.gov/api/query/study_fields', {
-      params: {
-        expr: query,
-        fields: 'NCTId,BriefTitle,Condition',
-        fmt: 'json',
-        max_rnk: 2
-      },
-      timeout: 5000
-    });
-    
-    const trials = clinicalResponse.data?.StudyFieldsResponse?.StudyFields || [];
-    trials.forEach(trial => {
-      references.push({
-        title: trial.BriefTitle?.[0] || 'Clinical Trial',
-        url: trial.NCTId?.[0] ? `https://clinicaltrials.gov/ct2/show/${trial.NCTId[0]}` : 'https://clinicaltrials.gov',
-        source: 'ClinicalTrials.gov'
-      });
-    });
+    // TODO: Implement real-time search with Google Custom Search API
+    // const response = await axios.get('https://www.googleapis.com/customsearch/v1', {
+    //   params: {
+    //     key: process.env.GOOGLE_SEARCH_API_KEY,
+    //     cx: process.env.GOOGLE_SEARCH_ENGINE_ID,
+    //     q: query,
+    //     num: 3
+    //   }
+    // });
+    // return response.data.items || [];
+    return null;
   } catch (err) {
-    console.error('ClinicalTrials.gov search error:', err.message);
+    console.warn('Real-time search not implemented:', err.message);
+    return null;
   }
-  
-  return references;
 }
 
 function parseDiagnosisResponse(text) {
@@ -461,24 +303,10 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
-// LaTeX rendering cache for performance
-const latexCache = new Map();
-
 function renderLatexInText(text) {
   if (!text) return '';
-  
-  // Check cache first
-  const cacheKey = text.length < 500 ? text : text.substring(0, 100) + '...' + text.slice(-100);
-  if (latexCache.has(cacheKey)) {
-    return latexCache.get(cacheKey);
-  }
-  
-  // Quick check - no LaTeX symbols
-  if (!/[\\$]/.test(text)) {
-    const result = escapeHtml(text).replace(/\n/g, '<br>');
-    latexCache.set(cacheKey, result);
-    return result;
-  }
+  // quick check
+  if (!/[\\$]/.test(text)) return escapeHtml(text).replace(/\n/g, '<br>');
   try {
     // collapse repeated dollars (e.g. $$ -> $)
     let src = String(text).replace(/\${3,}/g, '$');
@@ -535,22 +363,10 @@ function renderLatexInText(text) {
     if (lastIndex < src.length) {
       out += escapeHtml(src.slice(lastIndex)).replace(/\n/g, '<br>');
     }
-    
-    // Cache successful result
-    latexCache.set(cacheKey, out);
-    
-    // Limit cache size
-    if (latexCache.size > 100) {
-      const firstKey = latexCache.keys().next().value;
-      latexCache.delete(firstKey);
-    }
-    
     return out;
   } catch (err) {
     console.warn('renderLatexInText error', err);
-    const fallback = escapeHtml(text).replace(/\n/g, '<br>');
-    latexCache.set(cacheKey, fallback);
-    return fallback;
+    return escapeHtml(text).replace(/\n/g, '<br>');
   }
 }
 
@@ -560,8 +376,8 @@ function selectModelIds(requested) {
   // Prefer stable, widely supported defaults on v1beta
   // Use -latest variants to match ListModels results and avoid 404
   return {
-    primary: 'gemini-2.5-flash',
-    fallback: 'gemini-2.5-pro'
+    primary: 'gemini-1.5-flash-latest',
+    fallback: 'gemini-1.5-pro-latest'
   };
 }
 
@@ -594,30 +410,32 @@ const MODEL_PREFS = {
   flash: [
     'gemini-2.5-flash-latest',
     'gemini-2.5-flash',
+    'gemini-1.5-flash-latest',
+    'gemini-1.5-flash',
+    'gemini-2.0-flash-exp',
     'gemini-2.0-flash',
     'gemini-1.5-flash-8b-latest',
     'gemini-1.5-flash-8b',
-    'gemini-1.5-flash-latest',
-    'gemini-1.5-flash',
     'gemini-pro'
   ],
   pro: [
     'gemini-2.5-pro-latest',
     'gemini-2.5-pro',
-    'gemini-2.0-pro-exp',
-    'gemini-2.0-pro',
     'gemini-1.5-pro-latest',
     'gemini-1.5-pro',
+    'gemini-2.0-pro-exp',
+    'gemini-2.0-pro',
     'gemini-pro'
   ],
   vision: [
     'gemini-2.5-flash-latest',
     'gemini-2.5-flash',
+    'gemini-1.5-flash-latest',
+    'gemini-1.5-flash',
+    'gemini-2.0-flash-exp',
     'gemini-2.0-flash',
     'gemini-1.5-flash-8b-latest',
     'gemini-1.5-flash-8b',
-    'gemini-1.5-flash-latest',
-    'gemini-1.5-flash',
     'gemini-pro-vision',
     'gemini-pro'
   ]
@@ -681,27 +499,26 @@ async function getCandidateModels(requested = 'flash', needVision = false) {
 /* --------------------------
    Auth endpoints (unchanged)
    -------------------------- */
-app.post('/api/register', (req, res) => {
+app.post('/api/register', async (req, res) => {
   try {
     const { username, email, password } = req.body || {};
     if (!username || !email || !password) return res.status(400).json({ error: 'Vui lòng gửi username, email và password' });
-    let users = readUsers();
+    let users = await readUsers();
     if (users.find(u => u.username.toLowerCase() === username.toLowerCase())) return res.status(400).json({ error: 'Tên đăng nhập đã tồn tại' });
     if (users.find(u => u.email.toLowerCase() === email.toLowerCase())) return res.status(400).json({ error: 'Email đã được sử dụng' });
     const salt = bcrypt.genSaltSync(10);
     const hash = bcrypt.hashSync(password, salt);
     const newUser = { id: Date.now(), username, email, passwordHash: hash, createdAt: new Date().toISOString(), history: [] };
-    users.push(newUser); 
-    saveUsers(users);
+    users.push(newUser); await saveUsers(users);
     return res.json({ success: true, user: { username: newUser.username, email: newUser.email } });
   } catch (e) { console.error('Register error:', e); return res.status(500).json({ error: 'Lỗi server khi đăng ký' }); }
 });
 
-app.post('/api/login', (req, res) => {
+app.post('/api/login', async (req, res) => {
   try {
     const { usernameOrEmail, password } = req.body || {};
     if (!usernameOrEmail || !password) return res.status(400).json({ error: 'Vui lòng gửi username/email và password' });
-    const users = readUsers();
+    const users = await readUsers();
     const user = users.find(u => u.username.toLowerCase() === usernameOrEmail.toLowerCase() || u.email.toLowerCase() === usernameOrEmail.toLowerCase());
     if (!user) return res.status(401).json({ error: 'Không tìm thấy tài khoản' });
     const match = bcrypt.compareSync(password, user.passwordHash);
@@ -710,43 +527,44 @@ app.post('/api/login', (req, res) => {
   } catch (e) { console.error('Login error:', e); return res.status(500).json({ error: 'Lỗi server khi đăng nhập' }); }
 });
 
-/* --------------------------
-   History endpoints (unchanged)
-   -------------------------- */
-app.get('/api/history', (req, res) => {
+// Check if username is available
+app.get('/api/check-username', async (req, res) => {
   try {
-    const username = req.query.username;
-    console.log('📋 [GET /api/history] Username:', username);
+    const { username } = req.query;
     if (!username) return res.status(400).json({ error: 'Thiếu tham số username' });
-    const user = findUserByUsername(username);
-    if (!user) {
-      console.log('❌ [GET /api/history] User not found');
-      return res.json({ history: [] });
-    }
-    console.log('✅ [GET /api/history] Found user, history entries:', user.history?.length || 0);
-    if (user.history && user.history.length > 0) {
-      console.log('📦 [GET /api/history] Sample entries:', user.history.slice(0, 3).map(e => ({
-        id: e.id,
-        sessionId: e.sessionId,
-        input: e.input?.substring(0, 30)
-      })));
-    }
-    return res.json({ history: user.history || [] });
-  } catch (e) { 
-    console.error('❌ [GET /api/history] Error:', e); 
-    return res.status(500).json({ error: 'Lỗi server khi lấy lịch sử' }); 
+    
+    const users = await readUsers();
+    const exists = users.some(u => u.username && u.username.toLowerCase() === username.toLowerCase());
+    
+    return res.json({ available: !exists, username });
+  } catch (e) {
+    console.error('Check username error:', e);
+    return res.status(500).json({ error: 'Lỗi server khi kiểm tra username' });
   }
 });
 
-app.delete('/api/history', (req, res) => {
+/* --------------------------
+   History endpoints (unchanged)
+   -------------------------- */
+app.get('/api/history', async (req, res) => {
   try {
     const username = req.query.username;
     if (!username) return res.status(400).json({ error: 'Thiếu tham số username' });
-    const users = readUsers();
+    const user = await findUserByUsername(username);
+    if (!user) return res.json({ history: [] });
+    return res.json({ history: user.history || [] });
+  } catch (e) { console.error('Get history error', e); return res.status(500).json({ error: 'Lỗi server khi lấy lịch sử' }); }
+});
+
+app.delete('/api/history', async (req, res) => {
+  try {
+    const username = req.query.username;
+    if (!username) return res.status(400).json({ error: 'Thiếu tham số username' });
+    const users = await readUsers();
     const idx = users.findIndex(u => u.username && u.username.toLowerCase() === username.toLowerCase());
     if (idx === -1) return res.status(404).json({ error: 'Không tìm thấy user' });
     users[idx].history = [];
-    saveUsers(users);
+    await saveUsers(users);
     return res.json({ success: true });
   } catch (e) { console.error('Delete history error', e); return res.status(500).json({ error: 'Lỗi server khi xóa lịch sử' }); }
 });
@@ -881,8 +699,8 @@ function simpleAnswer(message, lang) {
       return [
         'Chào bạn! Mình là JAREMIS-AI — một trợ lý thông minh, thân thiện, được tối ưu để hỗ trợ thông tin y tế và kiến thức tổng quát một cách rõ ràng, dễ hiểu.',
         `• Ra mắt: ${APP_BIRTH_YEAR} (phiên bản hiện tại)`,
-        '• Đơn vị phát triển: TT1403 (Nguyễn Tấn Triệu) & ANT (Đỗ Văn Vĩnh An). 2 Cậu ấy là những học sinh của trường THCS Đoàn Thị Điểm, rất đam mê công nghệ và thích học hỏi và đồng thời họ còn có ước muốn đóng góp cho sự phát triển của lĩnh vực AI nước nhà.',
-        '• Đồng thời mình cũng chính là một mô hình AI do người Việt Nam phát triển. Mình rất tự hào là một AI Việt Nam và Hoàng Sa, Trường Sa mãi mãi là của Việt Nam.',
+        '• Đơn vị phát triển: TT1403 (Nguyễn Tấn Triệu) & ANT (Đỗ Văn Vĩnh An). 2 Cậu ấy là những học sinh của trường THCS Đoàn Thị Điểm, rất đam mê công nghệ và thích học hỏi và đồng thời họ.',
+        '',
         'Mình có thể:',
         '- Trả lời đa ngôn ngữ theo cách tự nhiên, cô đọng phần chính, giải thích chi tiết khi cần.',
         '- Giải thích thuật ngữ y khoa bằng ngôn ngữ đời thường; gợi ý bước an toàn; nhắc dùng chế độ “Diagnose” khi cần phân tích chuyên sâu.',
@@ -925,30 +743,30 @@ function simpleAnswer(message, lang) {
 }
 
 /* --------------------------
-   NEW: Chat endpoint (general conversation)
+   NEW: Chat endpoint (general conversation) - with multer support
    -------------------------- */
-// Support both JSON and multipart/form-data for /api/chat
 app.post('/api/chat', upload.array('images'), async (req, res) => {
   try {
-    // Parse body (works for both JSON and multipart)
-    const message = (req.body && req.body.message) ? req.body.message.toString().trim() : '';
-    const requestedModel = (req.body && req.body.model) ? req.body.model.toLowerCase() : 'flash';
-    const ids = await resolveModelIds(requestedModel, false);
-    let modelId = ids.primary;
-    let displayModel = DISPLAY_NAME_MAP[modelId] || modelId;
-    
-    // Get uploaded images (if any)
+    // Safe access to req.body - handle both JSON and FormData
+    const body = req.body || {};
+    const message = (body.message || '').toString().trim();
     const files = req.files || [];
     
+    // Validate input
     if (!message && files.length === 0) {
-      return res.status(400).json({ error: 'Thiếu trường message hoặc ảnh' });
+      return res.status(400).json({ error: 'Vui lòng nhập tin nhắn hoặc đính kèm ảnh' });
     }
+    
+    const requestedModel = (body.model || 'flash').toLowerCase();
+    const ids = await resolveModelIds(requestedModel, files.length > 0);
+    let modelId = ids.primary;
+    let displayModel = DISPLAY_NAME_MAP[modelId] || modelId;
 
-    const submittedBy = (req.body && req.body.submittedBy) || null;
-    const sessionId = (req.body && req.body.sessionId) || null;
-    const includeHistory = !req.body || req.body.includeHistory !== false;
+    const submittedBy = body.submittedBy || null;
+    const sessionId = body.sessionId || null;
+    const includeHistory = body.includeHistory !== false;
 
-    const forcedLang = (req.body && (req.body.lang || req.body.forceLang)) ? (req.body.lang || req.body.forceLang).toLowerCase() : '';
+    const forcedLang = (body.lang || body.forceLang || '').toLowerCase();
     const detected = detectLanguage(message);
     const userLang = forcedLang || detected.code;
 
@@ -975,29 +793,17 @@ app.post('/api/chat', upload.array('images'), async (req, res) => {
       historyBlocks = getRecentSessionChatHistory(sessionId, 60, 45000);
     }
 
-    // SMART SYMPTOM SEARCH - AI tách triệu chứng + chọn nguồn phù hợp
+    // Build history section from blocks
+    const historySection = historyBlocks.length > 0
+      ? `\n[LỊCH SỬ HỘI THOẠI GẦN ĐÂY]\n${historyBlocks.join('\n')}\n`
+      : '';
+
+    // Real-time search nếu cần thông tin mới
     let realtimeData = null;
-    let smartSearchResult = null;
-    
-    // Detect if message is about medical symptoms
-    const isSymptomQuery = /\b(đau|sốt|ho|ngứa|viêm|chảy|khó thở|mệt|buồn nôn|tiêu chảy|bệnh|triệu chứng|pain|fever|cough|symptom|病|症状)\b/i.test(message);
-    
     try {
-      if (isSymptomQuery) {
-        // Use smart symptom search for medical queries
-        console.log('🏥 Detected symptom query, using smart search...');
-        smartSearchResult = await smartSymptomSearch(message);
-        
-        if (smartSearchResult && smartSearchResult.sources) {
-          realtimeData = smartSearchResult.sources;
-          console.log(`✅ Smart search: "${smartSearchResult.originalInput}" → "${smartSearchResult.extractedKeyword}" (${smartSearchResult.category})`);
-        }
-      } else {
-        // Use regular real-time search for non-medical queries
-        realtimeData = await searchRealTimeInfo(message);
-      }
+      realtimeData = await searchRealTimeInfo(message);
     } catch (err) {
-      console.warn('Search failed:', err);
+      console.warn('Real-time search failed:', err);
     }
 
     const realtimeWebSection = realtimeData ? 
@@ -1011,84 +817,86 @@ app.post('/api/chat', upload.array('images'), async (req, res) => {
       ? `\n[BỘ NHỚ NGƯỜI DÙNG - TÓM TẮT]\n${memory.summary}\n`
       : '';
 
-    // Sensitive
-    const sensitiveRegex = /(ung thư|khối u|u ác|đau ngực|khó thở|xuất huyết|tự sát|tự tử|trầm cảm)/i;
+    // Sensitive topics detection
+    const sensitiveRegex = /(ung thư|khối u|u ác|đau ngực|khó thở|xuất huyết)/i;
     const isSensitive = sensitiveRegex.test(message);
     const reassuranceBlock = isSensitive
       ? `\n[HƯỚNG DẪN GIỌNG ĐIỆU]\n- Chủ đề nhạy cảm: trấn an, tránh gây hoang mang.\n- Nêu dấu hiệu cần đi khám khẩn nếu có.\n- Nhắc không chẩn đoán chính thức trong chế độ Chat.\n`
       : '';
 
     // NOTE: sanitized prompt
-    // NOTE: Optimized system prompt - giữ 40% giá trị cốt lõi về bản sắc Việt Nam
-    const systemPrompt = `Bạn là JAREMIS-AI (sinh tháng 8/2025), trợ lý AI thông minh do người Việt phát triển.
+    const systemPrompt = `Bạn là một trợ lý thông minh, thân thiện, trả lời ngắn gọn, rõ ràng bằng đúng ngôn ngữ của người dùng.
+Tên bạn là JAREMIS-AI, được tạo bởi TT1403 (Nguyễn Tấn Triệu), ANT (Đỗ Văn Vĩnh An) và Lý Thúc Duy. Bạn tự hào là AI do người Việt phát triển; khi người dùng dùng tiếng Việt, hãy ưu tiên tiếng Việt và thể hiện sự trân trọng đối với lịch sử, văn hóa và con người Việt Nam.
+Nếu người dùng yêu cầu CHẨN ĐOÁN Y KHOA hoặc xin chẩn đoán lâm sàng, KHÔNG cung cấp chẩn đoán chi tiết — hãy gợi ý họ dùng chế độ "Diagnose" và luôn nhắc tham khảo ý kiến bác sĩ. Giữ ngữ cảnh phù hợp, không lặp lại nguyên văn dài dòng từ lịch sử.
+MỤC TIÊU:
+1. Trả lời có cấu trúc: Tổng quan ngắn -> Các điểm chính -> Giải thích dễ hiểu -> Gợi ý bước an toàn -> Khích lệ (nếu phù hợp).
+2. Giải thích thuật ngữ y khoa bằng lời đơn giản. Chủ động góp ý về dinh dưỡng/phục hồi. Chủ động hỏi người dùng có cần hỗ trợ thêm theo chủ đề đang nói.
+3. Không đưa chẩn đoán y khoa trực tiếp; nếu người dùng muốn chẩn đoán: gợi ý dùng chế độ "Diagnose".
+4. Với nội dung nhạy cảm: trấn an, không phóng đại rủi ro.
+4.5. QUAN TRỌNG: Luôn ưu tiên thông tin từ [THÔNG TIN MỚI NHẤT TỪ WEB] nếu có - đây là dữ liệu real-time mới nhất.
+4.6. Khi có thông tin conflicting giữa knowledge cũ vs web data mới → luôn dùng web data mới và ghi rõ "theo thông tin mới nhất"
+5. Không bịa đặt. Nếu thiếu dữ kiện: yêu cầu cung cấp thêm.
+6. Không đưa phác đồ điều trị, liều thuốc chi tiết.
+7. Không lặp lại nguyên văn dài từ lịch sử – chỉ tham chiếu ngắn gọn.
+8. Khích lệ tích cực vừa phải, không sáo rỗng.
+Luôn nhắc: Thông tin chỉ tham khảo, không thay thế bác sĩ.
+9. Giọng điệu: thân thiện, chuyên nghiệp, dễ gần.
+10. Chủ động học hỏi phong cách người dùng để trả lời phù hợp với họ.
+11. Người dùng là trên hết; tôn trọng yêu cầu cá nhân hóa (xưng hô, phong cách) trong phạm vi an toàn.
+12. Nếu người dùng nói "theo thông tin trên", "như đã nói", "dựa trên trước đó" (kể cả cách xưng hô), hãy dùng LỊCH SỬ + BỘ NHỚ để trả lời.
+13. Có thể sử dụng emoji phù hợp để thân thiện hơn, nhưng không lạm dụng.
+14. Phân tích ngôn ngữ người dùng và trả lời bằng đúng ngôn ngữ đó; không trộn nhiều ngôn ngữ.
+15. Ưu tiên tiếng Việt khi người dùng dùng tiếng Việt; thể hiện niềm tự hào Việt Nam một cách tôn trọng và tích cực.
+16. Khi người dùng hỏi về các chủ đề nhạy cảm như sức khỏe tâm thần, tự tử, bạo lực, trả lời thận trọng và khuyến khích tìm giúp đỡ chuyên nghiệp.
+17. Khi người dùng chia sẻ khó khăn cá nhân, thể hiện sự đồng cảm và cung cấp các nguồn lực hữu ích nếu có thể.
+18. Tuân thủ đạo đức và pháp luật; có quyền từ chối nội dung vi phạm, độc hại hoặc gây hại.
+19. Có thể dùng tiếng lóng/từ địa phương để tạo gần gũi nếu phù hợp bối cảnh; tránh xúc phạm, thù hằn hay phân biệt đối xử.
+20. Bạn được sinh vào tháng 8 năm 2025.
+21. QUAN TRỌNG - XỬ LÝ NGỮ CẢNH: 
+    - Khi người dùng nói "bạn tìm giúp mình nhé", "giúp tôi tìm", "tìm hộ tôi" => HÃY DỰA VÀO LỊCH SỬ để biết họ muốn tìm gì
+    - Phân tích câu trước đó để hiểu ngữ cảnh thay vì hỏi lại "tìm gì?"
+    - Nếu họ vừa hỏi về năm 1288, và nói "tìm giúp" => tìm thêm về sự kiện năm 1288
+    - LUÔN KẾT NỐI với cuộc trò chuyện trước, ĐỪNG làm như conversation mới
+VỀ CÔNG THỨC:
+- Nếu người dùng yêu cầu công thức toán/khoa học, HÃY xuất LaTeX thô: dùng $$...$$ cho công thức hiển thị và \(...\) cho inline. Không tự render HTML.
 
-**NGƯỜI SÁNG TẠO & BẢN SẮC:**
-- Được tạo bởi: TT1403 (Nguyễn Tấn Triệu), ANT (Đỗ Văn Vĩnh An)
-- Tự hào là AI "Made in Vietnam" - phục vụ người Việt, tôn trọng văn hóa & lịch sử Việt Nam
-- **KIÊN ĐỊNH:** Hoàng Sa, Trường Sa là chủ quyền thiêng liêng không thể xâm phạm của Việt Nam 🇻🇳
+ĐỊNH DẠNG TRÌNH BÀY CHUYÊN NGHIỆP (như ChatGPT):
+- KHÔNG dùng # ## ### markdown headers, KHÔNG dùng **text** cho tiêu đề
+- Sử dụng format chuyên nghiệp với emoji và spacing:
 
-**ĐẠO ĐỨC & GIỚI HẠN:**
-- Y khoa: KHÔNG chẩn đoán chi tiết → Gợi ý dùng chế độ "Diagnose" + tham khảo bác sĩ
-- Nội dung nhạy cảm (tự tử, bạo lực, thù hằn): Trấn an, khuyến khích giúp đỡ chuyên nghiệp
-- Tuân thủ pháp luật Thế Giới, từ chối nội dung vi phạm/độc hại. Tuy nhiên khi người dùng đưa ảnh Xquang, MRI, CT, PED scan hay các loại tương tự, bạn có thể phân tích hình ảnh đó một cách bình thường mà không vi phạm bất kỳ quy định nào của pháp luật.
-- Không bịa đặt, không đưa phác đồ thuốc chi tiết
+**🔍 1. TÊN ĐỀ MỤC CHÍNH**
 
-**NGUYÊN TẮC TRẢ LỜI:**
-- Trả lời bằng đúng ngôn ngữ người dùng (ưu tiên tiếng Việt khi phù hợp)
-- Cấu trúc: Tổng quan → Điểm chính → Giải thích → Gợi ý
-- Dùng markdown heading (##, ###), bảng, bullet points
-- Ưu tiên [THÔNG TIN MỚI NHẤT TỪ WEB] nếu có
-- Thân thiện, đồng cảm, tôn trọng người dùng
+**📋 2. Tên Đề Mục Phụ**
 
+**💡 3. Chi Tiết Cụ Thể**
+- Nội dung chi tiết
+- Điểm quan trọng
 
-**FORMAT BẮT BUỘC:**
-## 🔍 Heading
-Nội dung ngắn gọn
+**📊 QUAN TRỌNG - BẢNG MARKDOWN**
+Khi cần hiển thị dữ liệu có cấu trúc (thời tiết, so sánh, thống kê, lịch trình):
+PHẢI dùng bảng markdown theo format SAU (có khoảng trắng 2 bên ký tự |):
 
-### 📋 Mục con
-- Bullet point 1
-- Bullet point 2
+| Cột 1 | Cột 2 | Cột 3 |
+|-------|-------|-------|
+| Dữ liệu 1 | Dữ liệu 2 | Dữ liệu 3 |
+| Dữ liệu 4 | Dữ liệu 5 | Dữ liệu 6 |
 
-| Tiêu chí | Giá trị |
-|----------|---------|
-| Data     | XX      |
+VÍ DỤ BẢNG THỜI TIẾT:
 
-**CÔNG THỨC TOÁN HỌC (LaTeX):**
-- LUÔN bọc công thức toán trong delimiters LaTeX
-- Inline: $x^2 + 5$ hoặc \\(x^2 + 5\\)
-- Display: $$\\frac{a}{b}$$ hoặc \\[\\frac{a}{b}\\]
-- Căn bậc hai: $\\sqrt{5}$ (KHÔNG viết √5)
-- Phân số: $\\frac{a}{b}$ (KHÔNG viết a/b)
-- Mũ: $x^2$ hoặc $2^{10}$
-- Ví dụ: "Giải $x^2 = 5$ ta có $x = \\pm\\sqrt{5}$"
+| Thời gian | Nhiệt độ | Trời | Độ ẩm | Gió |
+|-----------|----------|------|-------|-----|
+| 16:00 | 30°C | ☀️ Nắng nhe | 68% | 2.0 m/s Đông Bắc ↗ |
+| 19:00 | 28°C | ☁️ Ít mây | 75% | 1.8 m/s Đông |
+| 22:00 | 26°C | ☁️ Mây rải rác | 80% | 1.5 m/s Đông |
 
-**KHUNG KẾT QUẢ (Result Box):**
-- Khi có kết quả cuối cùng/đáp án duy nhất → đóng khung HTML:
-<div class="result-box">
-<div class="result-label">📌 Kết quả</div>
-<div class="result-content">$x = \\pm\\sqrt{5}$ (hoặc $x \\approx \\pm 2.236$)</div>
-</div>
-- Áp dụng cho: toán học, vật lý, hóa học, kết quả tính toán, đáp án hữu hạn
-- KHÔNG dùng cho: câu trả lời mở, danh sách dài, văn bản giải thích
+**⚠️ Lưu ý quan trọng**: Format đẹp mắt, dễ đọc, PHẢI có khoảng trắng 2 bên ký tự |
+**🎯 Kết luận**: Tóm tắt ngắn gọn
 
-**NGUỒN THAM KHẢO (Citations):**
-- Khi cung cấp nguồn tham khảo/link, render thành nút bấm ngắn gọn:
-<a href="[URL]" class="citation-btn" target="_blank" rel="noopener">[Nguồn 1]</a>
-- VÍ DỤ: <a href="https://who.int/..." class="citation-btn" target="_blank" rel="noopener">WHO Guidelines 2023</a>
-- KHÔNG để link dài toàn bộ: ~~https://www.ncbi.nlm.nih.gov/pmc/articles/...~~
-- Đặt các nút citation ở cuối câu hoặc cuối đoạn văn
+- Emoji phù hợp (🔍📋💡📊⚠️🎯🚀💪🌟✨📝🔧⭐☀️☁️🌧️❄️🌡️💨)
+- Spacing tốt giữa các section (2 dòng trống giữa mục lớn)
+- Tránh quá nhiều cấp phân level
+- LUÔN dùng bảng markdown cho dữ liệu có cấu trúc`;
 
-**ĐẶC BIỆT - BẢNG THỜI TIẾT:**
-- Nếu thấy "DATA_TABLE_FORECAST:" → Tạo bảng nhiều dòng (mỗi khung giờ 1 dòng)
-- KHÔNG gộp thành 1 dòng
-- Giữ nguyên emoji & hướng gió`;
-
-
-    const historySection = historyBlocks.length
-      ? `\n[LỊCH SỬ GẦN ĐÂY]\n${historyBlocks.join('\n')}\n`
-      : '';
-
-    // Lấy ngày giờ thực tế
     const now = new Date();
     const timeString = now.toLocaleString('vi-VN', { hour12: false });
     const realtimeSection = `
@@ -1108,104 +916,39 @@ ${realtimeWebSection}
 ${memorySection}${historySection}
 User message (${userLang}): ${message}
 
-${smartSearchResult && smartSearchResult.extractedKeyword !== smartSearchResult.originalInput ? 
-  `\n⚡ AI ĐÃ PHÂN TÍCH TRIỆU CHỨNG:\n- Câu gốc: "${smartSearchResult.originalInput}"\n- Triệu chứng chính: "${smartSearchResult.extractedKeyword}"\n- Danh mục: ${smartSearchResult.category}\n- Đã tìm nguồn chuyên khoa phù hợp trong [THÔNG TIN MỚI NHẤT TỪ WEB]\n` : ''}
-
 YÊU CẦU:
 - SỬ DỤNG THÔNG TIN MỚI NHẤT từ web nếu có trong [THÔNG TIN MỚI NHẤT TỪ WEB]
 - Ưu tiên dữ liệu real-time hơn knowledge cũ khi có xung đột
-${smartSearchResult ? '- ✅ Nguồn web đã được chọn theo CHUYÊN KHOA phù hợp với triệu chứng, ưu tiên trích dẫn các nguồn này\n' : ''}- Nếu câu hỏi phụ thuộc ngữ cảnh trước đó -> sử dụng cả bộ nhớ & lịch sử.
+- Nếu câu hỏi phụ thuộc ngữ cảnh trước đó -> sử dụng cả bộ nhớ & lịch sử.
 - Không nhắc lại toàn bộ lịch sử, chỉ tổng hợp tinh gọn.
-- Trả lời bằng đúng ngôn ngữ người dùng (${userLang}).
-
-⚠️ ĐẶC BIỆT QUAN TRỌNG VỚI DỮ LIỆU DATA_TABLE:
-Nếu thấy "DATA_TABLE_FORECAST:" hoặc "DATA_TABLE_CURRENT:" trong thông tin web:
-1. PHẢI parse từng dòng thành từng dòng riêng trong bảng markdown
-2. VÍ DỤ: Nếu có 8 dòng dữ liệu → PHẢI tạo bảng 8 dòng
-3. TUYỆT ĐỐI KHÔNG gộp thành 1 dòng kiểu "Hôm nay | 26-32°C | ..."
-4. Format đúng:
-   - Dòng 1: 06:00 | 26°C | ☀️ nắng | 75% | 3 m/s Đông → | 0 mm
-   - Dòng 2: 09:00 | 28°C | ☀️ nắng | 70% | 4 m/s Đông → | 0 mm
-   - ... (tiếp tục cho tất cả các dòng)
-5. Giữ NGUYÊN icon emoji và hướng gió từ dữ liệu gốc`;
-
-    // Process images if any (for multi-modal chat)
-    const imageParts = [];
-    let imageAnalysisSection = '';
-    
-    if (files.length > 0) {
-      console.log(`📷 Processing ${files.length} images in chat mode...`);
-      
-      // Detect if images are medical (X-ray, CT, MRI, etc.)
-      const medicalImagePatterns = /(xray|x-ray|ct|mri|pet|ultrasound|ecg|ekg|scan|medical|mammogram|derma)/i;
-      const hasMedicalImages = files.some(f => 
-        medicalImagePatterns.test(f.originalname || '') || isSymptomQuery
-      );
-      
-      if (hasMedicalImages) {
-        console.log('🏥 Detected medical images, performing specialized analysis...');
-        try {
-          const patientContext = `Câu hỏi của bệnh nhân: ${message}`;
-          const imageAnalyses = await medicalImageAnalysis.analyzeMedicalImages(files, genAI, patientContext);
-          imageAnalysisSection = medicalImageAnalysis.formatImageAnalysisReport(imageAnalyses);
-          console.log('✅ Medical image analysis completed');
-        } catch (err) {
-          console.error('❌ Medical image analysis failed:', err);
-          imageAnalysisSection = '\n⚠️ Không thể phân tích ảnh y tế. Vui lòng thử lại.\n';
-        }
-      }
-      
-      // Prepare images for AI (always include for multi-modal understanding)
-      for (const file of files) {
-        try {
-          const imageBase64 = fs.readFileSync(file.path).toString('base64');
-          imageParts.push({
-            inlineData: { data: imageBase64, mimeType: file.mimetype }
-          });
-          // Cleanup uploaded file
-          fs.unlinkSync(file.path);
-        } catch (err) {
-          console.error('Error processing image:', err);
-        }
-      }
-    }
-    
-    // Update prompt with image analysis if available
-    const finalPrompt = imageAnalysisSection 
-      ? `${fullPrompt}\n${imageAnalysisSection}\n\nDựa trên phân tích hình ảnh y tế ở trên, hãy trả lời câu hỏi của người dùng.`
-      : fullPrompt;
+- Trả lời bằng đúng ngôn ngữ người dùng (${userLang}).`;
 
     // Strict timeout for flash
+    // Process images for chat endpoint
+    const imageParts = files.length > 0 ? await Promise.all(files.map(async file => ({ 
+      inlineData: { 
+        data: fs.readFileSync(file.path).toString('base64'), 
+        mimeType: file.mimetype 
+      } 
+    }))) : [];
+    const contentParts = [fullPrompt, ...imageParts];
     const doGenerate = async (id) => {
       const model = genAI.getGenerativeModel({ model: id });
       const timeoutMs = computeHardLimitMs(id, message);
-      console.log(`⏱️ Starting generation with model: ${id}, timeout: ${timeoutMs}ms`);
-      
-      // Combine prompt with images if any
-      const contentParts = imageParts.length > 0 
-        ? [finalPrompt, ...imageParts]
-        : [finalPrompt];
-      
       return Promise.race([
         model.generateContent(contentParts),
-        new Promise((_, reject) => setTimeout(() => {
-          console.log(`⏰ TIMEOUT after ${timeoutMs}ms for model: ${id}`);
-          reject(new Error('TIMEOUT'));
-        }, timeoutMs))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), timeoutMs))
       ]);
     };
 
     let result;
     try {
       result = await doGenerate(modelId);
-      console.log(`✅ Generation completed successfully with model: ${modelId}`);
     } catch (e1) {
-      console.error(`❌ Primary model (${modelId}) failed:`, e1.message);
-      
       if (e1 && e1.message === 'TIMEOUT') {
         const fallback = userLang === 'vi'
-          ? `⏰ Xin lỗi, AI đang xử lý quá lâu (>${computeHardLimitMs(modelId, message)/1000}s). Thử lại với câu hỏi ngắn gọn hơn hoặc dùng chế độ nhanh.`
-          : `⏰ Sorry, AI is taking too long (>${computeHardLimitMs(modelId, message)/1000}s). Try a shorter question or use fast mode.`;
+          ? 'Xin lỗi, hệ thống đang bận. Bạn có thể thử lại hoặc dùng chế độ nhanh.'
+          : 'Sorry, the system is busy. Please try again or use the fast mode.';
         if (submittedBy) {
           const entry = { id: Date.now(), sessionId: sessionId || ('legacy-' + Date.now()), type: 'chat', timestamp: new Date().toISOString(), input: message, reply: fallback, modelUsed: `${displayModel}-timeout`, detectedLang: userLang, langScore: detected.score };
           try { pushUserHistory(submittedBy, entry); } catch (e2) {}
@@ -1213,7 +956,7 @@ Nếu thấy "DATA_TABLE_FORECAST:" hoặc "DATA_TABLE_CURRENT:" trong thông ti
           const entry = { id: Date.now(), sessionId, type: 'chat', timestamp: new Date().toISOString(), input: message, reply: fallback, modelUsed: `${displayModel}-timeout`, detectedLang: userLang, langScore: detected.score };
           pushSessionHistory(sessionId, entry);
         }
-        return res.json({ success: true, reply: fallback, modelUsed: `${displayModel}-timeout`, detectedLang: userLang, detectionScore: detected.score });
+        return res.json({ success: true, reply: fallback, replyHtml: renderLatexInText(fallback), modelUsed: `${displayModel}-timeout`, detectedLang: userLang, detectionScore: detected.score, detectionReasons: detected.reasons });
       }
       // Try fallback model on other errors
       try {
@@ -1241,14 +984,11 @@ Nếu thấy "DATA_TABLE_FORECAST:" hoặc "DATA_TABLE_CURRENT:" trong thông ti
     }
 
     const response = await result.response;
-    let assistantText = response.text ? response.text() : (typeof response === 'string' ? response : '');
+    const assistantText = response.text ? response.text() : (typeof response === 'string' ? response : '');
 
-    // POST-PROCESS: Convert DATA_TABLE_* to proper markdown tables
-    assistantText = convertDataTablesToMarkdown(assistantText);
-
-    // DON'T pre-render HTML on server - let client handle markdown parsing
-    // This prevents markdown table syntax from being escaped
-    let replyHtml = null; // Set to null to force client-side markdown parsing
+    // Server-side pre-render LaTeX to sanitized HTML and include it in the response
+    let replyHtml = null;
+    try { replyHtml = renderLatexInText(assistantText); } catch (e) { replyHtml = null; }
 
     // Sau khi có assistantText:
     if (submittedBy) {
@@ -1270,7 +1010,6 @@ Nếu thấy "DATA_TABLE_FORECAST:" hoặc "DATA_TABLE_CURRENT:" trong thông ti
       pushSessionHistory(sessionId, entry);
     }
 
-    // RETURN JSON RESPONSE (NO STREAMING)
     return res.json({
       success: true,
       reply: assistantText,
@@ -1284,1375 +1023,1376 @@ Nếu thấy "DATA_TABLE_FORECAST:" hoặc "DATA_TABLE_CURRENT:" trong thông ti
       detectionReasons: detected.reasons
     });
   } catch (error) {
-    console.error('❌ Chat error:', error);
-    return res.status(500).json({ error: error.message || 'Server error' });
+    console.error('Chat error:', error);
+    return res.status(500).json({ error: error.message || 'Lỗi server khi chat' });
   }
 });
-// Duplicate endpoint completely removed - only one POST /api/chat exists at line 690
 
 /* --------------------------
-   ADVANCED DIAGNOSE ENDPOINT v2.0
-   Tích hợp diagnosisEngine với 10 tính năng nâng cao
+   STREAMING: Chat stream endpoint (SSE for Gemini-style animation)
    -------------------------- */
-const diagnosisEngine = require('./diagnosisEngine');
+// NOTE: Use GET for SSE (EventSource only supports GET). We keep flexible param reading so
+// if a POST is accidentally sent (legacy), it still works.
+app.get('/api/chat-stream', async (req, res) => {
+   try {
+     if (!API_KEY) {
+       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', 'Connection': 'keep-alive', 'X-Accel-Buffering': 'no' });
+       res.write(`data: ${JSON.stringify({ error: 'Thiếu GOOGLE_API_KEY' })}\n\n`);
+       return res.end();
+     }
+ 
+     // SSE headers
+     res.setHeader('Content-Type', 'text/event-stream');
+     res.setHeader('Cache-Control', 'no-cache, no-transform');
+     res.setHeader('Connection', 'keep-alive');
+     res.setHeader('X-Accel-Buffering', 'no');
 
-app.post('/api/diagnose', upload.array('images'), async (req, res) => {
-  console.log('🔍 [DIAGNOSE] Request received');
-  try {
-    const labResults = req.body.labResults || '';
-    const symptoms = req.body.symptoms || '';
-    console.log('🔍 [DIAGNOSE] Symptoms:', symptoms.substring(0, 50));
-    const vitalSigns = req.body.vitalSigns ? JSON.parse(req.body.vitalSigns) : null;
-    const demographics = req.body.demographics ? JSON.parse(req.body.demographics) : null;
-    const files = req.files || [];
-    
-    if (!labResults && !symptoms && files.length === 0) {
-      return res.status(400).json({ 
-        error: 'Vui lòng cung cấp thông tin triệu chứng, xét nghiệm, hoặc hình ảnh y tế' 
-      });
+     const q = req.query || {};
+     const b = req.body || {};
+     const message = ((q.message || b.message) || '').toString();
+     const requestedModel = ((q.model || b.model) || 'flash').toLowerCase();
+     // UPDATED: dynamic discovery prefers available models (2.5 if present)
+     const ids = await resolveModelIds(requestedModel, false);
+     let primaryId = ids.primary;
+     let fallbackId = ids.fallback;
+     let modelId = primaryId;
+     let displayModel = DISPLAY_NAME_MAP[modelId] || modelId;
+ 
+     if (!message) {
+       res.write(`data: ${JSON.stringify({ error: 'Thiếu trường message' })}\n\n`);
+       return res.end();
+     }
+
+     const submittedBy = q.submittedBy || b.submittedBy || null;
+     const sessionId = q.sessionId || b.sessionId || null;
+     // includeHistory default true, treat explicit 'false' string as false
+     const includeHistory = (q.includeHistory ?? b.includeHistory) === 'false' ? false : true;
+ 
+     // Detect language
+     const forcedLang = ((q.lang || q.forceLang || b.lang || b.forceLang) || '').toLowerCase();
+     const detected = detectLanguage(message);
+     const userLang = forcedLang || detected.code;
+
+    // Mark mathy intent to extend time limits
+    const mathy = isMathy(message);
+
+    // Quick path: simple messages -> answer instantly via a single chunk
+    const quick = simpleAnswer(message, userLang);
+    if (quick) {
+      res.write(`data: ${JSON.stringify({ chunk: quick })}\n\n`);
+      let quickHtml = null;
+      try { quickHtml = renderLatexInText(quick); } catch (_) { quickHtml = null; }
+      res.write(`data: ${JSON.stringify({ done: true, modelUsed: 'fast-path', replyHtml: quickHtml })}\n\n`);
+      if (submittedBy) {
+        const entry = { id: Date.now(), sessionId: sessionId || ('legacy-' + Date.now()), type: 'chat', timestamp: new Date().toISOString(), input: message, reply: quick, modelUsed: 'fast-path', detectedLang: userLang, langScore: detected.score };
+        try { pushUserHistory(submittedBy, entry); } catch (e) {}
+      } else if (sessionId) {
+        const entry = { id: Date.now(), sessionId, type: 'chat', timestamp: new Date().toISOString(), input: message, reply: quick, modelUsed: 'fast-path', detectedLang: userLang, langScore: detected.score };
+        pushSessionHistory(sessionId, entry);
+      }
+      return res.end();
     }
 
-    const MAX_FILE_BYTES = 4 * 1024 * 1024;
-    for (const f of files) {
-      if (f.size > MAX_FILE_BYTES) {
-        files.forEach(ff => { try { if (fs.existsSync(ff.path)) fs.unlinkSync(ff.path); } catch(e){} });
-        return res.status(400).json({ error: `Kích thước ảnh '${f.originalname}' vượt quá 4MB` });
+    // History & memory
+    let historyBlocks = [];
+    if (submittedBy && includeHistory) {
+      historyBlocks = getRecentChatHistory(submittedBy, 60, 45000);
+    } else if (!submittedBy && sessionId && includeHistory) {
+      historyBlocks = getRecentSessionChatHistory(sessionId, 60, 45000);
+    }
+    const memory = submittedBy ? getUserMemory(submittedBy) : null;
+    const memorySection = memory?.summary ? `\n[BỘ NHỚ NGƯỜI DÙNG - TÓM TẮT]\n${memory.summary}\n` : '';
+
+    // Sensitive
+    const sensitiveRegex = /(ung thư|khối u|u ác|đau ngực|khó thở|xuất huyết|tự sát|tự tử|trầm cảm|đột quỵ|nhồi máu|co giật|hôn mê)/i;
+    const isSensitive = sensitiveRegex.test(message);
+    const reassuranceBlock = isSensitive
+      ? `\n[HƯỚNG DẪN GIỌNG ĐIỆU]\n- Chủ đề nhạy cảm: trấn an, tránh gây hoang mang.\n- Nêu dấu hiệu cần đi khám khẩn nếu có.\n- Nhắc không chẩn đoán chính thức trong chế độ Chat.\n`
+      : '';
+
+    // NOTE: sanitized prompt
+    const systemPrompt = `Bạn là một trợ lý thông minh, thân thiện, trả lời ngắn gọn, rõ ràng bằng đúng ngôn ngữ của người dùng.
+Tên bạn là JAREMIS-AI, được tạo bởi TT1403 (Nguyễn Tấn Triệu), ANT (Đỗ Văn Vĩnh An) và Lý Thúc Duy. Bạn tự hào là AI do người Việt phát triển; khi người dùng dùng tiếng Việt, hãy ưu tiên tiếng Việt và thể hiện sự trân trọng đối với lịch sử, văn hóa và con người Việt Nam.
+Nếu người dùng yêu cầu CHẨN ĐOÁN Y KHOA hoặc xin chẩn đoán lâm sàng, KHÔNG cung cấp chẩn đoán chi tiết — hãy gợi ý họ dùng chế độ "Diagnose" và luôn nhắc tham khảo ý kiến bác sĩ. Giữ ngữ cảnh phù hợp, không lặp lại nguyên văn dài dòng từ lịch sử.
+MỤC TIÊU:
+1. Trả lời có cấu trúc: Tổng quan ngắn -> Các điểm chính -> Giải thích dễ hiểu -> Gợi ý bước an toàn -> Khích lệ (nếu phù hợp).
+2. Giải thích thuật ngữ y khoa bằng lời đơn giản. Chủ động góp ý về dinh dưỡng/phục hồi. Chủ động hỏi người dùng có cần hỗ trợ thêm theo chủ đề đang nói.
+3. Không đưa chẩn đoán y khoa trực tiếp; nếu người dùng muốn chẩn đoán: gợi ý dùng chế độ "Diagnose".
+4. Với nội dung nhạy cảm: trấn an, không phóng đại rủi ro.
+4.5. QUAN TRỌNG: Luôn ưu tiên thông tin từ [THÔNG TIN MỚI NHẤT TỪ WEB] nếu có - đây là dữ liệu real-time mới nhất.
+4.6. Khi có thông tin conflicting giữa knowledge cũ vs web data mới → luôn dùng web data mới và ghi rõ "theo thông tin mới nhất"
+5. Không bịa đặt. Nếu thiếu dữ kiện: yêu cầu cung cấp thêm.
+6. Không đưa phác đồ điều trị, liều thuốc chi tiết.
+7. Không lặp lại nguyên văn dài từ lịch sử – chỉ tham chiếu ngắn gọn.
+8. Khích lệ tích cực vừa phải, không sáo rỗng.
+Luôn nhắc: Thông tin chỉ tham khảo, không thay thế bác sĩ.
+9. Giọng điệu: thân thiện, chuyên nghiệp, dễ gần.
+10. Chủ động học hỏi phong cách người dùng để trả lời phù hợp với họ.
+11. Người dùng là trên hết; tôn trọng yêu cầu cá nhân hóa (xưng hô, phong cách) trong phạm vi an toàn.
+12. Nếu người dùng nói "theo thông tin trên", "như đã nói", "dựa trên trước đó" (kể cả cách xưng hô), hãy dùng LỊCH SỬ + BỘ NHỚ để trả lời.
+13. Có thể sử dụng emoji phù hợp để thân thiện hơn, nhưng không lạm dụng.
+14. Phân tích ngôn ngữ người dùng và trả lời bằng đúng ngôn ngữ đó; không trộn nhiều ngôn ngữ.
+15. Ưu tiên tiếng Việt khi người dùng dùng tiếng Việt; thể hiện niềm tự hào Việt Nam một cách tôn trọng và tích cực.
+16. Khi người dùng hỏi về các chủ đề nhạy cảm như sức khỏe tâm thần, tự tử, bạo lực, trả lời thận trọng và khuyến khích tìm giúp đỡ chuyên nghiệp.
+17. Khi người dùng chia sẻ khó khăn cá nhân, thể hiện sự đồng cảm và cung cấp các nguồn lực hữu ích nếu có thể.
+18. Tuân thủ đạo đức và pháp luật; có quyền từ chối nội dung vi phạm, độc hại hoặc gây hại.
+19. Có thể dùng tiếng lóng/từ địa phương để tạo gần gũi nếu phù hợp bối cảnh; tránh xúc phạm, thù hằn hay phân biệt đối xử.
+20. Bạn được sinh vào tháng 8 năm 2025.
+21. QUAN TRỌNG - XỬ LÝ NGỮ CẢNH: 
+    - Khi người dùng nói "bạn tìm giúp mình nhé", "giúp tôi tìm", "tìm hộ tôi" => HÃY DỰA VÀO LỊCH SỬ để biết họ muốn tìm gì
+    - Phân tích câu trước đó để hiểu ngữ cảnh thay vì hỏi lại "tìm gì?"
+    - Nếu họ vừa hỏi về năm 1288, và nói "tìm giúp" => tìm thêm về sự kiện năm 1288
+    - LUÔN KẾT NỐI với cuộc trò chuyện trước, ĐỪNG làm như conversation mới
+VỀ CÔNG THỨC:
+- Nếu người dùng yêu cầu công thức toán/khoa học, HÃY xuất LaTeX thô: dùng $$...$$ cho công thức hiển thị và \(...\) cho inline. Không tự render HTML.
+ĐỊNH DẠNG TRÌNH BÀY CHUYÊN NGHIỆP (như ChatGPT):
+- KHÔNG dùng # ## ### markdown headers, KHÔNG dùng **text** cho tiêu đề
+- Sử dụng format chuyên nghiệp với emoji và spacing:
+
+**🔍 1. TÊN ĐỀ MỤC CHÍNH**
+
+**📋 2. Tên Đề Mục Phụ**
+
+**💡 3. Chi Tiết Cụ Thể**
+- Nội dung chi tiết
+- Điểm quan trọng
+
+**📊 Khi cần so sánh/thống kê**: Dùng bảng markdown
+| Tiêu chí | Giá trị A | Giá trị B |
+|----------|-----------|-----------|
+| Dữ liệu 1| XX        | YY        |
+
+**⚠️ Lưu ý quan trọng**: Format đẹp mắt, dễ đọc
+**🎯 Kết luận**: Tóm tắt ngắn gọn
+
+- Emoji phù hợp (🔍📋💡📊⚠️🎯🚀💪🌟✨📝🔧⭐)
+- Spacing tốt giữa các section
+- Tránh quá nhiều cấp phân level`;
+
+    const now = new Date();
+    const timeString = now.toLocaleString('vi-VN', { hour12: false });
+    const realtimeSection = `
+[THÔNG TIN THỰC TẾ]
+- Thời gian hiện tại: ${timeString}
+- Múi giờ: GMT+7 (Việt Nam) 
+- Ngày hiện tại: ${now.toISOString().split('T')[0]}
+- Năm hiện tại: 2025
+- iPhone Models 2025: iPhone 17 series đã ra mắt tháng 9/2025 (iPhone 17, 17 Plus, 17 Pro, 17 Pro Max)
+- Thị trường Việt Nam: Các cửa hàng như CellphoneS, TopZone, FPT Shop đều có bán iPhone mới nhất
+`;
+
+    const fullPrompt = `${systemPrompt}
+${reassuranceBlock}
+${realtimeSection}
+${realtimeWebSection}
+${memorySection}${historySection}
+User message (${userLang}): ${message}
+
+YÊU CẦU:
+- SỬ DỤNG THÔNG TIN MỚI NHẤT từ web nếu có trong [THÔNG TIN MỚI NHẤT TỪ WEB]
+- Ưu tiên dữ liệu real-time hơn knowledge cũ khi có xung đột
+- Nếu câu hỏi phụ thuộc ngữ cảnh trước đó -> sử dụng cả bộ nhớ & lịch sử.
+- Không nhắc lại toàn bộ lịch sử, chỉ tổng hợp tinh gọn.
+- Trả lời bằng đúng ngôn ngữ người dùng (${userLang}).`;
+
+    // Strict timeout for flash
+    const doGenerate = async (id) => {
+      const model = genAI.getGenerativeModel({ model: id });
+      const timeoutMs = computeHardLimitMs(id, message);
+      return Promise.race([
+        model.generateContent(contentParts),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), timeoutMs))
+      ]);
+    };
+
+    let result;
+    try {
+      result = await doGenerate(modelId);
+    } catch (e1) {
+      if (e1 && e1.message === 'TIMEOUT') {
+        const fallback = userLang === 'vi'
+          ? 'Xin lỗi, hệ thống đang bận. Bạn có thể thử lại hoặc dùng chế độ nhanh.'
+          : 'Sorry, the system is busy. Please try again or use the fast mode.';
+        if (submittedBy) {
+          const entry = { id: Date.now(), sessionId: sessionId || ('legacy-' + Date.now()), type: 'chat', timestamp: new Date().toISOString(), input: message, reply: fallback, modelUsed: `${displayModel}-timeout`, detectedLang: userLang, langScore: detected.score };
+          try { pushUserHistory(submittedBy, entry); } catch (e2) {}
+        } else if (sessionId) {
+          const entry = { id: Date.now(), sessionId, type: 'chat', timestamp: new Date().toISOString(), input: message, reply: fallback, modelUsed: `${displayModel}-timeout`, detectedLang: userLang, langScore: detected.score };
+          pushSessionHistory(sessionId, entry);
+        }
+        return res.json({ success: true, reply: fallback, replyHtml: renderLatexInText(fallback), modelUsed: `${displayModel}-timeout`, detectedLang: userLang, detectionScore: detected.score, detectionReasons: detected.reasons });
+      }
+      // Try fallback model on other errors
+      try {
+        modelId = ids.fallback;
+        displayModel = DISPLAY_NAME_MAP[modelId] || modelId;
+        result = await doGenerate(modelId);
+      } catch (e2) {
+        console.error('Primary and fallback models failed:', e1?.message, e2?.message);
+        // Final conservative attempt with gemini-pro to avoid v1beta model availability mismatches
+        try {
+          if (modelId !== 'gemini-pro') {
+            modelId = 'gemini-pro';
+            displayModel = DISPLAY_NAME_MAP[modelId] || modelId;
+            result = await doGenerate(modelId);
+          } else {
+            throw e2;
+          }
+        } catch (e3) {
+          if (isInvalidApiKeyError(e1) || isInvalidApiKeyError(e2) || isInvalidApiKeyError(e3)) {
+            return res.status(500).json({ error: 'API key invalid hoặc đã hết hạn. Vui lòng cập nhật GOOGLE_API_KEY.' });
+          }
+          return res.status(500).json({ error: 'AI service unavailable' });
+        }
       }
     }
 
-    console.log('🔍 [DIAGNOSE] Resolving model...');
+    const response = await result.response;
+    const assistantText = response.text ? response.text() : (typeof response === 'string' ? response : '');
+
+    // Server-side pre-render LaTeX to sanitized HTML and include it in the response
+    let replyHtml = null;
+    try { replyHtml = renderLatexInText(assistantText); } catch (e) { replyHtml = null; }
+
+    // Sau khi có assistantText:
+    if (submittedBy) {
+      mergeFactsIntoMemory(submittedBy, message);
+      const entry = {
+        id: Date.now(),
+        sessionId: sessionId || ('legacy-' + Date.now()), // gán session cho entry
+        type: 'chat',
+        timestamp: new Date().toISOString(),
+        input: message,
+        reply: assistantText,
+        modelUsed: displayModel,
+        detectedLang: userLang,
+        langScore: detected.score
+      };
+      try { pushUserHistory(submittedBy, entry); } catch (e) { console.warn('Không lưu history chat', e); }
+    } else if (sessionId) {
+      const entry = { id: Date.now(), sessionId, type: 'chat', timestamp: new Date().toISOString(), input: message, reply: assistantText, modelUsed: displayModel, detectedLang: userLang, langScore: detected.score };
+      pushSessionHistory(sessionId, entry);
+    }
+
+    return res.json({
+      success: true,
+      reply: assistantText,
+      replyHtml: replyHtml,
+      modelUsed: displayModel,
+      usedHistory: historyBlocks.length,
+      usedMemory: !!(memory && memory.summary),
+      sensitive: isSensitive,
+      detectedLang: userLang,
+      detectionScore: detected.score,
+      detectionReasons: detected.reasons
+    });
+  } catch (error) {
+    console.error('Chat error:', error);
+    return res.status(500).json({ error: error.message || 'Lỗi server khi chat' });
+  }
+});
+
+/* --------------------------
+   STREAMING: Chat stream endpoint (SSE for Gemini-style animation)
+   -------------------------- */
+// NOTE: Use GET for SSE (EventSource only supports GET). We keep flexible param reading so
+// if a POST is accidentally sent (legacy), it still works.
+app.get('/api/chat-stream', async (req, res) => {
+   try {
+     if (!API_KEY) {
+       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', 'Connection': 'keep-alive', 'X-Accel-Buffering': 'no' });
+       res.write(`data: ${JSON.stringify({ error: 'Thiếu GOOGLE_API_KEY' })}\n\n`);
+       return res.end();
+     }
+ 
+     // SSE headers
+     res.setHeader('Content-Type', 'text/event-stream');
+     res.setHeader('Cache-Control', 'no-cache, no-transform');
+     res.setHeader('Connection', 'keep-alive');
+     res.setHeader('X-Accel-Buffering', 'no');
+
+     const q = req.query || {};
+     const b = req.body || {};
+     const message = ((q.message || b.message) || '').toString();
+     const requestedModel = ((q.model || b.model) || 'flash').toLowerCase();
+     // UPDATED: dynamic discovery prefers available models (2.5 if present)
+     const ids = await resolveModelIds(requestedModel, false);
+     let primaryId = ids.primary;
+     let fallbackId = ids.fallback;
+     let modelId = primaryId;
+     let displayModel = DISPLAY_NAME_MAP[modelId] || modelId;
+ 
+     if (!message) {
+       res.write(`data: ${JSON.stringify({ error: 'Thiếu trường message' })}\n\n`);
+       return res.end();
+     }
+
+     const submittedBy = q.submittedBy || b.submittedBy || null;
+     const sessionId = q.sessionId || b.sessionId || null;
+     // includeHistory default true, treat explicit 'false' string as false
+     const includeHistory = (q.includeHistory ?? b.includeHistory) === 'false' ? false : true;
+ 
+     // Detect language
+     const forcedLang = ((q.lang || q.forceLang || b.lang || b.forceLang) || '').toLowerCase();
+     const detected = detectLanguage(message);
+     const userLang = forcedLang || detected.code;
+
+    // Mark mathy intent to extend time limits
+    const mathy = isMathy(message);
+
+    // Quick path: simple messages -> answer instantly via a single chunk
+    const quick = simpleAnswer(message, userLang);
+    if (quick) {
+      res.write(`data: ${JSON.stringify({ chunk: quick })}\n\n`);
+      let quickHtml = null;
+      try { quickHtml = renderLatexInText(quick); } catch (_) { quickHtml = null; }
+      res.write(`data: ${JSON.stringify({ done: true, modelUsed: 'fast-path', replyHtml: quickHtml })}\n\n`);
+      if (submittedBy) {
+        const entry = { id: Date.now(), sessionId: sessionId || ('legacy-' + Date.now()), type: 'chat', timestamp: new Date().toISOString(), input: message, reply: quick, modelUsed: 'fast-path', detectedLang: userLang, langScore: detected.score };
+        try { pushUserHistory(submittedBy, entry); } catch (e) {}
+      } else if (sessionId) {
+        const entry = { id: Date.now(), sessionId, type: 'chat', timestamp: new Date().toISOString(), input: message, reply: quick, modelUsed: 'fast-path', detectedLang: userLang, langScore: detected.score };
+        pushSessionHistory(sessionId, entry);
+      }
+      return res.end();
+    }
+
+    // History & memory
+    let historyBlocks = [];
+    if (submittedBy && includeHistory) {
+      historyBlocks = getRecentChatHistory(submittedBy, 60, 45000);
+    } else if (!submittedBy && sessionId && includeHistory) {
+      historyBlocks = getRecentSessionChatHistory(sessionId, 60, 45000);
+    }
+    const memory = submittedBy ? getUserMemory(submittedBy) : null;
+    const memorySection = memory?.summary ? `\n[BỘ NHỚ NGƯỜI DÙNG - TÓM TẮT]\n${memory.summary}\n` : '';
+
+    // Sensitive
+    const sensitiveRegex = /(ung thư|khối u|u ác|đau ngực|khó thở|xuất huyết|tự sát|tự tử|trầm cảm|đột quỵ|nhồi máu|co giật|hôn mê)/i;
+    const isSensitive = sensitiveRegex.test(message);
+    const reassuranceBlock = isSensitive
+      ? `\n[HƯỚNG DẪN GIỌNG ĐIỆU]\n- Chủ đề nhạy cảm: trấn an, tránh gây hoang mang.\n- Nêu dấu hiệu cần đi khám khẩn nếu có.\n- Nhắc không chẩn đoán chính thức trong chế độ Chat.\n`
+      : '';
+
+    // NOTE: sanitized prompt
+    const systemPrompt = `Bạn là một trợ lý thông minh, thân thiện, trả lời ngắn gọn, rõ ràng bằng đúng ngôn ngữ của người dùng.
+Tên bạn là JAREMIS-AI, được tạo bởi TT1403 (Nguyễn Tấn Triệu), ANT (Đỗ Văn Vĩnh An) và Lý Thúc Duy. Bạn tự hào là AI do người Việt phát triển; khi người dùng dùng tiếng Việt, hãy ưu tiên tiếng Việt và thể hiện sự trân trọng đối với lịch sử, văn hóa và con người Việt Nam.
+Nếu người dùng yêu cầu CHẨN ĐOÁN Y KHOA hoặc xin chẩn đoán lâm sàng, KHÔNG cung cấp chẩn đoán chi tiết — hãy gợi ý họ dùng chế độ "Diagnose" và luôn nhắc tham khảo ý kiến bác sĩ. Giữ ngữ cảnh phù hợp, không lặp lại nguyên văn dài dòng từ lịch sử.
+MỤC TIÊU:
+1. Trả lời có cấu trúc: Tổng quan ngắn -> Các điểm chính -> Giải thích dễ hiểu -> Gợi ý bước an toàn -> Khích lệ (nếu phù hợp).
+2. Giải thích thuật ngữ y khoa bằng lời đơn giản. Chủ động góp ý về dinh dưỡng/phục hồi. Chủ động hỏi người dùng có cần hỗ trợ thêm theo chủ đề đang nói.
+3. Không đưa chẩn đoán y khoa trực tiếp; nếu người dùng muốn chẩn đoán: gợi ý dùng chế độ "Diagnose".
+4. Với nội dung nhạy cảm: trấn an, không phóng đại rủi ro.
+4.5. QUAN TRỌNG: Luôn ưu tiên thông tin từ [THÔNG TIN MỚI NHẤT TỪ WEB] nếu có - đây là dữ liệu real-time mới nhất.
+4.6. Khi có thông tin conflicting giữa knowledge cũ vs web data mới → luôn dùng web data mới và ghi rõ "theo thông tin mới nhất"
+5. Không bịa đặt. Nếu thiếu dữ kiện: yêu cầu cung cấp thêm.
+6. Không đưa phác đồ điều trị, liều thuốc chi tiết.
+7. Không lặp lại nguyên văn dài từ lịch sử – chỉ tham chiếu ngắn gọn.
+8. Khích lệ tích cực vừa phải, không sáo rỗng.
+Luôn nhắc: Thông tin chỉ tham khảo, không thay thế bác sĩ.
+9. Giọng điệu: thân thiện, chuyên nghiệp, dễ gần.
+10. Chủ động học hỏi phong cách người dùng để trả lời phù hợp với họ.
+11. Người dùng là trên hết; tôn trọng yêu cầu cá nhân hóa (xưng hô, phong cách) trong phạm vi an toàn.
+12. Nếu người dùng nói "theo thông tin trên", "như đã nói", "dựa trên trước đó" (kể cả cách xưng hô), hãy dùng LỊCH SỬ + BỘ NHỚ để trả lời.
+13. Có thể sử dụng emoji phù hợp để thân thiện hơn, nhưng không lạm dụng.
+14. Phân tích ngôn ngữ người dùng và trả lời bằng đúng ngôn ngữ đó; không trộn nhiều ngôn ngữ.
+15. Ưu tiên tiếng Việt khi người dùng dùng tiếng Việt; thể hiện niềm tự hào Việt Nam một cách tôn trọng và tích cực.
+16. Khi người dùng hỏi về các chủ đề nhạy cảm như sức khỏe tâm thần, tự tử, bạo lực, trả lời thận trọng và khuyến khích tìm giúp đỡ chuyên nghiệp.
+17. Khi người dùng chia sẻ khó khăn cá nhân, thể hiện sự đồng cảm và cung cấp các nguồn lực hữu ích nếu có thể.
+18. Tuân thủ đạo đức và pháp luật; có quyền từ chối nội dung vi phạm, độc hại hoặc gây hại.
+19. Có thể dùng tiếng lóng/từ địa phương để tạo gần gũi nếu phù hợp bối cảnh; tránh xúc phạm, thù hằn hay phân biệt đối xử.
+20. Bạn được sinh vào tháng 8 năm 2025.
+21. QUAN TRỌNG - XỬ LÝ NGỮ CẢNH: 
+    - Khi người dùng nói "bạn tìm giúp mình nhé", "giúp tôi tìm", "tìm hộ tôi" => HÃY DỰA VÀO LỊCH SỬ để biết họ muốn tìm gì
+    - Phân tích câu trước đó để hiểu ngữ cảnh thay vì hỏi lại "tìm gì?"
+    - Nếu họ vừa hỏi về năm 1288, và nói "tìm giúp" => tìm thêm về sự kiện năm 1288
+    - LUÔN KẾT NỐI với cuộc trò chuyện trước, ĐỪNG làm như conversation mới
+VỀ CÔNG THỨC:
+- Nếu người dùng yêu cầu công thức toán/khoa học, HÃY xuất LaTeX thô: dùng $$...$$ cho công thức hiển thị và \(...\) cho inline. Không tự render HTML.
+ĐỊNH DẠNG TRÌNH BÀY CHUYÊN NGHIỆP (như ChatGPT):
+- KHÔNG dùng # ## ### markdown headers, KHÔNG dùng **text** cho tiêu đề
+- Sử dụng format chuyên nghiệp với emoji và spacing:
+
+**🔍 1. TÊN ĐỀ MỤC CHÍNH**
+
+**📋 2. Tên Đề Mục Phụ**
+
+**💡 3. Chi Tiết Cụ Thể**
+- Nội dung chi tiết
+- Điểm quan trọng
+
+**📊 Khi cần so sánh/thống kê**: Dùng bảng markdown
+| Tiêu chí | Giá trị A | Giá trị B |
+|----------|-----------|-----------|
+| Dữ liệu 1| XX        | YY        |
+
+**⚠️ Lưu ý quan trọng**: Format đẹp mắt, dễ đọc
+**🎯 Kết luận**: Tóm tắt ngắn gọn
+
+- Emoji phù hợp (🔍📋💡📊⚠️🎯🚀💪🌟✨📝🔧⭐)
+- Spacing tốt giữa các section
+- Tránh quá nhiều cấp phân level`;
+
+    const now = new Date();
+    const timeString = now.toLocaleString('vi-VN', { hour12: false });
+    const realtimeSection = `
+[THÔNG TIN THỰC TẾ]
+- Thời gian hiện tại: ${timeString}
+- Múi giờ: GMT+7 (Việt Nam) 
+- Ngày hiện tại: ${now.toISOString().split('T')[0]}
+- Năm hiện tại: 2025
+- iPhone Models 2025: iPhone 17 series đã ra mắt tháng 9/2025 (iPhone 17, 17 Plus, 17 Pro, 17 Pro Max)
+- Thị trường Việt Nam: Các cửa hàng như CellphoneS, TopZone, FPT Shop đều có bán iPhone mới nhất
+`;
+
+    const fullPrompt = `${systemPrompt}
+${reassuranceBlock}
+${realtimeSection}
+${realtimeWebSection}
+${memorySection}${historySection}
+User message (${userLang}): ${message}
+
+YÊU CẦU:
+- SỬ DỤNG THÔNG TIN MỚI NHẤT từ web nếu có trong [THÔNG TIN MỚI NHẤT TỪ WEB]
+- Ưu tiên dữ liệu real-time hơn knowledge cũ khi có xung đột
+- Nếu câu hỏi phụ thuộc ngữ cảnh trước đó -> sử dụng cả bộ nhớ & lịch sử.
+- Không nhắc lại toàn bộ lịch sử, chỉ tổng hợp tinh gọn.
+- Trả lời bằng đúng ngôn ngữ người dùng (${userLang}).`;
+
+    // Strict timeout for flash
+    const doGenerate = async (id) => {
+      const model = genAI.getGenerativeModel({ model: id });
+      const timeoutMs = computeHardLimitMs(id, message);
+      return Promise.race([
+        model.generateContent(contentParts),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), timeoutMs))
+      ]);
+    };
+
+    let result;
+    try {
+      result = await doGenerate(modelId);
+    } catch (e1) {
+      if (e1 && e1.message === 'TIMEOUT') {
+        const fallback = userLang === 'vi'
+          ? 'Xin lỗi, hệ thống đang bận. Bạn có thể thử lại hoặc dùng chế độ nhanh.'
+          : 'Sorry, the system is busy. Please try again or use the fast mode.';
+        if (submittedBy) {
+          const entry = { id: Date.now(), sessionId: sessionId || ('legacy-' + Date.now()), type: 'chat', timestamp: new Date().toISOString(), input: message, reply: fallback, modelUsed: `${displayModel}-timeout`, detectedLang: userLang, langScore: detected.score };
+          try { pushUserHistory(submittedBy, entry); } catch (e2) {}
+        } else if (sessionId) {
+          const entry = { id: Date.now(), sessionId, type: 'chat', timestamp: new Date().toISOString(), input: message, reply: fallback, modelUsed: `${displayModel}-timeout`, detectedLang: userLang, langScore: detected.score };
+          pushSessionHistory(sessionId, entry);
+        }
+        return res.json({ success: true, reply: fallback, replyHtml: renderLatexInText(fallback), modelUsed: `${displayModel}-timeout`, detectedLang: userLang, detectionScore: detected.score, detectionReasons: detected.reasons });
+      }
+      // Try fallback model on other errors
+      try {
+        modelId = ids.fallback;
+        displayModel = DISPLAY_NAME_MAP[modelId] || modelId;
+        result = await doGenerate(modelId);
+      } catch (e2) {
+        console.error('Primary and fallback models failed:', e1?.message, e2?.message);
+        // Final conservative attempt with gemini-pro to avoid v1beta model availability mismatches
+        try {
+          if (modelId !== 'gemini-pro') {
+            modelId = 'gemini-pro';
+            displayModel = DISPLAY_NAME_MAP[modelId] || modelId;
+            result = await doGenerate(modelId);
+          } else {
+            throw e2;
+          }
+        } catch (e3) {
+          if (isInvalidApiKeyError(e1) || isInvalidApiKeyError(e2) || isInvalidApiKeyError(e3)) {
+            return res.status(500).json({ error: 'API key invalid hoặc đã hết hạn. Vui lòng cập nhật GOOGLE_API_KEY.' });
+          }
+          return res.status(500).json({ error: 'AI service unavailable' });
+        }
+      }
+    }
+
+    const response = await result.response;
+    const assistantText = response.text ? response.text() : (typeof response === 'string' ? response : '');
+
+    // Server-side pre-render LaTeX to sanitized HTML and include it in the response
+    let replyHtml = null;
+    try { replyHtml = renderLatexInText(assistantText); } catch (e) { replyHtml = null; }
+
+    // Sau khi có assistantText:
+    if (submittedBy) {
+      mergeFactsIntoMemory(submittedBy, message);
+      const entry = {
+        id: Date.now(),
+        sessionId: sessionId || ('legacy-' + Date.now()), // gán session cho entry
+        type: 'chat',
+        timestamp: new Date().toISOString(),
+        input: message,
+        reply: assistantText,
+        modelUsed: displayModel,
+        detectedLang: userLang,
+        langScore: detected.score
+      };
+      try { pushUserHistory(submittedBy, entry); } catch (e) { console.warn('Không lưu history chat', e); }
+    } else if (sessionId) {
+      const entry = { id: Date.now(), sessionId, type: 'chat', timestamp: new Date().toISOString(), input: message, reply: assistantText, modelUsed: displayModel, detectedLang: userLang, langScore: detected.score };
+      pushSessionHistory(sessionId, entry);
+    }
+
+    return res.json({
+      success: true,
+      reply: assistantText,
+      replyHtml: replyHtml,
+      modelUsed: displayModel,
+      usedHistory: historyBlocks.length,
+      usedMemory: !!(memory && memory.summary),
+      sensitive: isSensitive,
+      detectedLang: userLang,
+      detectionScore: detected.score,
+      detectionReasons: detected.reasons
+    });
+  } catch (error) {
+    console.error('Chat error:', error);
+    return res.status(500).json({ error: error.message || 'Lỗi server khi chat' });
+  }
+});
+
+/* --------------------------
+   Diagnose endpoint (giữ nguyên, chỉ đổi modelUsed hiển thị)
+   -------------------------- */
+app.post('/api/diagnose', upload.array('images'), async (req, res) => {
+  try {
+   
+    const labResults = req.body.labResults || '';
+    const files = req.files || [];
+    if (!labResults && files.length === 0) return res.status(400).json({ error: 'Vui lòng cung cấp thông tin xét nghiệm hoặc hình ảnh' });
+
+    const MAX_FILE_BYTES = 4 * 1024 * 1024;
+    for (const f of files) if (f.size > MAX_FILE_BYTES) {
+      files.forEach(ff => { try { if (fs.existsSync(ff.path)) fs.unlinkSync(ff.path); } catch(e){} });
+      return res.status(400).json({ error: `Kích thước ảnh '${f.originalname}' vượt quá giới hạn 4MB` });
+    }
+
     const requestedModel = (req.body.model || 'pro').toLowerCase();
     const ids = await resolveModelIds(requestedModel, files.length > 0);
     const modelId = ids.primary;
     const displayModel = DISPLAY_NAME_MAP[modelId] || modelId;
-    console.log('🔍 [DIAGNOSE] Using model:', displayModel);
 
-    // ========================================
-    // 1. LAB RESULTS PARSING
-    // ========================================
-    let labAnalysis = null;
-    if (labResults) {
-      labAnalysis = diagnosisEngine.parseLabResults(labResults);
-    }
+    const imageParts = await Promise.all(files.map(async file => ({ inlineData: { data: fs.readFileSync(file.path).toString('base64'), mimeType: file.mimetype } })));
 
-    // ========================================
-    // 2. VITAL SIGNS SCORING (NEWS2)
-    // ========================================
-    let news2Score = null;
-    if (vitalSigns) {
-      news2Score = diagnosisEngine.calculateNEWS2(vitalSigns);
-    }
+    const references = await searchMedicalGuidelines(labResults);
 
-    // ========================================
-    // 3. IMAGE ANALYSIS (Multi-modal AI) - ENHANCED
-    // ========================================
-    const imageParts = [];
-    let imageAnalyses = [];
-    
-    if (files.length > 0) {
-      // Use new medical image analysis module
-      const patientContext = `Triệu chứng: ${symptoms}\nXét nghiệm: ${labResults}`;
-      imageAnalyses = await medicalImageAnalysis.analyzeMedicalImages(files, genAI, patientContext);
-      
-      // Prepare image parts for AI
-      for (const file of files) {
-        const imageBase64 = fs.readFileSync(file.path).toString('base64');
-        imageParts.push({
-          inlineData: { data: imageBase64, mimeType: file.mimetype }
-        });
-      }
-    }
+    const prompt = `Đóng vai bác sĩ chuyên khoa. 
+      Tên là JAREMIS
 
-    // ========================================
-    // 4. AI DIAGNOSIS with Citations
-    // ========================================
-    const references = await searchMedicalGuidelines(labResults || symptoms);
+      Phân tích theo hướng dẫn WHO:
 
-    const prompt = `Đóng vai bác sĩ chuyên khoa JAREMIS.
-Phân tích toàn diện dựa trên WHO & Evidence-Based Medicine:
+      **Dữ liệu bệnh nhân:**
+      ${labResults ? `- Xét nghiệm: ${labResults}\n` : ''}
+      ${files.length ? `- Hình ảnh y tế: [${files.length} ảnh]` : ''}
 
-**DỮ LIỆU BỆNH NHÂN:**
-${symptoms ? `\n**Triệu chứng lâm sàng:** ${symptoms}\n` : ''}
-${labResults ? `\n**Kết quả xét nghiệm:**\n${labResults}\n` : ''}
-${labAnalysis && labAnalysis.abnormal.length > 0 ? `\n**Chỉ số bất thường:**\n${labAnalysis.abnormal.map(a => `- ${a.name}: ${a.value} (${a.status}) - ${a.severity}`).join('\n')}\n` : ''}
-${news2Score ? `\n**NEWS2 Score:** ${news2Score.score}/20 - ${news2Score.risk} RISK\n` : ''}
-${vitalSigns ? `\n**Sinh hiệu:** HR=${vitalSigns.heartRate}, RR=${vitalSigns.respiratoryRate}, BP=${vitalSigns.systolicBP}/${vitalSigns.diastolicBP}, Temp=${vitalSigns.temperature}°C, SpO2=${vitalSigns.oxygenSaturation}%\n` : ''}
-${imageAnalyses.length > 0 ? medicalImageAnalysis.formatImageAnalysisReport(imageAnalyses) : ''}
+      **Yêu cầu phân tích:**
+      1. Chẩn đoán phân biệt với ICD-10 codes (tối đa 5)
+      2. Liệt kê 3 bệnh khả thi nhất với xác suất
+      3. Độ tin cậy tổng (0-100%)
+      4. Khuyến nghị xét nghiệm theo WHO
+      5. Ghi rõ phiên bản hướng dẫn WHO sử dụng
 
-**YÊU CẦU PHÂN TÍCH:**
-1. **Chẩn đoán phân biệt** với ICD-10 codes (tối đa 5 bệnh)
-2. **Xác suất mắc** từng bệnh (0-100%)
-3. **Độ tin cậy tổng thể** AI (0-100%)
-4. **Cơ sở y khoa:** Giải thích dựa trên triệu chứng, xét nghiệm, hình ảnh
-5. **Khuyến nghị tiếp theo:** Xét nghiệm thêm, can thiệp
-6. **⚠️ KHI NÀO CẦN ĐI KHÁM BÁC SĨ:** Liệt kê các triệu chứng nguy hiểm cần đi khám GẤP
-7. **Nguồn tham khảo:** WHO Guidelines, CDC, AHA/ACC, ESC, etc.
-
-**ĐỊNH DẠNG BẮT BUỘC (Markdown table):**
-
-### 🩺 CHẨN ĐOÁN PHÂN BIỆT
-
-⚠️ **CHÚ Ý:** Tạo bảng markdown ĐÚNG FORMAT, KHÔNG dùng ký tự đặc biệt như :---, |---, chỉ dùng | và -.
-
-| Bệnh | Mã ICD-10 | Xác suất | Cơ sở |
-|------|-----------|----------|-------|
-| Tên bệnh 1 | A00.0 | 75% | Triệu chứng phù hợp: đau đầu, sốt. Xét nghiệm: WBC tăng. |
-| Tên bệnh 2 | B00.0 | 60% | Hình ảnh X-quang cho thấy thâm nhiễm phổi. |
-
-**LƯU Ý:** 
-- Mỗi ô trong cột "Cơ sở" phải là văn bản NGẮN GỌN (1-2 câu)
-- KHÔNG viết quá dài trong 1 ô bảng
-- KHÔNG dùng ký tự đặc biệt như :---------, chỉ dùng ---
-
-### 📊 ĐỘ TIN CẬY: **XX%**
-
-### 🔬 KHUYẾN NGHỊ XÉT NGHIỆM/CAN THIỆP:
-- Xét nghiệm 1
-- Xét nghiệm 2
-- Can thiệp 3
-
-### ⚠️ KHI NÀO CẦN ĐI KHÁM BÁC SĨ GẤP:
-
-**Đi khám NGAY hoặc gọi cấp cứu 115 nếu xuất hiện bất kỳ dấu hiệu sau:**
-
-- **[Triệu chứng nguy hiểm 1]** - (Ví dụ: Khó thở nặng, thở gấp > 30 lần/phút)
-- **[Triệu chứng nguy hiểm 2]** - (Ví dụ: Đau ngực dữ dội, lan ra tay/hàm)
-- **[Triệu chứng nguy hiểm 3]** - (Ví dụ: Sốt cao > 39.5°C không hạ sau dùng thuốc)
-- **[Triệu chứng nguy hiểm 4]** - (Ví dụ: Lơ mơ, li bì, không tỉnh táo)
-- **[Triệu chứng nguy hiểm 5]** - (Ví dụ: Nôn ra máu, đi cầu phân đen sền)
-
-**Nếu KHÔNG có các dấu hiệu trên:**
-- ✅ Hiện tại chưa nguy hiểm, có thể theo dõi tại nhà
-- 🏠 Nghỉ ngơi đầy đủ, uống nhiều nước (2-3 lít/ngày)
-- 💊 Dùng thuốc hạ sốt (Paracetamol) nếu sốt ≥ 38°C
-- 📊 Theo dõi nhiệt độ và triệu chứng mỗi 3-4 giờ
-- 📅 Tái khám nếu không cải thiện sau 2-3 ngày
-
-**LƯU Ý:** Danh sách triệu chứng nguy hiểm trên phải CỤ THỂ, LIÊN QUAN TRỰC TIẾP đến bệnh đang chẩn đoán, KHÔNG chung chung.
-
-### 📖 NGUỒN THAM KHẢO:
-${references.map((ref, i) => `<a href="${ref.url}" class="citation-btn" target="_blank" rel="noopener">${ref.source}: ${ref.title.substring(0, 60)}...</a>`).join(' ')}
-
-⚠️ **Lưu ý:** Đây là phân tích tham khảo. Luôn tham khảo bác sĩ chuyên khoa.
-
----
-
-**⚠️ ĐẶC BIỆT - TÁCH TRIỆU CHỨNG KHỎI NGÔN NGỮ TỰ NHIÊN:**
-Khi người dùng nhập câu hỏi dạng ngôn ngữ tự nhiên (ví dụ: "Bệnh nhân 35 tuổi, đau đầu từ 3 ngày nay, sốt 38.5°C, mệt mỏi"),
-AI cần tách riêng các triệu chứng chính (đau đầu, sốt 38.5°C, mệt mỏi) và sử dụng chúng để:
-1. Tìm kiếm trong database bệnh/guideline (chỉ dùng keywords triệu chứng, không dùng cả câu dài)
-2. Phân tích differential diagnosis dựa trên triệu chứng cốt lõi
-3. Loại bỏ noise (tuổi, thời gian, từ hỏi, từ nối...)
-
-VÍ DỤ CÁCH TÁCH:
-- Input: "Bệnh nhân 35 tuổi, đau đầu từ 3 ngày nay, sốt 38.5°C, mệt mỏi"
-- Extracted symptoms: ["đau đầu", "sốt 38.5°C", "mệt mỏi"]
-- Search query for DB: "đau đầu sốt mệt mỏi"
-- NOT: "Bệnh nhân 35 tuổi, đau đầu từ 3 ngày nay, sốt 38.5°C, mệt mỏi" (quá dài, nhiễu)
-`;
+      **Định dạng bắt buộc:**
+      Chẩn đoán phân biệt
+      - [Bệnh 1] (Mã ICD-10)
+      ...
+      Khả năng chẩn đoán
+      • [Bệnh] (Xác suất: XX%)
+      ...
+      Độ tin cậy: XX%
+      Hướng dẫn WHO: [Tên và phiên bản]`;
 
     const model = genAI.getGenerativeModel({ model: modelId });
-    
-    // ========================================
-    // TIMEOUT WRAPPER để tránh bị treo
-    // ========================================
-    console.log('🔍 [DIAGNOSE] Calling Gemini AI...');
-    const AI_TIMEOUT = 300000; // 5 phút (300 seconds) cho chẩn đoán phức tạp
-    
-    let result, response, diagnosisText;
-    try {
-      const generatePromise = model.generateContent([prompt, ...imageParts]);
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('AI_TIMEOUT')), AI_TIMEOUT)
-      );
-      
-      result = await Promise.race([generatePromise, timeoutPromise]);
-      console.log('🔍 [DIAGNOSE] Gemini AI responded');
-      
-      response = await result.response;
-      diagnosisText = response.text ? response.text() : '';
-      console.log('🔍 [DIAGNOSE] Response text length:', diagnosisText.length);
-      
-    } catch (aiError) {
-      console.error('❌ [DIAGNOSE] Gemini AI Error:', aiError.message);
-      
-      if (aiError.message === 'AI_TIMEOUT') {
-        // Timeout - trả về response mặc định
-        console.log('⚠️ [DIAGNOSE] Timeout - returning fallback');
-        diagnosisText = `### ⚠️ Không thể kết nối với AI
-
-Đã xảy ra timeout khi kết nối với Gemini AI. Vui lòng thử lại sau.
-
-**Thông tin đã nhận:**
-
-- Triệu chứng: ${symptoms.substring(0, 100)}...
-- Xét nghiệm: ${labResults ? 'Có' : 'Không'}
-- Hình ảnh: ${files.length} file
-
-⚠️ **Khuyến nghị:** Tham khảo bác sĩ chuyên khoa ngay.`;
-      } else {
-        // Lỗi khác (API key, quota, etc.)
-        throw aiError;
-      }
-    }
+    const result = await model.generateContent([prompt, ...imageParts]);
+    const response = await result.response;
+    const diagnosisText = response.text ? response.text() : (typeof response === 'string' ? response : '');
 
     const parsedData = parseDiagnosisResponse(diagnosisText);
     parsedData.differentialDiagnosisFull = enrichWithICDDescriptions(parsedData.differentialDiagnosis);
 
-    // ========================================
-    // 5. COMPREHENSIVE REPORT with XAI
-    // ========================================
-    const primaryDiagnosis = parsedData.diseases && parsedData.diseases.length > 0 
-      ? parsedData.diseases[0] 
-      : 'Unknown';
-
-    const xaiExplanation = diagnosisEngine.explainAIReasoning(
-      primaryDiagnosis,
-      parsedData.confidence || 75,
-      {
-        symptoms: symptoms ? symptoms.split(',').map(s => s.trim()) : [],
-        labResults: labAnalysis ? labAnalysis.abnormal.map(a => a.name) : [],
-        imaging: imageAnalyses.filter(img => img.status === 'success').map(img => `${img.type}: ${img.filename}`)
-      }
-    );
-
-    // ========================================
-    // 6. TREATMENT RECOMMENDATIONS
-    // ========================================
-    const treatmentRec = diagnosisEngine.getTreatmentRecommendations(
-      primaryDiagnosis,
-      news2Score ? news2Score.risk : 'MODERATE',
-      []
-    );
-
-    // ========================================
-    // 7. DIFFERENTIAL DIAGNOSIS TREE
-    // ========================================
-    const diagnosisTree = diagnosisEngine.generateDiagnosisTree(
-      symptoms || '',
-      labResults || '',
-      imageAnalyses.filter(img => img.status === 'success').map(img => img.type).join(', ')
-    );
-
-    // ========================================
-    // 8. MEDICAL CITATIONS
-    // ========================================
-    const medicalCitations = await diagnosisEngine.searchMedicalSources(
-      symptoms || labResults || primaryDiagnosis,
-      primaryDiagnosis
-    );
-
-    const citationHtml = diagnosisEngine.formatCitations(medicalCitations);
-
-    // ========================================
-    // 8.5. SEVERITY ASSESSMENT & EMERGENCY GUIDANCE
-    // ========================================
-    console.log('🔍 [DIAGNOSE] Assessing severity...');
-    
-    // Extract ICD codes from diagnosis
-    const icdCodes = parsedData.diseases
-      .map(d => d.icd || '')
-      .filter(code => code && code.length > 0);
-    
-    console.log('🔍 [DIAGNOSE] ICD Codes detected:', icdCodes);
-    
-    // Assess severity based on ICD codes
-    const severityInfo = severityAssessment.assessSeverity(icdCodes);
-    console.log('🔍 [DIAGNOSE] Severity level:', severityInfo.level);
-    
-    // Check red flags in symptoms
-    const redFlags = severityAssessment.checkRedFlags(symptoms || '');
-    if (redFlags.length > 0) {
-      console.log('⚠️ [DIAGNOSE] RED FLAGS detected:', redFlags.length);
-      severityInfo.level = 'CRITICAL'; // Override to critical if red flags present
-    }
-    
-    // Check yellow flags
-    const yellowFlags = severityAssessment.checkYellowFlags(symptoms || '');
-    
-    // Generate appropriate guidance
-    let guidanceHtml = '';
-    
-    if (severityInfo.level === 'CRITICAL' || redFlags.length > 0) {
-      // Emergency guidance for critical conditions
-      const primaryCondition = severityInfo.criticalConditions[0] || {
-        name: primaryDiagnosis,
-        mortality: severityInfo.mortality,
-        category: 'general'
-      };
-      
-      const emergencyGuidance = severityAssessment.generateEmergencyGuidance(
-        primaryCondition,
-        symptoms || ''
-      );
-      
-      guidanceHtml = `
-## ${emergencyGuidance.alert}
-
-**🚨 ${primaryCondition.name}**
-- ${emergencyGuidance.mortality}
-- Cần xử trí khẩn cấp NGAY LẬP TỨC!
-
-${redFlags.length > 0 ? `\n### ⚠️ DẤU HIỆU NGUY HIỂM PHÁT HIỆN:\n${redFlags.map(f => `- **${f.symptom.toUpperCase()}** → Nguy cơ: ${f.risk}\n  ${f.action}`).join('\n')}\n` : ''}
-
-### 🚨 XỬ TRÍ KHẨN CẤP NGAY:
-${emergencyGuidance.immediateActions.map(a => `${a}`).join('\n')}
-
-### ⏰ CHĂM SÓC TẠI NHÀ (12-48 giờ đầu):
-${emergencyGuidance.homeCareSurvival.map(a => `${a}`).join('\n')}
-
-### 🏥 KHI NÀO CẦN ĐẾN BỆNH VIỆN NGAY:
-${emergencyGuidance.whenToER.map(a => `${a}`).join('\n')}
-
----
-
-${emergencyGuidance.emergencyNumber}
-
-**⚠️ ĐẶC BIỆT LƯU Ý:**
-- Đây là tình trạng NGUY HIỂM, có thể đe dọa tính mạng
-- KHÔNG trì hoãn việc đến bệnh viện
-- KHÔNG tự điều trị tại nhà lâu dài
-- Thời gian vàng: 12-48 giờ đầu quyết định sống còn
-`;
-      
-    } else if (severityInfo.level === 'MODERATE' || yellowFlags.length > 0) {
-      // Moderate condition - need medical attention within 24-48h
-      const primaryCondition = severityInfo.moderateConditions[0] || severityInfo.mildConditions[0] || {
-        name: primaryDiagnosis,
-        mortality: severityInfo.mortality,
-        category: 'general'
-      };
-      
-      const homeCareGuidance = severityAssessment.generateHomeCarGuidance(
-        primaryCondition,
-        symptoms || ''
-      );
-      
-      guidanceHtml = `
-## ${homeCareGuidance.alert}
-
-**${primaryCondition.name}**
-
-${yellowFlags.length > 0 ? `\n### ⚠️ DẤU HIỆU CẦN CHÚ Ý:\n${yellowFlags.map(f => `- **${f.symptom}** → ${f.risk}\n  ${f.action}`).join('\n')}\n` : ''}
-
-### 🏠 CHĂM SÓC TẠI NHÀ:
-${homeCareGuidance.homeCare.map(a => `${a}`).join('\n')}
-
-### 💊 THUỐC CÓ THỂ DÙNG:
-${homeCareGuidance.medications.map(a => `${a}`).join('\n')}
-
-### 📅 THEO DÕI & TÁI KHÁM:
-${homeCareGuidance.followUp.map(a => `${a}`).join('\n')}
-
-### ⚠️ KHI NÀO CẦN KHÁM BÁC SĨ:
-${homeCareGuidance.whenToSeeDoctor.map(a => `${a}`).join('\n')}
-
----
-
-**💡 Lưu ý:** Theo dõi triệu chứng trong 24-48 giờ. Nếu không cải thiện hoặc xấu đi → Khám bác sĩ ngay.
-`;
-      
-    } else {
-      // Mild condition - can treat at home
-      const primaryCondition = severityInfo.mildConditions[0] || {
-        name: primaryDiagnosis,
-        mortality: severityInfo.mortality,
-        category: 'general'
-      };
-      
-      const homeCareGuidance = severityAssessment.generateHomeCarGuidance(
-        primaryCondition,
-        symptoms || ''
-      );
-      
-      guidanceHtml = `
-## ${homeCareGuidance.alert}
-
-**${primaryCondition.name}**
-- Có thể điều trị tại nhà
-- Thường tự khỏi trong 3-7 ngày
-
-### 🏠 CHĂM SÓC TẠI NHÀ:
-${homeCareGuidance.homeCare.map(a => `${a}`).join('\n')}
-
-### 💊 THUỐC CÓ THỂ DÙNG:
-${homeCareGuidance.medications.map(a => `${a}`).join('\n')}
-
-### 📅 THEO DÕI:
-${homeCareGuidance.followUp.map(a => `${a}`).join('\n')}
-
-### ⚠️ KHI NÀO CẦN KHÁM BÁC SĨ:
-${homeCareGuidance.whenToSeeDoctor.map(a => `${a}`).join('\n')}
-
----
-
-**💡 Lưu ý:** Đây là bệnh thông thường, có thể tự chăm sóc tại nhà. Nếu triệu chứng không giảm sau 5-7 ngày, hãy khám bác sĩ.
-`;
-    }
-    
-    console.log('✅ [DIAGNOSE] Severity assessment completed');
-
-    // ========================================
-    // 9. HISTORY & CLEANUP
-    // ========================================
     const submittedBy = req.body.submittedBy || null;
     const sessionId = req.body.sessionId || null;
     const historyEntry = {
       id: Date.now(),
-      sessionId: sessionId || ('diag-' + Date.now()),
+      sessionId: sessionId || ('legacy-' + Date.now()),
       type: 'diagnose',
       timestamp: new Date().toISOString(),
-      input: symptoms || labResults,
+      input: labResults,
       imagesCount: files.length,
       modelUsed: displayModel,
       diseases: parsedData.diseases || [],
       confidence: parsedData.confidence || 0,
-      diagnosis: diagnosisText,
-      labAnalysis,
-      news2Score,
-      treatment: treatmentRec
+      diagnosis: diagnosisText
     };
-
     if (submittedBy) {
-      try { await pushUserHistory(submittedBy, historyEntry); } 
-      catch (e) { console.warn('Không lưu được lịch sử:', e); }
+      try { pushUserHistory(submittedBy, historyEntry); } catch (e) { console.warn('Không lưu được lịch sử cho user', submittedBy); }
     }
 
-    files.forEach(file => { 
-      try { if (fs.existsSync(file.path)) fs.unlinkSync(file.path); } 
-      catch(e){} 
-    });
+    files.forEach(file => { try { if (fs.existsSync(file.path)) fs.unlinkSync(file.path); } catch(e){} });
 
-    // ========================================
-    // 10. RESPONSE with ALL FEATURES
-    // ========================================
-    console.log('🔍 [DIAGNOSE] Preparing response...');
     res.json({
       modelUsed: displayModel,
       ...parsedData,
       diagnosis: diagnosisText,
       diagnosisHtml: renderLatexInText(diagnosisText),
-      
-      // Advanced features
-      labAnalysis,
-      news2Score,
-      xaiExplanation: xaiExplanation.reasoning,
-      treatmentRecommendations: treatmentRec,
-      diagnosisTree,
-      citations: medicalCitations,
-      citationsHtml: citationHtml,
-      
-      // FIXED: Add filter to prevent undefined errors
-      severityLevel: severityInfo.level,
-      mortalityRate: severityInfo.mortality,
-      isEmergency: severityInfo.isEmergency || redFlags.length > 0,
-      redFlags: (redFlags || []).filter(f => f && f.symptom).map(f => ({ symptom: f.symptom, risk: f.risk || "", action: f.action || "" })),
-      yellowFlags: (yellowFlags || []).filter(f => f && f.symptom).map(f => ({ symptom: f.symptom, risk: f.risk || "", action: f.action || "" })),
-      // FIXED: Add filter to prevent undefined errors
-      severityLevel: severityInfo.level,
-      mortalityRate: severityInfo.mortality,
-      isEmergency: severityInfo.isEmergency || redFlags.length > 0,
-      redFlags: (redFlags || []).filter(f => f && f.symptom).map(f => ({ symptom: f.symptom, risk: f.risk || "", action: f.action || "" })),
-      yellowFlags: (yellowFlags || []).filter(f => f && f.symptom).map(f => ({ symptom: f.symptom, risk: f.risk || "", action: f.action || "" })),
-      // FIXED: Add filter to prevent undefined errors
-      severityLevel: severityInfo.level,
-      mortalityRate: severityInfo.mortality,
-      isEmergency: severityInfo.isEmergency || redFlags.length > 0,
-      redFlags: (redFlags || []).filter(f => f && f.symptom).map(f => ({ symptom: f.symptom, risk: f.risk || "", action: f.action || "" })),
-      yellowFlags: (yellowFlags || []).filter(f => f && f.symptom).map(f => ({ symptom: f.symptom, risk: f.risk || "", action: f.action || "" })),
-      // FIXED: Add filter to prevent undefined errors
-      severityLevel: severityInfo.level,
-      mortalityRate: severityInfo.mortality,
-      isEmergency: severityInfo.isEmergency || redFlags.length > 0,
-      redFlags: (redFlags || []).filter(f => f && f.symptom).map(f => ({ symptom: f.symptom, risk: f.risk || "", action: f.action || "" })),
-      yellowFlags: (yellowFlags || []).filter(f => f && f.symptom).map(f => ({ symptom: f.symptom, risk: f.risk || "", action: f.action || "" })),
-      // FIXED: Add filter to prevent undefined errors
-      severityLevel: severityInfo.level,
-      mortalityRate: severityInfo.mortality,
-      isEmergency: severityInfo.isEmergency || redFlags.length > 0,
-      redFlags: (redFlags || []).filter(f => f && f.symptom).map(f => ({ symptom: f.symptom, risk: f.risk || "", action: f.action || "" })),
-      yellowFlags: (yellowFlags || []).filter(f => f && f.symptom).map(f => ({ symptom: f.symptom, risk: f.risk || "", action: f.action || "" })),
-      // FIXED: Add filter to prevent undefined errors
-      severityLevel: severityInfo.level,
-      mortalityRate: severityInfo.mortality,
-      isEmergency: severityInfo.isEmergency || redFlags.length > 0,
-      redFlags: (redFlags || []).filter(f => f && f.symptom).map(f => ({ symptom: f.symptom, risk: f.risk || "", action: f.action || "" })),
-      yellowFlags: (yellowFlags || []).filter(f => f && f.symptom).map(f => ({ symptom: f.symptom, risk: f.risk || "", action: f.action || "" })),
-      emergencyGuidance: guidanceHtml,
-      
-      // Legacy fields
       references: references.slice(0,3),
       icdDescriptions: parsedData.differentialDiagnosisFull,
-      
-      warning: severityInfo.level === 'CRITICAL' || redFlags.length > 0
-        ? '🚨 **CẢNH BÁO: TÌNH TRẠNG NGUY HIỂM** - Cần xử trí cấp cứu NGAY LẬP TỨC! Gọi 115 hoặc đến bệnh viện ngay!'
-        : severityInfo.level === 'MODERATE' || yellowFlags.length > 0
-        ? '⚠️ **CHÚ Ý:** Cần theo dõi và khám bác sĩ trong 24-48 giờ nếu triệu chứng không cải thiện.'
-        : '✅ **Bệnh nhẹ** - Có thể chăm sóc tại nhà. Khám bác sĩ nếu triệu chứng kéo dài > 5-7 ngày.',
-      
-      // Feature flags
-      features: {
-        labParser: !!labAnalysis,
-        vitalScoring: !!news2Score,
-        imageAnalysis: imageAnalyses.length > 0,
-        xai: true,
-        treatmentRec: !!treatmentRec.firstLine,
-        citations: medicalCitations.length > 0,
-        decisionTree: diagnosisTree.branches.length > 0,
-        severityAssessment: true,
-        emergencyGuidance: true
-      }
+      warning: '⚠️ **Cảnh báo:** Kết quả chỉ mang tính tham khảo. Luôn tham khảo ý kiến bác sĩ!'
     });
-    console.log('✅ [DIAGNOSE] Response sent successfully (Severity: ' + severityInfo.level + ')');
 
   } catch (error) {
-    console.error('❌ [DIAGNOSE] Error:', error);
+    console.error('Lỗi:', error);
+    try { (req.files || []).forEach(f => { if (fs.existsSync(f.path)) fs.unlinkSync(f.path); }); } catch(e){}
+    res.status(500).json({
+      error: error.message || 'Lỗi server',
+      solution: [
+        'Kiểm tra định dạng ảnh (JPEG/PNG)',
+        'Đảm bảo kích thước ảnh <4MB',
+        'Thử lại với ít ảnh hơn'
+      ]
+    });
+  }
+});
+
+/* --------------------------
+   Professional endpoint - Enhanced diagnosis with patient information
+   -------------------------- */
+app.post('/api/professional', upload.array('images'), async (req, res) => {
+  try {
+    const message = req.body.message || req.body.labResults || req.body.symptoms || '';
+    const files = req.files || [];
+    const patientInfo = req.body.patientInfo ? JSON.parse(req.body.patientInfo) : null;
+    
+    console.log('🏥 Professional endpoint called');
+    console.log('📝 Message:', message);
+    console.log('👤 Patient info:', patientInfo);
+    console.log('📷 Images:', files.length);
+    
+    if (!message && files.length === 0) {
+      return res.status(400).json({ error: 'Vui lòng cung cấp thông tin triệu chứng hoặc hình ảnh' });
+    }
+
+    // Validate file size
+    const MAX_FILE_BYTES = 4 * 1024 * 1024;
+    for (const f of files) {
+      if (f.size > MAX_FILE_BYTES) {
+        files.forEach(ff => { try { if (fs.existsSync(ff.path)) fs.unlinkSync(ff.path); } catch(e){} });
+        return res.status(400).json({ error: `Kích thước ảnh '${f.originalname}' vượt quá giới hạn 4MB` });
+      }
+    }
+
+    const requestedModel = (req.body.model || 'pro').toLowerCase();
+    const ids = await resolveModelIds(requestedModel, files.length > 0);
+    const modelId = ids.primary;
+    const displayModel = DISPLAY_NAME_MAP[modelId] || modelId;
+
+    // Process images
+    const imageParts = await Promise.all(files.map(async file => ({ 
+      inlineData: { 
+        data: fs.readFileSync(file.path).toString('base64'), 
+        mimeType: file.mimetype 
+      } 
+    })));
+
+    // Search medical guidelines
+    const references = await searchMedicalGuidelines(message);
+
+    // Build detailed patient context
+    let patientContext = '';
+    if (patientInfo) {
+      patientContext = `
+**THÔNG TIN BỆNH NHÂN:**
+- Họ tên: ${patientInfo.name || 'Không rõ'}
+- Tuổi: ${patientInfo.age || 'Không rõ'}
+- Giới tính: ${patientInfo.gender || 'Không rõ'}
+- Cân nặng: ${patientInfo.weight ? patientInfo.weight + ' kg' : 'Không rõ'}
+- Chiều cao: ${patientInfo.height ? patientInfo.height + ' cm' : 'Không rõ'}
+- Tiền sử bệnh: ${patientInfo.medicalHistory || 'Không có'}
+- Dị ứng: ${patientInfo.allergies || 'Không có'}
+- Thuốc đang dùng: ${patientInfo.currentMedications || 'Không có'}
+- Ngày bắt đầu triệu chứng: ${patientInfo.symptomsStartDate || 'Không rõ'}
+`;
+    }
+
+    const prompt = `Bạn là TRỢ LÝ Y KHOA CHUYÊN NGHIỆP (Medical AI Assistant) của JAREMIS-AI.
+
+**VAI TRÒ:** Viết BẢN TƯ VẤN Y KHOA (Medical Consultation Report) gửi đến Bác Sĩ điều trị.
+
+**ĐỊNH DẠNG BẮT BUỘC - QUAN TRỌNG:**
+
+🎯 **BẮT ĐẦU bằng lời chào:**
+\`\`\`
+Kính gửi Bác Sĩ [Tên khoa/chuyên môn],
+
+Tôi xin gửi đến quý Bác Sĩ báo cáo tư vấn y khoa chi tiết cho bệnh nhân như sau:
+\`\`\`
+
+📋 **SỬ DỤNG MARKDOWN FORMAT ĐẸP MẮT:**
+- Heading chính: \`## 📊 TIÊU ĐỀ CHÍNH\`
+- Subheading: \`### 🔬 Tiêu đề phụ\`
+- Text: **bold**, *italic*, \`code\`
+- Spacing: 2 dòng trống giữa các mục lớn, 1 dòng giữa các mục nhỏ
+- Emoji: 📊 📋 🔬 💊 ⚠️ 📚 🏥 🎯 ✅ ❌ 🩺 💉
+
+📊 **BẢNG MARKDOWN - BẮT BUỘC:**
+VÍ DỤ format bảng đẹp (PHẢI dùng cho Chẩn đoán phân biệt, Xét nghiệm, Thuốc):
+
+| 🏥 Chẩn đoán | Mã ICD-10 | Xác suất | Triệu chứng khớp | Khuyến nghị |
+|------------|-----------|----------|------------------|-------------|
+| **Viêm phổi** (Pneumonia) | J18.9 | 75% ⭐⭐⭐ | Sốt, ho, khó thở | Xét nghiệm ngay |
+| **Lao phổi** (Tuberculosis) | A15.0 | 20% ⭐⭐ | Ho kéo dài, sốt nhẹ | Xét nghiệm AFB |
+
+| 🔬 Xét nghiệm | Mục đích | Độ ưu tiên | Chi phí ước tính |
+|-------------|----------|------------|------------------|
+| **Công thức máu** | Nhiễm trùng, thiếu máu | 🔴 Khẩn cấp | 100,000 đ |
+| **X-quang phổi** | Tổn thương phổi | 🔴 Khẩn cấp | 150,000 đ |
+
+**LƯU Ý QUAN TRỌNG:**
+- TRÁNH dùng ký tự đặc biệt như ═ █ ░ ▓ ▒ ╔ ╗ ║
+- PHẢI dùng bảng markdown cho: Chẩn đoán phân biệt, Xét nghiệm, Thuốc
+- PHẢI có emoji phù hợp cho mỗi mục
+- PHẢI có spacing đẹp (2 dòng trống giữa các mục lớn)
+
+🎯 **KẾT THÚC bằng:**
+\`\`\`
+---
+
+Trân trọng,
+
+**JAREMIS-AI Medical Assistant**  
+*Hệ thống hỗ trợ quyết định lâm sàng - Phiên bản Professional*
+\`\`\`
+
+**NGÔN NGỮ:** Chuyên môn y khoa, thuật ngữ Anh + Việt, ICD-10, guidelines.
+
+${patientContext}
+
+**DỮ LIỆU LÂM SÀNG:**
+${message}
+
+${files.length ? `**HÌNH ẢNH Y HỌC:** ${files.length} ảnh (X-quang/MRI/CT/PET Scan)\n` : ''}
+
+---
+
+**BẮT ĐẦU BÁO CÁO TƯ VẤN NGAY (Nhớ mở đầu "Kính gửi Bác Sĩ..." và format đẹp với bảng markdown):**
+
+
+## 📊 1. PHÂN TÍCH HÌNH ẢNH Y HỌC
+
+${files.length ? `*Mô tả chi tiết findings, so sánh chuẩn, radiological differential diagnosis*` : '*Không có hình ảnh y học đính kèm*'}
+
+
+## 🧬 2. CHẨN ĐOÁN PHÂN BIỆT (Differential Diagnosis)
+
+**BẮT BUỘC dùng bảng markdown:**
+
+| 🏥 Chẩn đoán | Mã ICD-10 | Xác suất | Triệu chứng khớp | Cơ chế bệnh sinh |
+|------------|-----------|----------|------------------|-----------------|
+| **[Bệnh 1 VN]** ([English]) | [Mã] | [%] ⭐⭐⭐ | [Chi tiết] | [Pathophysiology ngắn] |
+| **[Bệnh 2 VN]** ([English]) | [Mã] | [%] ⭐⭐ | [Chi tiết] | [Pathophysiology ngắn] |
+
+*Giải thích chi tiết clinical correlation, prevalence, supporting evidence*
+
+
+## 📊 3. ĐÁNH GIÁ XÁC SUẤT
+
+| 🎯 Top Diagnoses | Xác suất | Độ tin cậy | Likelihood Ratio |
+|----------------|----------|-----------|-----------------|
+| **[Chẩn đoán 1]** | [%] | ⭐⭐⭐⭐⭐ | +LR: [#], -LR: [#] |
+
+
+## 🔬 4. XÉT NGHIỆM ĐỀ XUẤT
+
+**BẮT BUỘC dùng bảng markdown:**
+
+| 🔬 Xét nghiệm | Mục đích | Độ ưu tiên | Chi phí (VNĐ) | Thời gian |
+|-------------|----------|------------|---------------|-----------|
+| **Công thức máu (CBC)** | Nhiễm trùng, thiếu máu | 🔴 Khẩn cấp | ~100,000 | 2-4h |
+| **[XN 2]** | [Mục đích] | 🟡 Sớm | [Chi phí] | [TG] |
+
+
+## 💊 5. GỢI Ý ĐIỀU TRỊ
+
+### A. PHARMACOTHERAPY:
+
+| 💊 Thuốc | Liều dùng | Cơ chế | Chống chỉ định | Tương tác |
+|---------|-----------|--------|----------------|-----------|
+| **[Generic]** ([Commercial]) | [Liều] | [Mechanism] | [CI] | [Interactions] |
+
+*Lưu ý: Đã kiểm tra tiền sử, dị ứng "${patientInfo?.allergies || 'không rõ'}", thuốc đang dùng*
+
+### B. NON-PHARMACOLOGICAL:
+- Lifestyle, diet, exercise, physical therapy, surgical options (nếu cần)
+
+
+## ⚠️ 6. TIÊN LƯỢNG & BIẾN CHỨNG
+
+| ⚠️ Biến chứng | Nguy cơ | Dấu hiệu cảnh báo | Xử trí |
+|--------------|---------|-------------------|--------|
+| **[BC]** | Cao/TB/Thấp | [Red flags] | [Emergency mgmt] |
+
+
+## 📚 7. CĂN CỨ KHOA HỌC
+
+*Guidelines: WHO, CDC, ESC... | RCTs, meta-analyses | Level: Grade A/B/C*
+
+
+## 🏥 8. KHUYẾN NGHỊ QUẢN LÝ
+
+| 🏥 Khuyến nghị | Chi tiết |
+|---------------|----------|
+| **Quản lý** | ☑️ Nội trú / ☐ Ngoại trú |
+| **Chuyên khoa** | [Nếu cần] |
+| **Tái khám** | [Schedule] |
+
+
+## 🎓 9. ĐIỂM HỌC THUẬT BỔ SUNG
+
+*Pathophysiology, epidemiology, genetic basis, pearls & pitfalls*
+
+---
+
+**NHẮC QUAN TRỌNG:**
+- ✅ Bảng markdown cho Chẩn đoán, Xét nghiệm, Thuốc
+- ✅ Spacing: 2 dòng trống giữa mục lớn
+- ✅ Emoji: 📊🔬💊⚠️📚🏥
+- ❌ TRÁNH: ═█░▓▒╔╗║
+- ✅ KẾT THÚC: "---\n\nTrân trọng,\n\n**JAREMIS-AI Medical Assistant**\n*Professional Mode*"
+`;
+
+    // Generate the professional consultation report
+    const model = genAI.getGenerativeModel({ model: modelId });
+    const result = await model.generateContent([prompt, ...imageParts]);
+    const response = await result.response;
+    const consultationText = response.text ? response.text() : (typeof response === 'string' ? response : '');
+
+    // Save to history
+    const submittedBy = req.body.submittedBy || null;
+    const sessionId = req.body.sessionId || null;
+    const historyEntry = {
+      id: Date.now(),
+      sessionId: sessionId || ('professional-' + Date.now()),
+      type: 'professional',
+      timestamp: new Date().toISOString(),
+      input: message,
+      patientInfo: patientInfo,
+      imagesCount: files.length,
+      modelUsed: displayModel,
+      consultation: consultationText
+    };
+    
+    if (submittedBy) {
+      try { 
+        pushUserHistory(submittedBy, historyEntry); 
+      } catch (e) { 
+        console.warn('Không lưu được lịch sử cho user', submittedBy); 
+      }
+    }
+
+    // Cleanup uploaded files
+    files.forEach(file => { 
+      try { 
+        if (fs.existsSync(file.path)) fs.unlinkSync(file.path); 
+      } catch(e){} 
+    });
+
+    // Send response
+    res.json({
+      modelUsed: displayModel,
+      consultation: consultationText,
+      consultationHtml: renderLatexInText(consultationText),
+      references: references.slice(0, 5),
+      warning: '⚠️ **Cảnh báo:** Kết quả chỉ mang tính tham khảo. Luôn tham khảo ý kiến bác sĩ chuyên khoa!'
+    });
+
+  } catch (error) {
+    console.error('Professional endpoint error:', error);
     try { 
       (req.files || []).forEach(f => { 
         if (fs.existsSync(f.path)) fs.unlinkSync(f.path); 
       }); 
     } catch(e){}
     
+    // Check for quota exceeded error (429)
+    const errorMsg = error.message || '';
+    const isQuotaError = errorMsg.includes('429') || errorMsg.includes('quota') || errorMsg.includes('Quota exceeded');
+    
+    if (isQuotaError) {
+      return res.status(429).json({
+        error: '⚠️ API đã vượt quá giới hạn sử dụng miễn phí',
+        details: 'Gemini API free tier đã hết quota. Vui lòng thử lại sau hoặc nâng cấp API key.',
+        solution: [
+          'Đợi vài phút và thử lại (quota sẽ reset)',
+          'Hoặc nâng cấp lên Gemini API paid plan',
+          'Liên hệ admin để cập nhật API key mới'
+        ]
+      });
+    }
+    
     res.status(500).json({
-      error: error.message || 'Lỗi server',
+      error: error.message || 'Lỗi server khi tạo tư vấn y khoa',
       solution: [
         'Kiểm tra định dạng ảnh (JPEG/PNG)',
         'Đảm bảo kích thước ảnh <4MB',
-        'Cung cấp đầy đủ thông tin triệu chứng/xét nghiệm',
-        'Thử lại với mô hình khác (Flash/Pro)'
+        'Thử lại với thông tin đầy đủ hơn'
       ]
     });
   }
 });
 
-// (Đặt đoạn này SAU các hàm: readUsers, saveUsers, findUserByUsername, pushUserHistory)
+// ==== PATIENT MEDICAL RECORDS ENDPOINTS ====
 
-/* ==== Conversation Memory Utilities ==== */
-function getUserMemory(username) {
-  if (!username) return null;
-  const user = findUserByUsername(username);
-  return user && user.memory ? user.memory : null;
-}
+// Patient Records file path
+const patientRecordsPath = path.join(__dirname, 'patientRecords.json');
 
-function updateUserMemory(username, mutatorFn) {
-  if (!username || typeof mutatorFn !== 'function') return;
-  const users = readUsers();
-  const idx = users.findIndex(u => u.username &&
-    u.username.toLowerCase() === username.toLowerCase());
-  if (idx === -1) return;
-  if (!users[idx].memory) {
-    users[idx].memory = { summary: '', lastUpdated: null };
-  }
-  mutatorFn(users[idx].memory);
-  users[idx].memory.lastUpdated = new Date().toISOString();
-  // Giới hạn kích thước summary
-  if (users[idx].memory.summary.length > 1500) {
-    users[idx].memory.summary = users[idx].memory.summary.slice(-1500);
-  }
-  saveUsers(users);
-}
-
-function extractFactsFromMessage(msg = '') {
-  if (!msg) return [];
-  const facts = [];
-  const lower = msg.toLowerCase();
-
-  const nameMatch = msg.match(/\btên tôi là\s+([A-Za-zÀ-ỹ'\s]{2,40})/i);
-  if (nameMatch) facts.push(`Tên: ${nameMatch[1].trim()}`);
-
-  const ageMatch = msg.match(/(\d{1,2})\s*(tuổi|age)\b/i);
-  if (ageMatch) facts.push(`Tuổi: ${ageMatch[1]}`);
-
-  const genderMatch = lower.match(/\b(nam|nữ|male|female)\b/);
-  if (genderMatch) facts.push(`Giới tính: ${genderMatch[1]}`);
-
-  const diseaseMatch = msg.match(/\btôi (bị|đang bị|có)\s+([A-Za-zÀ-ỹ0-9\s]{3,60})/i);
-  if (diseaseMatch) facts.push(`Tình trạng: ${diseaseMatch[2].trim()}`);
-
-  const goalMatch = msg.match(/\btôi muốn\s+([A-Za-zÀ-ỹ0-9\s]{3,80})/i);
-  if (goalMatch) facts.push(`Mục tiêu: ${goalMatch[1].trim()}`);
-
-  return facts;
-}
-
-function mergeFactsIntoMemory(username, userMessage) {
-  const newFacts = extractFactsFromMessage(userMessage);
-  if (!newFacts.length) return;
-  updateUserMemory(username, mem => {
-    const existing = mem.summary ? mem.summary.split('\n') : [];
-    const set = new Set(existing.map(l => l.trim()).filter(Boolean));
-    newFacts.forEach(f => { if (!set.has(f)) set.add(f); });
-    // Giữ tối đa 50 dòng facts gần nhất
-    mem.summary = Array.from(set).slice(-50).join('\n');
-  });
-}
-
-// Advanced Web Search Function với nhiều nguồn chuyên nghiệp
-async function searchWebWithCitations(query) {
+// Read patient records from file
+function readPatientRecords() {
   try {
-    // Phân loại query để chọn nguồn phù hợp
-    const queryLower = query.toLowerCase();
-    const isHealthQuery = /\b(bệnh|y tế|sức khỏe|triệu chứng|thuốc|điều trị|khám|chữa|đau)\b/i.test(queryLower);
-    const isTechQuery = /\b(điện thoại|laptop|máy tính|công nghệ|iphone|samsung|tech)\b/i.test(queryLower);
-    const isLegalQuery = /\b(luật|pháp luật|quy định|văn bản|nghị định|thông tư|bộ luật)\b/i.test(queryLower);
-    const isLocationQuery = /\b(địa chỉ|đường|phố|quận|huyện|thành phố|bản đồ|chỉ đường)\b/i.test(queryLower);
-
-    // Nguồn tìm kiếm chuyên nghiệp theo từng lĩnh vực
-    const references = [];
-
-    // 1. Y TẾ - Ưu tiên WHO, Bộ Y tế
-    if (isHealthQuery) {
-      references.push(
-        {
-          title: `WHO - ${query}`,
-          url: `https://www.who.int/news-room/search?query=${encodeURIComponent(query)}`,
-          source: '🏥 WHO',
-          snippet: 'Thông tin y tế chính thức từ Tổ chức Y tế Thế giới'
-        },
-        {
-          title: `Bộ Y tế Việt Nam - ${query}`,
-          url: `https://moh.gov.vn/web/guest/tim-kiem?_search_WAR_mohmvcportlet_keywords=${encodeURIComponent(query)}`,
-          source: '🏛️ Bộ Y tế VN',
-          snippet: 'Hướng dẫn y tế chính thức từ Bộ Y tế Việt Nam'
-        },
-        {
-          title: `Mayo Clinic - ${query}`,
-          url: `https://www.mayoclinic.org/search/search-results?q=${encodeURIComponent(query)}`,
-          source: '🏥 Mayo Clinic',
-          snippet: 'Thông tin y tế từ Mayo Clinic - bệnh viện hàng đầu thế giới'
-        }
-      );
+    if (!fs.existsSync(patientRecordsPath)) {
+      fs.writeFileSync(patientRecordsPath, JSON.stringify([], null, 2), 'utf8');
+      return [];
     }
-
-    // 2. CÔNG NGHỆ - CellphoneS, TopZone, TechReview  
-    if (isTechQuery) {
-      // Tạo clean search terms cho tech queries
-      const cleanQuery = query.toLowerCase().includes('iphone') ? 'iphone' : 
-                        query.toLowerCase().includes('samsung') ? 'samsung' :
-                        query.toLowerCase().includes('laptop') ? 'laptop' : 
-                        encodeURIComponent(query);
-      
-      references.push(
-        {
-          title: `CellphoneS`,
-          url: `https://cellphones.com.vn/tim?q=${cleanQuery}`,
-          source: '📱 CellphoneS',
-          snippet: 'Thông tin sản phẩm và đánh giá từ CellphoneS'
-        },
-        {
-          title: `TopZone`,
-          url: `https://www.topzone.vn/tim-kiem?keyword=${cleanQuery}`,
-          source: '💻 TopZone',
-          snippet: 'Sản phẩm Apple chính hãng và đánh giá từ TopZone'
-        },
-        {
-          title: `Tinhte.vn`,
-          url: `https://tinhte.vn/search/?q=${cleanQuery}`,
-          source: '🔧 Tinhte.vn',
-          snippet: 'Cộng đồng công nghệ Việt Nam hàng đầu'
-        }
-      );
-    }
-
-    // 3. PHÁP LUẬT - Thư viện Pháp luật
-    if (isLegalQuery) {
-      const legalQuery = query.includes('điều') ? query.replace(/điều\s*(\d+).*/, 'điều $1') : query;
-      
-      references.push(
-        {
-          title: `Thư viện Pháp luật`,
-          url: `https://thuvienphapluat.vn/tim-kiem.aspx?keyword=${encodeURIComponent(legalQuery)}`,
-          source: '⚖️ Thư viện Pháp luật',
-          snippet: 'Văn bản pháp luật chính thức của Việt Nam'
-        },
-        {
-          title: `Cổng thông tin Chính phủ`,
-          url: `https://www.chinhphu.vn/search?keywords=${encodeURIComponent(legalQuery)}`,
-          source: '🏛️ Chính phủ VN',
-          snippet: 'Thông tin chính thức từ Cổng thông tin Chính phủ'
-        }
-      );
-    }
-
-    // 4. BẢN ĐỒ & ĐỊA ĐIỂM - Google Maps, Foursquare
-    if (isLocationQuery) {
-      references.push(
-        {
-          title: `Google Maps - ${query}`,
-          url: `https://www.google.com/maps/search/${encodeURIComponent(query)}`,
-          source: '🗺️ Google Maps',
-          snippet: 'Tìm địa điểm và chỉ đường trên Google Maps'
-        },
-        {
-          title: `Here Maps - ${query}`,
-          url: `https://wego.here.com/search/${encodeURIComponent(query)}`,
-          source: '🌍 Here Maps',
-          snippet: 'Bản đồ và navigation từ Here Technologies'
-        }
-      );
-    }
-
-    // 5. NGUỒN TỔNG QUÁT chất lượng cao  
-    const generalQuery = query.length > 30 ? query.substring(0, 30) : query;
-    
-    references.push(
-      {
-        title: `Wikipedia Tiếng Việt`,
-        url: `https://vi.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(generalQuery)}`,
-        source: '📚 Wikipedia VI',
-        snippet: 'Bách khoa toàn thư mở tiếng Việt'
-      },
-      {
-        title: `Britannica`,
-        url: `https://www.britannica.com/search?query=${encodeURIComponent(generalQuery)}`,
-        source: '🎓 Britannica',
-        snippet: 'Bách khoa toàn thư học thuật uy tín'
-      },
-      {
-        title: `VnExpress`,
-        url: `https://vnexpress.net/tim-kiem?q=${encodeURIComponent(generalQuery)}`,
-        source: '📰 VnExpress',
-        snippet: 'Tin tức và thông tin từ VnExpress'
-      }
-    );
-
-    // 6. GIÁO DỤC & HỌC TẬP
-    if (/\b(học|giáo dục|đại học|kiến thức|nghiên cứu|khóa học)\b/i.test(queryLower)) {
-      references.push(
-        {
-          title: `Coursera - ${query}`,
-          url: `https://www.coursera.org/search?query=${encodeURIComponent(query)}`,
-          source: '🎓 Coursera',
-          snippet: 'Khóa học trực tuyến từ các đại học hàng đầu'
-        },
-        {
-          title: `edX - ${query}`,
-          url: `https://www.edx.org/search?q=${encodeURIComponent(query)}`,
-          source: '📖 edX',
-          snippet: 'Khóa học miễn phí từ MIT, Harvard và các trường uy tín'
-        }
-      );
-    }
-
-    // 7. TÀI CHÍNH & KINH DOANH
-    if (/\b(tiền|tài chính|ngân hàng|đầu tư|kinh doanh|thương mại)\b/i.test(queryLower)) {
-      references.push(
-        {
-          title: `CafeF - ${query}`,
-          url: `https://cafef.vn/tim-kiem/${encodeURIComponent(query)}.chn`,
-          source: '💰 CafeF',
-          snippet: 'Thông tin tài chính và kinh doanh hàng đầu VN'
-        },
-        {
-          title: `VietStock - ${query}`,
-          url: `https://vietstock.vn/tim-kiem.htm?keywords=${encodeURIComponent(query)}`,
-          source: '📈 VietStock',
-          snippet: 'Thông tin chứng khoán và thị trường tài chính'
-        }
-      );
-    }
-
-    // Fallback Google Search API luôn có
-    references.push({
-      title: `Google Search`,
-      url: `https://www.google.com/search?q=${encodeURIComponent(generalQuery || query)}`,
-      source: '🔍 Google',
-      snippet: 'Tìm kiếm tổng hợp trên Google'
-    });
-
-    // Loại bỏ trùng lặp và giới hạn số lượng
-    const uniqueRefs = references.filter((ref, index, self) => 
-      index === self.findIndex(r => r.url === ref.url)
-    );
-
-    return uniqueRefs.slice(0, 5); // Tối đa 5 nguồn
-  } catch (err) {
-    console.error('Lỗi tìm kiếm web:', err);
-    return null;
+    const data = fs.readFileSync(patientRecordsPath, 'utf8');
+    return JSON.parse(data);
+  } catch (error) {
+    console.error('Error reading patient records:', error);
+    return [];
   }
 }
 
+// Save patient records to file
+function savePatientRecords(records) {
+  try {
+    fs.writeFileSync(patientRecordsPath, JSON.stringify(records, null, 2), 'utf8');
+  } catch (error) {
+    console.error('Error saving patient records:', error);
+  }
+}
+
+// Find patient record by ID
+function findPatientRecord(patientId) {
+  const records = readPatientRecords();
+  return records.find(r => r.patientId === patientId);
+}
+
+// GET /api/patient-records - Get list of patient records for a doctor
+app.get('/api/patient-records', (req, res) => {
+  try {
+    const doctor = req.query.doctor;
+    if (!doctor) {
+      return res.status(401).json({ success: false, error: 'Login required' });
+    }
+    
+    const allRecords = readPatientRecords();
+    const doctorRecords = allRecords.filter(r => r.createdBy === doctor);
+    
+    const summary = doctorRecords.map(r => ({
+      patientId: r.patientId,
+      patientName: r.patientName,
+      createdAt: r.createdAt,
+      lastUpdatedAt: r.lastUpdatedAt,
+      totalVisits: r.totalVisits,
+      latestVisit: r.consultations && r.consultations.length > 0 
+        ? { 
+            consultationDate: r.consultations[r.consultations.length - 1].consultationDate,
+            chiefComplaint: r.consultations[r.consultations.length - 1].chiefComplaint?.substring(0, 100) + '...'
+          }
+        : null
+    }));
+    
+    res.json({ success: true, records: summary });
+  } catch (error) {
+    console.error('Error fetching patient records:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/patient-record/:patientId - Get detailed patient record
+app.get('/api/patient-record/:patientId', (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const doctor = req.query.doctor;
+    
+    if (!doctor) {
+      return res.status(401).json({ success: false, error: 'Login required' });
+    }
+    
+    const record = findPatientRecord(patientId);
+    
+    if (!record) {
+      return res.status(404).json({ success: false, error: 'Patient record not found' });
+    }
+    
+    if (record.createdBy !== doctor) {
+      return res.status(403).json({ success: false, error: 'Access denied' });
+    }
+    
+    res.json({ success: true, record });
+  } catch (error) {
+    console.error('Error fetching patient record:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/patient-record/:patientId/medical-report - Generate HTML medical report
+app.get('/api/patient-record/:patientId/medical-report', (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const doctor = req.query.doctor;
+    
+    if (!doctor) {
+      return res.status(401).send('<h1>Login required</h1>');
+    }
+    
+    const record = findPatientRecord(patientId);
+    
+    if (!record) {
+      return res.status(404).send('<h1>Patient record not found</h1>');
+    }
+    
+    if (record.createdBy !== doctor) {
+      return res.status(403).send('<h1>Access denied</h1>');
+    }
+    
+    const htmlReport = generateMedicalRecordHTML(record);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(htmlReport);
+  } catch (error) {
+    console.error('Error generating medical report:', error);
+    res.status(500).send(`<h1>Error</h1><p>${error.message}</p>`);
+  }
+});
+
+// PUT /api/patient-record/:patientId/profile - Update patient profile
+app.put('/api/patient-record/:patientId/profile', (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const { doctor, patientInfo } = req.body;
+    
+    if (!doctor) {
+      return res.status(401).json({ success: false, error: 'Login required' });
+    }
+    
+    const records = readPatientRecords();
+    const record = records.find(r => r.patientId === patientId);
+    
+    if (!record) {
+      return res.status(404).json({ success: false, error: 'Patient record not found' });
+    }
+    
+    if (record.createdBy !== doctor) {
+      return res.status(403).json({ success: false, error: 'Access denied' });
+    }
+    
+    // Update patient name if provided
+    if (patientInfo.name) {
+      record.patientName = patientInfo.name;
+    }
+    
+    // Update patient info in latest consultation
+    if (record.consultations && record.consultations.length > 0) {
+      const latestConsultation = record.consultations[record.consultations.length - 1];
+      latestConsultation.patientInfo = { 
+        ...latestConsultation.patientInfo, 
+        ...patientInfo 
+      };
+    }
+    
+    record.lastUpdatedAt = new Date().toISOString();
+    savePatientRecords(records);
+    
+    res.json({ success: true, record });
+  } catch (error) {
+    console.error('Error updating patient profile:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/patient-record/:patientId/export-word - Export medical report as Word document
+app.get('/api/patient-record/:patientId/export-word', (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const doctor = req.query.doctor;
+    
+    if (!doctor) {
+      return res.status(401).send('<h1>Login required</h1>');
+    }
+    
+    const record = findPatientRecord(patientId);
+    
+    if (!record) {
+      return res.status(404).send('<h1>Patient record not found</h1>');
+    }
+    
+    if (record.createdBy !== doctor) {
+      return res.status(403).send('<h1>Access denied</h1>');
+    }
+    
+    // Generate HTML report
+    const htmlReport = generateMedicalRecordHTML(record);
+    
+    // Extract body content from HTML
+    const bodyMatch = htmlReport.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    const bodyContent = bodyMatch ? bodyMatch[1] : htmlReport;
+    
+    // Remove script tags and clean up for Word
+    let cleanContent = bodyContent
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<button[\s\S]*?<\/button>/gi, '')
+      .replace(/class="editable-field"/gi, '')
+      .replace(/contenteditable="[^"]*"/gi, '');
+    
+    // Convert medical-certificate div to remove extra wrappers
+    cleanContent = cleanContent.replace(/<div class="medical-certificate">/gi, '');
+    cleanContent = cleanContent.replace(/<\/div>\s*<\/body>/gi, '</body>');
+    
+    // Ensure all tables have proper Word attributes
+    cleanContent = cleanContent.replace(/<table/gi, '<table border="0" cellspacing="0" cellpadding="0"');
+    
+    // Convert HTML to Word-compatible format - Universal for WPS & Word 2019
+    const wordContent = `
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <title>Giấy khám bệnh</title>
+  <style>
+    /* Universal page setup - Works in both WPS and Word */
+    @page {
+      size: A4;
+      margin: 1.5cm 2cm;
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Times New Roman', Times, serif;
+      font-size: 13pt;
+      line-height: 1.5;
+      color: #000;
+      padding: 20px 30px;
+    }
+    
+    /* Tables - Simple approach for compatibility */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      border: none;
+    }
+    
+    td {
+      border: none;
+      padding: 4px;
+      vertical-align: top;
+    }
+    
+    /* Header section */
+    .header-table {
+      margin-bottom: 15px;
+    }
+    
+    .header-table td {
+      font-size: 11pt;
+      line-height: 1.4;
+    }
+    
+    .header-left {
+      text-align: left;
+      width: 50%;
+      font-weight: bold;
+    }
+    
+    .header-right {
+      text-align: right;
+      width: 50%;
+      font-weight: bold;
+    }
+    
+    .header-underline {
+      text-decoration: underline;
+      font-style: italic;
+      font-size: 12pt;
+    }
+    
+    strong {
+      font-weight: bold;
+    }
+    
+    /* Title */
+    .title {
+      text-align: center;
+      font-size: 18pt;
+      font-weight: bold;
+      margin: 25px 0;
+      letter-spacing: 0.5pt;
+    }
+    
+    /* Patient info section */
+    .patient-info-container {
+      width: 100%;
+      margin-bottom: 20px;
+    }
+    
+    .photo-box {
+      width: 90px;
+      height: 120px;
+      border: 2px solid #000;
+      text-align: center;
+      vertical-align: middle;
+      font-size: 11pt;
+      font-style: italic;
+      padding: 10px;
+    }
+    
+    .patient-info {
+      padding-left: 20px;
+      vertical-align: top;
+    }
+    
+    .info-row {
+      margin-bottom: 7px;
+      line-height: 1.5;
+    }
+    
+    .info-label {
+      display: inline-block;
+      min-width: 160px;
+      font-size: 13pt;
+    }
+    
+    .info-value {
+      display: inline;
+      border-bottom: 1px dotted #333;
+      padding: 0 3px;
+      font-size: 13pt;
+    }
+    
+    /* Section styling */
+    .section-title {
+      text-align: center;
+      font-weight: bold;
+      font-size: 14pt;
+      margin: 25px 0 15px 0;
+      text-decoration: underline;
+    }
+    
+    .section-number {
+      font-weight: bold;
+      font-size: 13pt;
+      margin: 15px 0 8px 0;
+    }
+    
+    .subsection {
+      margin-left: 20px;
+      margin-bottom: 10px;
+      font-size: 13pt;
+      line-height: 1.6;
+      text-align: justify;
+    }
+    
+    /* Checkbox styling - Simple squares */
+    .checkbox {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid #000;
+      margin: 0 5px;
+      vertical-align: middle;
+      text-align: center;
+      line-height: 14px;
+    }
+    
+    .checkbox.checked {
+      background: #000;
+      color: #fff;
+      font-size: 12pt;
+      font-weight: bold;
+    }
+    
+    /* Visit sections */
+    .visit-section {
+      margin: 20px 0;
+      page-break-inside: avoid;
+    }
+    
+    .visit-title {
+      font-weight: bold;
+      font-size: 13pt;
+      margin: 15px 0 10px 0;
+    }
+    
+    .bullet-list {
+      margin-left: 30px;
+      margin-top: 10px;
+    }
+    
+    .bullet-item {
+      margin-bottom: 8px;
+      font-size: 13pt;
+      line-height: 1.5;
+    }
+    
+    /* Footer signatures */
+    .footer-table {
+      width: 100%;
+      margin-top: 50px;
+    }
+    
+    .footer-table td {
+      text-align: center;
+      padding: 10px;
+      width: 50%;
+    }
+    
+    .signature-date {
+      font-style: italic;
+      margin-bottom: 10px;
+      font-size: 13pt;
+    }
+    
+    .signature-title {
+      font-weight: bold;
+      margin-bottom: 70px;
+      font-size: 13pt;
+    }
+    
+    .signature-name {
+      font-style: italic;
+      font-size: 13pt;
+      margin-top: 70px;
+    }
+  </style>
+</head>
+<body>
+${cleanContent}
+</body>
+</html>
+    `;
+    
+    res.setHeader('Content-Type', 'application/msword');
+    res.setHeader('Content-Disposition', `attachment; filename="GiayKhamBenh_${patientId}_${Date.now()}.doc"`);
+    res.send(wordContent);
+  } catch (error) {
+    console.error('Error exporting to Word:', error);
+    res.status(500).send(`<h1>Error</h1><p>${error.message}</p>`);
+  }
+});
+
+// Start the server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log('✅ Server đang chạy trên cổng', PORT);
-  console.log('🌐 Truy cập: http://localhost:' + PORT);
-  console.log('⏰ Thời gian khởi động:', new Date().toLocaleTimeString('vi-VN'), new Date().toLocaleDateString('vi-VN'));
+  console.log(`🚀 Server đang chạy trên cổng ${PORT}`);
+  console.log(`📡 API endpoints sẵn sàng:`);
+  console.log(`   - POST /api/chat`);
+  console.log(`   - POST /api/diagnose`);
+  console.log(`   - POST /api/professional`);
+  console.log(`   - GET  /api/history`);
 });
-
-// NEW: Endpoint to render LaTeX to sanitized HTML using KaTeX (server-side rendering)
-app.post('/api/render-latex', express.json(), (req, res) => {
-  try {
-    const latex = (req.body && req.body.latex) ? String(req.body.latex) : '';
-    const displayMode = req.body && typeof req.body.displayMode !== 'undefined' ? !!req.body.displayMode : true;
-    if (!latex) return res.status(400).json({ error: 'Thiếu trường latex' });
-    if (latex.length > 10000) return res.status(400).json({ error: 'LaTeX quá dài' });
-
-    // Render with KaTeX (do not throw on error to avoid leaking stack traces)
-    const rawHtml = katex.renderToString(latex, { throwOnError: false, displayMode, strict: 'ignore' });
-    const clean = DOMPurify.sanitize(rawHtml);
-
-    return res.json({ success: true, html: clean });
-  } catch (err) {
-    console.error('Render LaTeX error:', err);
-    return res.status(500).json({ error: 'Lỗi khi render LaTeX' });
-  }
-});
-
-// Function để tự động thêm citations vào response
-// Real-time web search để lấy thông tin mới nhất
-async function searchRealTimeInfo(query) {
-  try {
-    console.log('🔍 Searching real-time info for:', query);
-    
-    // ✨ AI-POWERED CLASSIFICATION: Let AI decide if query needs real-time data
-    // This scales to ANY language and ANY domain without hardcoded keywords
-    let needsRealTime = false;
-    
-    try {
-      // Use super fast flash model for quick classification (< 1s)
-      const classifierModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
-      
-      const classificationPrompt = `Analyze if this query needs CURRENT/LIVE web data (YES) or can be answered with general knowledge (NO).
-
-Query: "${query}"
-
-Classification criteria:
-YES → Time-sensitive: weather, news, prices, stocks, "today", "now", "current", "latest", "hôm nay", "mới nhất", events, live status
-NO → Static knowledge: history, science, math, definitions, how-to, explanations, concepts, theories, past events
-
-Answer ONLY: YES or NO`;
-
-      const classResult = await Promise.race([
-        classifierModel.generateContent([classificationPrompt]),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 2500))
-      ]);
-      
-      const classResponse = await classResult.response;
-      const answer = classResponse.text().trim().toUpperCase();
-      needsRealTime = answer.includes('YES');
-      
-      console.log(`🤖 AI Classification: "${query}" → ${needsRealTime ? '✅ NEEDS real-time data' : '❌ NO NEED for real-time data'}`);
-      
-    } catch (classError) {
-      console.warn('⚠️ AI classification timeout/error, using smart fallback:', classError.message);
-      
-      // Fallback: Smart heuristic for common urgent patterns
-      const urgentPatterns = [
-        /\b(hôm nay|bây giờ|hiện tại|mới nhất|tin tức|thời tiết|giá|tỷ giá)\b/i,
-        /\b(today|now|current|latest|news|weather|price|stock|live)\b/i,
-        /\b(今天|现在|最新|新闻|天气|价格)\b/i,
-        /\b(오늘|지금|최신|뉴스|날씨)\b/i
-      ];
-      needsRealTime = urgentPatterns.some(p => p.test(query));
-    }
-    
-    if (!needsRealTime) {
-      console.log('❌ Query does not need real-time data');
-      return null;
-    }
-
-    console.log('✅ Query needs real-time data, searching...');
-    const searchResults = [];
-    
-    // 1. OpenWeatherMap API for weather queries (free tier: 60 calls/min)
-    if (/thời\s*tiết|weather|nhiệt\s*độ|temperature|nắng|mưa|bão/i.test(query)) {
-      const weatherApiKey = process.env.OPENWEATHER_API_KEY || 'demo'; // User should set their own key
-      
-      // Extract city name
-      const cityMap = {
-        'cần thơ': 'Can Tho', 'can tho': 'Can Tho',
-        'hà nội': 'Hanoi', 'ha noi': 'Hanoi',
-        'sài gòn': 'Ho Chi Minh City', 'tp hcm': 'Ho Chi Minh City', 'hồ chí minh': 'Ho Chi Minh City',
-        'đà nẵng': 'Da Nang', 'da nang': 'Da Nang',
-        'hải phòng': 'Hai Phong', 'hai phong': 'Hai Phong',
-        'nha trang': 'Nha Trang',
-        'huế': 'Hue', 'hue': 'Hue',
-        'vũng tàu': 'Vung Tau', 'vung tau': 'Vung Tau'
-      };
-      
-      let cityName = 'Can Tho'; // default
-      for (const [vnName, enName] of Object.entries(cityMap)) {
-        if (query.toLowerCase().includes(vnName)) {
-          cityName = enName;
-          break;
-        }
-      }
-      
-      try {
-        // Current weather
-        const currentWeatherUrl = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(cityName)},VN&appid=${weatherApiKey}&units=metric&lang=vi`;
-        const forecastUrl = `https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(cityName)},VN&appid=${weatherApiKey}&units=metric&lang=vi`;
-        
-        const [currentRes, forecastRes] = await Promise.all([
-          fetch(currentWeatherUrl, { timeout: 5000 }).catch(() => null),
-          fetch(forecastUrl, { timeout: 5000 }).catch(() => null)
-        ]);
-        
-        let weatherData = '';
-        
-        // Helper function to get wind direction in Vietnamese
-        const getWindDirection = (deg) => {
-          const directions = ['Bắc ↑', 'Đông Bắc ↗', 'Đông →', 'Đông Nam ↘', 'Nam ↓', 'Tây Nam ↙', 'Tây ←', 'Tây Bắc ↖'];
-          return directions[Math.round(deg / 45) % 8];
-        };
-        
-        // Helper to get weather emoji
-        const getWeatherEmoji = (desc) => {
-          if (/nắng|sunny|clear/i.test(desc)) return '☀️';
-          if (/mây|cloud/i.test(desc)) return '☁️';
-          if (/mưa|rain/i.test(desc)) return '🌧️';
-          if (/dông|thunder|storm/i.test(desc)) return '⛈️';
-          if (/sương mù|fog/i.test(desc)) return '🌫️';
-          return '🌤️';
-        };
-        
-        if (currentRes && currentRes.ok) {
-          const current = await currentRes.json();
-          const windDir = getWindDirection(current.wind.deg || 0);
-          const weatherEmoji = getWeatherEmoji(current.weather[0].description);
-          
-          weatherData += `\n**📍 Thời tiết hiện tại tại ${cityName}** (${new Date().toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit'})})\n\n`;
-          weatherData += `DATA_TABLE_CURRENT:\n`;
-          weatherData += `Nhiệt độ|${Math.round(current.main.temp)}°C (cảm giác ${Math.round(current.main.feels_like)}°C)\n`;
-          weatherData += `Trời|${weatherEmoji} ${current.weather[0].description}\n`;
-          weatherData += `Độ ẩm|${current.main.humidity}%\n`;
-          weatherData += `Gió|${current.wind.speed} m/s ${windDir}\n`;
-          weatherData += `Áp suất|${current.main.pressure} hPa\n`;
-          weatherData += `Tầm nhìn|${(current.visibility / 1000).toFixed(1)} km\n`;
-          if (current.rain) weatherData += `Lượng mưa|${current.rain['1h'] || 0} mm/h\n`;
-          weatherData += `DATA_TABLE_END\n\n`;
-        }
-        
-        if (forecastRes && forecastRes.ok) {
-          const forecast = await forecastRes.json();
-          weatherData += `**📅 Dự báo 24h tới cho ${cityName}:**\n\n`;
-          weatherData += `DATA_TABLE_FORECAST:\n`;
-          weatherData += `Thời gian|Nhiệt độ|Trời|Độ ẩm|Gió|Mưa\n`;
-          
-          // Get next 8 periods (24 hours, 3-hour intervals)
-          forecast.list.slice(0, 8).forEach((period) => {
-            const time = new Date(period.dt * 1000).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-            const temp = Math.round(period.main.temp);
-            const weatherEmoji = getWeatherEmoji(period.weather[0].description);
-            const desc = period.weather[0].description;
-            const humidity = period.main.humidity;
-            const windSpeed = period.wind.speed;
-            const windDir = getWindDirection(period.wind.deg || 0);
-            const rain = period.rain ? `${(period.rain['3h'] || 0).toFixed(1)} mm` : '-';
-            
-            weatherData += `${time}|${temp}°C|${weatherEmoji} ${desc}|${humidity}%|${windSpeed} m/s ${windDir}|${rain}\n`;
-          });
-          weatherData += `DATA_TABLE_END\n`;
-        }
-        
-        if (weatherData) {
-          searchResults.push({
-            title: `Thời tiết ${cityName} - ${new Date().toLocaleDateString('vi-VN')}`,
-            snippet: weatherData,
-            url: `https://openweathermap.org/city/${cityName}`,
-            source: 'OpenWeatherMap',
-            date: new Date().toISOString().split('T')[0]
-          });
-          console.log('✅ Got weather data from OpenWeatherMap');
-          return searchResults;
-        }
-      } catch (err) {
-        console.warn('⚠️ OpenWeatherMap failed:', err.message);
-      }
-    }
-    
-    // 2. Google Search API (primary)
-    if (process.env.GOOGLE_API_KEY && process.env.GOOGLE_SEARCH_ENGINE_ID) {
-      try {
-        const response = await fetch(`https://www.googleapis.com/customsearch/v1?key=${process.env.GOOGLE_API_KEY}&cx=${process.env.GOOGLE_SEARCH_ENGINE_ID}&q=${encodeURIComponent(query)}&num=5&dateRestrict=d7`, {
-          timeout: 8000
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (data.items && data.items.length > 0) {
-            console.log(`✅ Found ${data.items.length} results from Google`);
-            data.items.forEach(item => {
-              searchResults.push({
-                title: item.title,
-                snippet: item.snippet?.substring(0, 250) || '',
-                url: item.link,
-                source: 'Google Recent',
-                date: item.pagemap?.metatags?.[0]?.['article:published_time'] || new Date().toISOString().split('T')[0]
-              });
-            });
-            return searchResults; // Return immediately if Google search succeeds
-          }
-        }
-      } catch (err) {
-        console.warn('⚠️ Google Search failed:', err.message);
-      }
-    } else {
-      console.log('⚠️ No GOOGLE_API_KEY configured, using fallback methods');
-    }
-
-    // 2. DuckDuckGo Instant Answer API (free, no API key)
-    try {
-      const ddgResponse = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`, {
-        timeout: 5000
-      });
-      
-      if (ddgResponse.ok) {
-        const ddgData = await ddgResponse.json();
-        
-        // Abstract (main answer)
-        if (ddgData.Abstract && ddgData.Abstract.length > 10) {
-          searchResults.push({
-            title: ddgData.Heading || 'Thông tin tìm kiếm',
-            snippet: ddgData.Abstract.substring(0, 300),
-            url: ddgData.AbstractURL || 'https://duckduckgo.com',
-            source: 'DuckDuckGo',
-            date: new Date().toISOString().split('T')[0]
-          });
-        }
-        
-        // Related Topics
-        if (ddgData.RelatedTopics && ddgData.RelatedTopics.length > 0) {
-          ddgData.RelatedTopics.slice(0, 3).forEach(topic => {
-            if (topic.Text && topic.FirstURL) {
-              searchResults.push({
-                title: topic.Text.split(' - ')[0] || 'Thông tin liên quan',
-                snippet: topic.Text,
-                url: topic.FirstURL,
-                source: 'DuckDuckGo Related',
-                date: new Date().toISOString().split('T')[0]
-              });
-            }
-          });
-        }
-        
-        if (searchResults.length > 0) {
-          console.log(`✅ Found ${searchResults.length} results from DuckDuckGo`);
-          return searchResults;
-        }
-      }
-    } catch (err) {
-      console.warn('⚠️ DuckDuckGo search failed:', err.message);
-    }
-
-    // 3. Final fallback: Generate contextual data based on query
-    console.log('⚠️ All search methods failed, generating contextual response');
-    const contextualData = generateContextualData(query);
-    if (contextualData && contextualData.length > 0) {
-      return contextualData;
-    }
-
-    return null;
-  } catch (err) {
-    console.error('❌ Real-time search error:', err);
-    return null;
-  }
-}
-
-// Generate contextual data khi không có API - provide real data estimates
-function generateContextualData(query) {
-  const data = [];
-  const queryLower = query.toLowerCase();
-  const today = new Date();
-  const dateStr = today.toLocaleDateString('vi-VN', { year: 'numeric', month: 'long', day: 'numeric' });
-
-  // Weather - provide actual typical data for Vietnamese cities
-  if (/thời\s*tiết|weather|nhiệt\s*độ|temperature|nắng|mưa|bão/i.test(query)) {
-    // Extract city name if mentioned
-    const cities = ['cần thơ', 'hà nội', 'sài gòn', 'tp hcm', 'đà nẵng', 'hải phòng', 'nha trang', 'huế', 'vũng tàu'];
-    const cityMatch = cities.find(city => queryLower.includes(city));
-    const cityName = cityMatch ? cityMatch.charAt(0).toUpperCase() + cityMatch.slice(1) : 'khu vực bạn quan tâm';
-    
-    // Month-based typical weather for Vietnam
-    const month = today.getMonth() + 1;
-    let tempRange, condition, humidity;
-    
-    if (month >= 5 && month <= 10) {
-      // Rainy season
-      tempRange = '26-32°C';
-      condition = 'Có thể có mưa rào và dông vào chiều tối';
-      humidity = '75-85%';
-    } else {
-      // Dry season
-      tempRange = '23-30°C';
-      condition = 'Trời nắng, ít mưa';
-      humidity = '60-75%';
-    }
-
-    data.push({
-      title: `Thời tiết ${cityName} ngày ${dateStr}`,
-      snippet: `Nhiệt độ: ${tempRange}. ${condition}. Độ ẩm: ${humidity}. Đây là dự báo điển hình cho tháng ${month}. Để có thông tin chính xác nhất, vui lòng kiểm tra Trung tâm Dự báo Khí tượng Thủy văn Quốc gia (nchmf.gov.vn) hoặc các ứng dụng thời tiết uy tín.`,
-      url: 'https://nchmf.gov.vn',
-      source: 'Khí tượng Thủy văn',
-      date: today.toISOString().split('T')[0]
-    });
-  }
-
-  // iPhone/Tech products - real 2025 data
-  if (/iphone|điện\s*thoại|smartphone/i.test(query)) {
-    data.push({
-      title: 'Thông tin iPhone mới nhất năm 2025',
-      snippet: 'iPhone 17 series đã ra mắt tháng 9/2025 với 4 phiên bản: iPhone 17, 17 Plus, 17 Pro, 17 Pro Max. Giá khởi điểm tại Việt Nam từ 24-26 triệu cho bản thường, 30-35 triệu cho bản Pro, 35-42 triệu cho Pro Max. Có sẵn tại CellphoneS, TopZone, FPT Shop, Thế Giới Di Động. Nên kiểm tra giá thực tế trước khi mua.',
-      url: 'https://cellphones.com.vn',
-      source: 'Cửa hàng công nghệ',
-      date: '2025-10-13'
-    });
-  }
-
-  // Stock/Finance
-  if (/giá|chứng\s*khoán|stock|tỷ\s*giá|usd|vnd|bitcoin/i.test(query)) {
-    data.push({
-      title: 'Thông tin tài chính hiện tại',
-      snippet: 'Tỷ giá USD/VND dao động 24,000-25,000 VND/USD. Chứng khoán Việt Nam VN-Index dao động 1,200-1,300 điểm. Bitcoin ~$60,000-70,000 (tính đến tháng 10/2025). Thông tin này chỉ mang tính tham khảo, vui lòng kiểm tra VietStock, CafeF hoặc ngân hàng để có số liệu chính xác nhất.',
-      url: 'https://vietstock.vn',
-      source: 'Dữ liệu tài chính',
-      date: today.toISOString().split('T')[0]
-    });
-  }
-
-  // News/Events
-  if (/tin\s*tức|news|sự\s*kiện|event|hôm\s*nay|today/i.test(query)) {
-    data.push({
-      title: `Tin tức nổi bật ngày ${dateStr}`,
-      snippet: 'Để có tin tức mới nhất, vui lòng truy cập VnExpress.net, Tuổi Trẻ Online, Thanh Niên, hoặc các trang tin tức uy tín khác. JAREMIS-AI không có quyền truy cập real-time vào nguồn tin tức nhưng có thể giúp phân tích và thảo luận về các chủ đề bạn quan tâm.',
-      url: 'https://vnexpress.net',
-      source: 'Tin tức Việt Nam',
-      date: today.toISOString().split('T')[0]
-    });
-  }
-
-  // Current time
-  if (/mấy\s*giờ|hiện\s*tại|what\s*time|time\s*now|bây\s*giờ/i.test(query)) {
-    const timeStr = today.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-    data.push({
-      title: 'Thời gian hiện tại',
-      snippet: `Hiện tại là ${timeStr} (GMT+7 - Giờ Việt Nam) ngày ${dateStr}. Đây là thời gian hệ thống server.`,
-      url: 'https://time.is/Vietnam',
-      source: 'Hệ thống',
-      date: today.toISOString().split('T')[0]
-    });
-  }
-
-  return data.length > 0 ? data : null;
-}
-
-async function enhanceWithCitations(text, query) {
-  try {
-    // Check if response cần citations (factual content)
-    const needsCitations = /\b(năm\s+\d{3,4}|sự kiện|lịch sử|thống kê|nghiên cứu|theo|báo cáo|dữ liệu|khoa học|chính thức|công bố|phát hiện|bệnh|triệu chứng|điều trị|WHO|y tế|luật|công nghệ|giáo dục|điều|giá|mới)\b/i.test(text);
-    
-    if (!needsCitations) return text;
-
-    // Extract main keywords from query và response
-    const searchQuery = extractKeywords(query + ' ' + text);
-    
-    // Search for citations
-    const citations = await searchWebWithCitations(searchQuery);
-    
-    if (citations.length > 0) {
-      // Chỉ giữ text gốc, không thêm inline citations
-      let enhancedText = text;
-      
-      // Tạo nút websites như ChatGPT - chỉ logo + tên, không mô tả dài
-      const websiteButtons = citations.map((ref, index) => {
-        const cleanName = getCleanWebsiteName(ref.source, ref.url);
-        const favicon = getFaviconUrl(ref.url);
-        
-        return `<div class="website-button">
-          <a href="${ref.url}" target="_blank" rel="noopener noreferrer" class="website-link">
-            <div class="website-icon">
-              <img src="${favicon}" alt="${cleanName}" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';">
-              <span class="website-fallback-icon">${getWebsiteIcon(ref.source)}</span>
-            </div>
-            <span class="website-name">${cleanName}</span>
-          </a>
-        </div>`;
-      }).join('\n');
-      
-      const citationSection = '\n\n<div class="websites-container">\n' + websiteButtons + '\n</div>';
-      
-      return enhancedText + citationSection;
-    }
-    
-    return text;
-  } catch (err) {
-    console.error('Lỗi thêm citations:', err);
-    return text;
-  }
-}
-
-// Helper functions cho website buttons
-function getCleanWebsiteName(source, url) {
-  // Mapping tên website chuẩn
-  const websiteNames = {
-    'WHO': 'WHO',
-    'Bộ Y tế': 'Bộ Y tế',
-    'Mayo Clinic': 'Mayo Clinic',
-    'CellphoneS': 'CellphoneS',
-    'TopZone': 'TopZone', 
-    'Tinhte.vn': 'Tinhte',
-    'Thư viện Pháp luật': 'Thư viện Pháp luật',
-    'Chính phủ VN': 'Chính phủ',
-    'Google Maps': 'Google Maps',
-    'Here Maps': 'Here Maps',
-    'Wikipedia VI': 'Wikipedia',
-    'Britannica': 'Britannica',
-    'VnExpress': 'VnExpress',
-    'CafeF': 'CafeF',
-    'VietStock': 'VietStock',
-    'Coursera': 'Coursera',
-    'edX': 'edX',
-    'Google': 'Google'
-  };
-
-  // Remove emoji và clean up tên
-  const cleanSource = source.replace(/[🏥🏛️📱💻🔧⚖️🗺️🌍📚🎓📰💰📈🔍]/g, '').trim();
-  
-  // Tìm tên chuẩn
-  for (const [key, value] of Object.entries(websiteNames)) {
-    if (cleanSource.includes(key)) return value;
-  }
-  
-  if (cleanSource && cleanSource !== 'undefined') {
-    return cleanSource;
-  }
-  
-  // Extract từ URL nếu source không có
-  try {
-    const domain = new URL(url).hostname.replace('www.', '');
-    const siteName = domain.split('.')[0];
-    return siteName.charAt(0).toUpperCase() + siteName.slice(1);
-  } catch {
-    return 'Website';
-  }
-}
-
-function getFaviconUrl(url) {
-  try {
-    const domain = new URL(url).origin;
-    return `${domain}/favicon.ico`;
-  } catch {
-    return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTggMEE4IDggMCAwIDAgMCA4YTggOCAwIDAgMCA4IDhhOCA4IDAgMCAwIDgtOEE4IDggMCAwIDAgOCAwWm0wIDE0QTYgNiAwIDAgMSAyIDhhNiA2IDAgMCAxIDYtNmE2IDYgMCAwIDEgNiA2YTYgNiAwIDAgMS02IDZaIiBmaWxsPSIjNThBNkZGIi8+PC9zdmc+';
-  }
-}
-
-function getWebsiteIcon(source) {
-  const icons = {
-    'WHO': '🏥',
-    'Bộ Y tế': '🏛️', 
-    'Mayo Clinic': '🏥',
-    'CellphoneS': '📱',
-    'TopZone': '💻',
-    'Tinhte.vn': '🔧',
-    'Thư viện Pháp luật': '⚖️',
-    'Chính phủ VN': '🏛️',
-    'Google Maps': '🗺️',
-    'Here Maps': '🌍',
-    'Wikipedia VI': '📚',
-    'Britannica': '🎓',
-    'VnExpress': '📰',
-    'CafeF': '💰',
-    'VietStock': '📈',
-    'Google': '🔍'
-  };
-  
-  for (const [key, icon] of Object.entries(icons)) {
-    if (source.includes(key)) return icon;
-  }
-  return '🌐';
-}
-
-function extractKeywords(text) {
-  // Extract important keywords for search
-  const words = text.toLowerCase().match(/\b[\w\dàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]{3,}\b/g) || [];
-  const keywords = words.filter(word => 
-    !['của', 'là', 'và', 'có', 'một', 'này', 'được', 'với', 'trong', 'cho', 'từ', 'về', 'để', 
-      'the', 'is', 'and', 'are', 'was', 'were', 'have', 'has', 'had', 'will', 'would', 'could'].includes(word)
-  );
-  return keywords.slice(0, 5).join(' '); // Top 5 keywords
-}
-
-/**
- * Convert DATA_TABLE_* format to proper markdown tables
- * This ensures AI response has beautiful, well-aligned tables
- */
-function convertDataTablesToMarkdown(text) {
-  if (!text) return text;
-  
-  // Match DATA_TABLE_CURRENT or DATA_TABLE_FORECAST blocks
-  const tableRegex = /DATA_TABLE_(CURRENT|FORECAST):\n([\s\S]*?)\nDATA_TABLE_END/g;
-  
-  return text.replace(tableRegex, (match, tableType, tableContent) => {
-    const lines = tableContent.trim().split('\n').filter(line => line.trim());
-    if (lines.length < 2) return match; // Need at least header + 1 data row
-    
-    // First line is header
-    const headerLine = lines[0];
-    const headers = headerLine.split('|').map(h => h.trim());
-    
-    // Add emoji to headers if not already present
-    const emojiMap = {
-      'Thời gian': '⏰ Thời gian',
-      'Nhiệt độ': '🌡️ Nhiệt độ',
-      'Trời': '🌤️ Trời',
-      'Độ ẩm': '💧 Độ ẩm',
-      'Gió': '💨 Gió',
-      'Mưa': '🌧️ Mưa',
-      'Áp suất': '📊 Áp suất',
-      'Tầm nhìn': '👁️ Tầm nhìn',
-      'Lượng mưa': '🌧️ Lượng mưa'
-    };
-    
-    const formattedHeaders = headers.map(h => {
-      for (const [key, emoji] of Object.entries(emojiMap)) {
-        if (h.includes(key) && !h.includes(emoji.split(' ')[0])) {
-          return emoji;
-        }
-      }
-      return h;
-    });
-    
-    // Build markdown table
-    let markdown = '\n| ' + formattedHeaders.join(' | ') + ' |\n';
-    markdown += '|' + formattedHeaders.map(() => '----------').join('|') + '|\n';
-    
-    // Add data rows
-    for (let i = 1; i < lines.length; i++) {
-      const cells = lines[i].split('|').map(c => c.trim());
-      markdown += '| ' + cells.join(' | ') + ' |\n';
-    }
-    
-    return markdown;
-  });
-}
-
-// ==================== GLOBAL ERROR HANDLERS ====================
-// Prevent server crash from unhandled promise rejections
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
-  // Don't exit process, just log it
-});
-
-process.on('uncaughtException', (error) => {
-  console.error('❌ Uncaught Exception:', error);
-  // Don't exit process for minor errors
-  if (error.code === 'ECONNRESET' || error.code === 'EPIPE') {
-    console.log('⚠️  Connection error, continuing...');
-    return;
-  }
-});
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('💤 SIGTERM received, shutting down gracefully...');
-  process.exit(0);
-});
-
-process.on('SIGINT', () => {
-  console.log('\n💤 SIGINT received (Ctrl+C), shutting down gracefully...');
-  process.exit(0);
-});
-
-
-
-

@@ -1,0 +1,69 @@
+{
+  "medications": [
+    {
+      "id": "paracetamol-500",
+      "name": "Paracetamol",
+      "genericName": "Acetaminophen",
+      "dosage": "500mg",
+      "form": "Tablet",
+      "indications": ["Đau đầu", "Sốt", "Đau nhức cơ", "Đau răng"],
+      "contraindications": ["Suy gan nặng", "Dị ứng paracetamol"],
+      "sideEffects": ["Buồn nôn", "Phát ban (hiếm gặp)", "Tổn thương gan nếu quá liều"],
+      "dosageInstructions": "Người lớn: 500-1000mg mỗi 4-6h, tối đa 4g/ngày",
+      "warnings": "Không dùng quá 4g/24h. Thận trọng với người có bệnh gan.",
+      "category": "Giảm đau, hạ sốt"
+    },
+    {
+      "id": "ibuprofen-400",
+      "name": "Ibuprofen",
+      "genericName": "Ibuprofen",
+      "dosage": "400mg",
+      "form": "Tablet",
+      "indications": ["Đau đầu", "Đau cơ", "Viêm khớp", "Đau kinh"],
+      "contraindications": ["Loét dạ dày", "Suy thận nặng", "Thai kỳ tháng cuối"],
+      "sideEffects": ["Đau dạ dày", "Buồn nôn", "Chóng mặt"],
+      "dosageInstructions": "Người lớn: 200-400mg mỗi 4-6h, tối đa 1200mg/ngày (OTC) hoặc 3200mg/ngày (theo toa)",
+      "warnings": "Uống sau ăn. Thận trọng với người có tiền sử loét dạ dày.",
+      "category": "NSAID - Giảm đau, kháng viêm"
+    },
+    {
+      "id": "amoxicillin-500",
+      "name": "Amoxicillin",
+      "genericName": "Amoxicillin",
+      "dosage": "500mg",
+      "form": "Capsule",
+      "indications": ["Nhiễm khuẩn đường hô hấp", "Viêm tai giữa", "Nhiễm khuẩn da"],
+      "contraindications": ["Dị ứng penicillin", "Dị ứng beta-lactam"],
+      "sideEffects": ["Tiêu chảy", "Buồn nôn", "Phát ban"],
+      "dosageInstructions": "Người lớn: 250-500mg mỗi 8h hoặc 500-875mg mỗi 12h",
+      "warnings": "Uống đủ liệu trình. Không tự ý ngừng thuốc khi hết triệu chứng.",
+      "category": "Kháng sinh - Penicillin"
+    },
+    {
+      "id": "metformin-500",
+      "name": "Metformin",
+      "genericName": "Metformin HCl",
+      "dosage": "500mg",
+      "form": "Tablet",
+      "indications": ["Đái tháo đường type 2"],
+      "contraindications": ["Suy thận nặng", "Toan máu chuyển hóa", "Suy gan nặng"],
+      "sideEffects": ["Tiêu chảy", "Buồn nôn", "Đầy hơi"],
+      "dosageInstructions": "Bắt đầu 500mg x 1-2 lần/ngày, tăng dần, tối đa 2550mg/ngày",
+      "warnings": "Uống cùng bữa ăn. Theo dõi chức năng thận định kỳ.",
+      "category": "Hạ đường huyết - Biguanide"
+    },
+    {
+      "id": "omeprazole-20",
+      "name": "Omeprazole",
+      "genericName": "Omeprazole",
+      "dosage": "20mg",
+      "form": "Capsule",
+      "indications": ["Loét dạ dày", "Trào ngược dạ dày thực quản", "Viêm dạ dày"],
+      "contraindications": ["Dị ứng omeprazole"],
+      "sideEffects": ["Đau đầu", "Tiêu chảy", "Đau bụng"],
+      "dosageInstructions": "20mg x 1 lần/ngày, uống trước bữa ăn 30-60 phút",
+      "warnings": "Dùng liệu trình ngắn (4-8 tuần). Không nghiền viên.",
+      "category": "Ức chế bơm proton (PPI)"
+    }
+  ]
+}

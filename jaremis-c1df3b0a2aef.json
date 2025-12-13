@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "jaremis",
+  "private_key_id": "c1df3b0a2aef17c8e5019bba6cea42aebdbe4961",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDkre1Vu54ofweV\nVB7VNO8D2uW5MnvL7NeBRW+D8AUEkungdju9uj6oYBUJ4RRFvd/WMpvaPWWoEQib\nt2q6EzZApquAGxWVMfD/JE0bcvPQz7CC3JDbYosA9RyrKS7p/akJO5p5JixTppmw\n5KdXHaibNdMeh10fxZg9BRIKFS+3m9bsJcTs8ntQTaakiH5eF6hEekzVe0oPSq1z\n846qBhZ4G323LaRLD4ksx9Xib9uo6gavvYQ1hVxvLc6pHWOtJsOAg00/Wp1x6K3h\noVnnfghyBq5JsEFQE9VjY80R18+z4zfr01qXeweeEtTZiDw+ZtPbiv4gPeyv/2QZ\nF1XP/cNFAgMBAAECggEADRv/aBPKXE3z9FaPMe/H5/OribNgL2+TZyDA5NJkpz94\n0tpUUGsV3ncrnZZeoCTjaRcboiY05q6bTLn2D1a8nHYxjLWAxj3HsAi3tuQfIBBX\n8RiN4VXD3Dkw/Iru2pElGJdnIpzSm7UISIDDKxZTLRqn0K834nNkZ9MblqJiSucz\na2CRUm04l2r5bMnHlIIunRloFkytn88MQhSxnN96zfMY1LISXBOBJxUQ1O9lsW50\ndqSTQE9RVKoYnBuKSWbxHpCODaRrhRecDHxg9D+nO3BpXCCeP5FfjRKZ6JVteZk0\nxfoSOkepWLDdrh4JcwyZRAWjg2eVdGxzM0oz056QAQKBgQD1stosTTGclIefg5Rq\nBdtx+iyOr0ApLCMQJvRjksTO8epmJxNyOvGlzGO1MRYkqXmqAARFZxMEkGMqt0xL\nBVKQOLWYAUPfxRd7OF829IUyDV8vSeBTbTgSEVEjft8qo0KL60TkZxta0a11MMuJ\nVFYT55CYemBauf76S0sgjpQ/RQKBgQDuRGclIMXGXTm9SB6kPFBw8G0kclvXMgOz\nTRFzWSO6lR77XgbFpJoXQkIzOgXK1ouOjs9C+IShDaR2r6Ske1F5KDWCq2uhs/aH\nWh6JqSK14mVYqwxX5gTGW0LoC5+VHlhrMGanf32//V+xXAgFxBvEVv3Efr8whV+h\nOBFclYm0AQKBgQDAYk8bKUaTiGm5qVnourVdxbpl7yuaEYlS+G2cGiworpwPaMF9\nTFIytJvOIKVqB5nQVzsA7PijNjuwEt6WT5CahQ0L/NGcwcLlJPrJGSXCT14ctQgF\nyxuAajbSSGGODU/qJ0pGXcW5kzzy6kY1Peg4pbU+73PLFqBkc9hbocjK0QKBgH9R\ntfw1Avn4nv3yJ82DHUj8cJXlNgZMB4YsTILiwyDUxnVzzRKX3m9HTLCq9KVq96/5\nx+71dYnKDHQPb18lNmgTgGSOzTjfPYEeOus8ofunOpii7jmaBDsqURpF+8RnLsA4\nYOJoUf3hmtzfXLoYDO5hvcDeKbP30R4JI93hWnABAoGBAMJyjVr+Bf4iE9DycCJS\nPP1EGDFR9jV9hE0S9N4pfTUlCIHryXsVjbkTWfxhGQPX5keiFCf08IrY1bcW37ka\n2EBt1oIE9PiSFLG901ThPqAedsmyK7V0VgS1Lr/kfenbM75Be6JZsZkXmMC8eqX4\nG0fX8oIFvm77KwEP6G/7UlyT\n-----END PRIVATE KEY-----\n",
+  "client_email": "jaremis@jaremis.iam.gserviceaccount.com",
+  "client_id": "101242404752768247250",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/jaremis%40jaremis.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

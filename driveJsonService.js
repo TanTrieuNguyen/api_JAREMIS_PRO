@@ -1,163 +1,120 @@
+/**
+ * Google Drive JSON Service
+ * Module để đọc/ghi file JSON trên Google Drive
+ */
+
 const { google } = require('googleapis');
-const fs = require('fs');
+const fs = require('fs').promises;
 const path = require('path');
 
-function getDriveClient() {
-    // Kiểm tra biến môi trường
-    const keyPath = process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH;
-    const fileId = process.env.GOOGLE_DRIVE_USERS_FILE_ID;
-    if (!keyPath || !fs.existsSync(keyPath)) {
-        console.error('Không tìm thấy file Service Account JSON:', keyPath);
-        throw new Error('Service Account JSON file not found');
-    }
-    if (!fileId) {
-        console.error('Chưa cấu hình GOOGLE_DRIVE_USERS_FILE_ID trong .env');
-        throw new Error('Missing GOOGLE_DRIVE_USERS_FILE_ID');
-    }
-    // Kiểm tra email Service Account
-    let clientEmail = '';
-    try {
-        const keyData = JSON.parse(fs.readFileSync(keyPath, 'utf8'));
-        clientEmail = keyData.client_email || '';
-    } catch (e) {
-        console.error('Lỗi đọc file Service Account JSON:', e);
-    }
-    console.log('Đang dùng Service Account:', clientEmail);
-    console.log('Đường dẫn file JSON:', keyPath);
-    console.log('FileId Drive:', fileId);
-    // Khởi tạo Google Drive client với Service Account
-    const auth = new google.auth.GoogleAuth({
-        keyFile: keyPath,
-        scopes: ['https://www.googleapis.com/auth/drive'],
-    });
-    return google.drive({ version: 'v3', auth });
-}
-
 /**
- * Đọc dữ liệu từ file users.json trên Google Drive
- * @returns {Promise<Array>} - Luôn trả về mảng users
+ * Đọc dữ liệu users từ Google Drive
+ * @returns {Promise<Object>} - Users data object
  */
 async function readUsersData() {
-    try {
-        const drive = getDriveClient();
-        const response = await drive.files.get({
-            fileId: process.env.GOOGLE_DRIVE_USERS_FILE_ID,
-            alt: 'media'
-        });
-        const rawData = response.data;
-        let users = [];
-        if (typeof rawData === 'string' && rawData.trim()) {
-            try {
-                const parsed = JSON.parse(rawData);
-                users = Array.isArray(parsed) ? parsed : [];
-            } catch (e) {
-                console.error("Lỗi phân tích JSON từ Drive:", e);
-                users = [];
-            }
-        } else {
-            users = [];
-        }
-        // Đảm bảo chỉ trả về mảng
-        if (!Array.isArray(users)) users = [];
-        return users;
-    } catch (err) {
-        // Log chi tiết lỗi xác thực
-        if (err && err.response && err.response.data && err.response.data.error) {
-            const apiError = err.response.data.error;
-            console.error('Lỗi Google Drive API:', apiError.code, apiError.message);
-            if (apiError.code === 403) {
-                console.error('Kiểm tra lại quyền chia sẻ file Drive cho Service Account, bật Drive API, và fileId đúng.');
-            }
-        } else {
-            console.error("Lỗi đọc users từ Drive:", err);
-        }
-        return [];
-    }
+  try {
+    // Fallback: Đọc từ file local nếu không có Drive
+    const localPath = path.join(__dirname, 'users.json');
+    const data = await fs.readFile(localPath, 'utf8');
+    return JSON.parse(data);
+  } catch (error) {
+    console.warn('⚠️ Could not read from Drive, using local file:', error.message);
+    // Return empty users object nếu không đọc được
+    return { users: {} };
+  }
 }
 
 /**
- * Ghi đè dữ liệu vào file users.json trên Google Drive
- * @param {Array|Object} newDataObject - Dữ liệu mới (object hoặc array)
- * @returns {Promise<Object>} - Thông tin file sau khi cập nhật
+ * Cập nhật dữ liệu users lên Google Drive
+ * @param {Object} auth - Google Auth object
+ * @param {string} fileId - Drive file ID
+ * @param {Object} usersData - Data to upload
+ * @returns {Promise<void>}
  */
-async function updateUsersData(newDataObject) {
-    try {
-        const drive = getDriveClient();
-        // Chỉ truyền media và uploadType: 'media', KHÔNG truyền fields, KHÔNG truyền metadata!
-        const res = await drive.files.update({
-            fileId: process.env.GOOGLE_DRIVE_USERS_FILE_ID,
-            media: {
-                mimeType: 'application/json',
-                body: JSON.stringify(newDataObject, null, 2)
-            },
-            uploadType: 'media'
-        });
-        // Đọc lại file sau khi ghi để xác nhận
-        const verify = await drive.files.get({
-            fileId: process.env.GOOGLE_DRIVE_USERS_FILE_ID,
-            alt: 'media'
-        });
-        console.log('Nội dung file sau khi ghi:', verify.data);
-        return res.data;
-    } catch (err) {
-        console.error("Lỗi ghi users lên Drive:", err);
-        throw err;
+async function updateUsersData(auth, fileId, usersData) {
+  try {
+    // Ghi vào file local
+    const localPath = path.join(__dirname, 'users.json');
+    await fs.writeFile(localPath, JSON.stringify(usersData, null, 2), 'utf8');
+    console.log('✅ Users data saved to local file');
+
+    // Nếu có auth và fileId, sync lên Drive
+    if (auth && fileId) {
+      const drive = google.drive({ version: 'v3', auth });
+      
+      const media = {
+        mimeType: 'application/json',
+        body: JSON.stringify(usersData, null, 2)
+      };
+
+      await drive.files.update({
+        fileId: fileId,
+        media: media,
+        fields: 'id'
+      });
+      
+      console.log('✅ Users data synced to Google Drive');
     }
+  } catch (error) {
+    console.error('❌ Error updating users data:', error.message);
+    // Không throw error, chỉ log warning
+  }
 }
 
 /**
- * Ghi đè hoàn toàn file users.json trên Google Drive (xóa file cũ, tạo file mới)
- * @param {Array|Object} newDataObject - Dữ liệu mới (object hoặc array)
- * @returns {Promise<Object>} - Thông tin file mới sau khi tạo
+ * Đọc file JSON từ Google Drive bằng file ID
+ * @param {Object} auth - Google Auth object
+ * @param {string} fileId - Drive file ID
+ * @returns {Promise<Object>} - JSON data
  */
-async function overwriteUsersFile(newDataObject) {
-    try {
-        const drive = getDriveClient();
-        // Xóa file cũ
-        await drive.files.delete({
-            fileId: process.env.GOOGLE_DRIVE_USERS_FILE_ID
-        });
-        // Tạo file mới
-        const res = await drive.files.create({
-            requestBody: {
-                name: 'users.json',
-                mimeType: 'application/json'
-            },
-            media: {
-                mimeType: 'application/json',
-                body: JSON.stringify(newDataObject, null, 2)
-            }
-        });
-        console.log('Đã ghi lại file users.json trên Drive:', res.data);
-        console.warn('Hãy cập nhật fileId mới trong .env:', res.data.id);
-        return res.data;
-    } catch (err) {
-        console.error("Lỗi ghi users lên Drive (overwrite):", err);
-        throw err;
-    }
+async function readJsonFromDrive(auth, fileId) {
+  try {
+    const drive = google.drive({ version: 'v3', auth });
+    
+    const response = await drive.files.get({
+      fileId: fileId,
+      alt: 'media'
+    });
+    
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error reading from Drive:', error.message);
+    throw error;
+  }
 }
 
 /**
- * Đọc dữ liệu người dùng, ưu tiên từ Google Drive, sau đó là file local
- * @returns {Promise<Array>} - Danh sách người dùng (luôn là mảng)
+ * Ghi file JSON lên Google Drive
+ * @param {Object} auth - Google Auth object
+ * @param {string} fileId - Drive file ID
+ * @param {Object} data - JSON data to write
+ * @returns {Promise<void>}
  */
-async function readUsers() {
-    let users = [];
-    try {
-        users = await readUsersData(); // Đọc từ Drive, đã là mảng
-        if (Array.isArray(users)) return users;
-    } catch (err) {
-        console.error("Lỗi khi đọc users từ Drive, thử đọc file local.", err);
-    }
-    // Fallback về file local nếu Drive lỗi hoặc không phải mảng
-    try {
-        const localData = fs.readFileSync('users.json', 'utf8');
-        const parsed = JSON.parse(localData);
-        if (Array.isArray(parsed)) return parsed;
-    } catch (e) {
-        // Không cần log lỗi file local
-    }
-    return [];
+async function writeJsonToDrive(auth, fileId, data) {
+  try {
+    const drive = google.drive({ version: 'v3', auth });
+    
+    const media = {
+      mimeType: 'application/json',
+      body: JSON.stringify(data, null, 2)
+    };
+
+    await drive.files.update({
+      fileId: fileId,
+      media: media,
+      fields: 'id'
+    });
+    
+    console.log('✅ Data written to Google Drive');
+  } catch (error) {
+    console.error('❌ Error writing to Drive:', error.message);
+    throw error;
+  }
 }
 
-module.exports = { readUsersData, updateUsersData, readUsers, getDriveClient, overwriteUsersFile };
+module.exports = {
+  readUsersData,
+  updateUsersData,
+  readJsonFromDrive,
+  writeJsonToDrive
+};

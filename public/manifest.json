@@ -1,0 +1,27 @@
+{
+  "name": "JAREMIS - AI Y Tế Thông Minh",
+  "short_name": "JAREMIS",
+  "description": "Trợ lý AI y tế thông minh - Hỗ trợ chẩn đoán, tư vấn sức khỏe 24/7",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4CAF50",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
