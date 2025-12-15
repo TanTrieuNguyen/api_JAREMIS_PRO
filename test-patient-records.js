@@ -28,7 +28,7 @@ async function testPatientRecords() {
   console.log('\n✅ Tests completed!');
 }
 
-// Run if executed directly
+// Chạy nếu được gọi trực tiếp
 if (require.main === module) {
   testPatientRecords().catch(console.error);
 }

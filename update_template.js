@@ -1,10 +1,10 @@
 const fs = require('fs');
 
-// Read server.js
+// Đọc nội dung server.js
 const serverPath = 'server.js';
 let content = fs.readFileSync(serverPath, 'utf8');
 
-// Find and replace the header section in medical report
+// Tìm và thay thế the header section in medical report
 const oldHeader = `          <div class="header">
             <div class="header-left">
               BỘ Y TẾ<br>
@@ -37,7 +37,7 @@ const newHeader = `          <div style="display: grid; grid-template-columns: 1
 
 content = content.replace(oldHeader, newHeader);
 
-// Update TIỀN SỬ BỆNH TẬT section to match figure 3,4
+// Cập nhật TIỀN SỬ BỆNH TẬT section to match figure 3,4
 const oldTienSu = `          <div class="section">
             <h2>I. TIỀN SỬ BỆNH TẬT</h2>
             
@@ -88,6 +88,6 @@ const newTienSu = `          <div class="section">
 
 content = content.replace(oldTienSu, newTienSu);
 
-// Write back
+// Ghi lại nội dung
 fs.writeFileSync(serverPath, content, 'utf8');
 console.log('✅ Template updated successfully!');

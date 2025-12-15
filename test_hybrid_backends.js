@@ -9,7 +9,7 @@ const hybridAnalysis = require('./medicalImageAnalysisHybrid');
 console.log('🧪 TESTING HYBRID MEDICAL IMAGE ANALYSIS BACKENDS\n');
 console.log('========================================\n');
 
-// Check available backends
+// Kiểm tra backends khả dụng
 console.log('📋 Checking Available Backends:\n');
 
 const backends = {
@@ -29,7 +29,7 @@ console.log('\n========================================\n');
 const priority = process.env.IMAGE_ANALYSIS_PRIORITY || 'openai,claude,gemini,ollama';
 console.log(`📊 Current Priority: ${priority}\n`);
 
-// Test Ollama connection
+// Kiểm tra kết nối Ollama
 async function testOllama() {
   try {
     const axios = require('axios');
@@ -45,7 +45,7 @@ async function testOllama() {
   }
 }
 
-// Test with sample base64 image (1x1 red pixel)
+// Kiểm thử với ảnh base64 mẫu (1x1 red pixel)
 async function testSampleImage() {
   const sampleBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==';
   const sampleMimeType = 'image/png';
@@ -83,7 +83,7 @@ async function testSampleImage() {
   }
 }
 
-// Main test runner
+// Chạy chương trình kiểm thử
 async function runTests() {
   console.log('========================================\n');
   console.log('🚀 Starting Tests...\n');
@@ -92,7 +92,7 @@ async function runTests() {
   
   console.log('========================================\n');
   
-  // Uncomment to test with real image:
+  // Bỏ comment để test với ảnh thật:
   // await testSampleImage();
   
   console.log('\n📝 Next Steps:\n');

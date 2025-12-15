@@ -1,20 +1,20 @@
 /**
  * ========================================
- * JAREMIS ADVANCED DIAGNOSIS ENGINE v2.0
+ * JAREMIS ADVANCED Chẩn đoán ENGINE v2.0
  * ========================================
  * Hệ thống chẩn đoán y khoa nâng cao đa năng
  * Cho dự án thi Khoa học Kỹ thuật Quốc gia
  * 
  * Features:
- * 1. Lab Result Parser (OCR + Analysis) ✅
+ * 1. Kết quả xét nghiệm Phân tíchr (OCR + Analysis) ✅
  * 2. Multi-modal AI (X-ray, CT, ECG, Dermatology) ✅
  * 3. Confidence Breakdown ✅
  * 4. Medical Knowledge Base (ICD-10 + Vietnam data) ✅
- * 5. Vital Signs Monitor (NEWS2 Score) ✅
+ * 5. Dấu hiệu sinh tồn Monitor (NEWS2 Score) ✅
  * 6. Scoring Systems (Wells DVT, CURB-65, APACHE II, CHA2DS2-VASc) ✅
  * 7. AI Explanation (XAI) ✅
- * 8. Differential Diagnosis Tree ✅
- * 9. Treatment Recommendation (WHO Guidelines) ✅
+ * 8. Differential Chẩn đoán Tree ✅
+ * 9. Điều trị Recommendation (WHO Guidelines) ✅
  * 10. Citations & Medical Sources (WHO, CDC, PubMed, UpToDate, Bộ Y tế VN) ✅
  */
 
@@ -24,11 +24,11 @@ const fs = require('fs');
 const path = require('path');
 
 // ========================================
-// 1. LAB RESULT PARSER
+// 1. Kết quả xét nghiệm Phân tíchR
 // ========================================
 
 /**
- * Parse lab results from text or OCR output
+ * Phân tích Kết quả xét nghiệms from text or OCR output
  */
 function parseLabResults(text) {
   const results = {
@@ -38,7 +38,7 @@ function parseLabResults(text) {
     normalRanges: {}
   };
 
-  // Common lab tests with normal ranges
+  // Common lab Kiểm thửs with normal ranges
   const labNormals = {
     'WBC': { min: 4000, max: 11000, unit: 'cells/μL', name: 'White Blood Cells' },
     'RBC': { min: 4.5, max: 5.9, unit: 'million cells/μL', name: 'Red Blood Cells' },
@@ -55,7 +55,7 @@ function parseLabResults(text) {
     'CRP': { min: 0, max: 3, unit: 'mg/L', name: 'C-Reactive Protein' }
   };
 
-  // Parse text for lab values
+  // Phân tích text for lab values
   for (const [key, range] of Object.entries(labNormals)) {
     const regex = new RegExp(`${key}[:\\s]*([0-9.]+)`, 'i');
     const match = text.match(regex);
@@ -65,7 +65,7 @@ function parseLabResults(text) {
       results.bloodCount[key] = value;
       results.normalRanges[key] = range;
       
-      // Check if abnormal
+      // Kiểm tra if abnormal
       if (value < range.min || value > range.max) {
         results.abnormal.push({
           test: key,
@@ -93,12 +93,12 @@ function calculateSeverity(value, range) {
 }
 
 // ========================================
-// 2. VITAL SIGNS MONITOR (NEWS2 SCORE)
+// 2. Dấu hiệu sinh tồn MONITOR (NEWS2 SCORE)
 // ========================================
 
 /**
- * Calculate NEWS2 (National Early Warning Score 2)
- * Used in UK NHS for detecting deteriorating patients
+ * Tính toán NEWS2 (National Early Warning Score 2)
+ * Used in UK NHS for detecting deteriorating Bệnh nhâns
  */
 function calculateNEWS2(vitalSigns) {
   const { 
@@ -390,12 +390,12 @@ async function searchMedicalSources(query, diagnosis) {
 }
 
 /**
- * Format citations for response (HTML buttons)
+ * Định dạng citations for Phản hồi (HTML buttons)
  */
 function formatCitations(sources) {
   let html = '\n\n---\n### 📖 Nguồn Tham Khảo Khoa Học\n\n';
   
-  // Render as HTML buttons (not markdown links)
+  // Hiển thị as HTML buttons (not markdown links)
   sources.forEach((source, idx) => {
     const shortTitle = source.title.length > 50 ? source.title.substring(0, 50) + '...' : source.title;
     html += `<a href="${source.url}" class="citation-btn" target="_blank" rel="noopener">${source.icon} ${source.type}: ${shortTitle}</a> `;
@@ -407,7 +407,7 @@ function formatCitations(sources) {
 }
 
 // ========================================
-// 5. EXPORT MODULE
+// 5. Xuất MODULE
 // ========================================
 
 module.exports = {
@@ -435,7 +435,7 @@ module.exports = {
  * @param {string} imageBase64 - Base64 encoded image
  * @param {string} imageType - 'xray' | 'ct' | 'ecg' | 'dermatology'
  * @param {object} genAI - Google Generative AI instance
- * @returns {Promise<string>} - Analysis result
+ * @Trả về {Promise<string>} - Analysis result
  */
 async function analyzeMedialImage(imageBase64, imageType, genAI) {
   try {
@@ -495,7 +495,7 @@ Trả lời chuyên môn.`
 // ========================================
 
 /**
- * Explain AI reasoning for diagnosis
+ * Explain AI reasoning for Chẩn đoán
  */
 function explainAIReasoning(primaryDiagnosis, confidence, evidenceData) {
   const explanation = {
@@ -505,7 +505,7 @@ function explainAIReasoning(primaryDiagnosis, confidence, evidenceData) {
     evidenceStrength: 'MODERATE'
   };
 
-  // Analyze symptoms
+  // Analyze Triệu chứngs
   if (evidenceData.symptoms && evidenceData.symptoms.length > 0) {
     explanation.reasoning.push({
       factor: 'Triệu chứng lâm sàng',
@@ -514,7 +514,7 @@ function explainAIReasoning(primaryDiagnosis, confidence, evidenceData) {
     });
   }
 
-  // Analyze lab results
+  // Analyze Kết quả xét nghiệms
   if (evidenceData.labResults && evidenceData.labResults.length > 0) {
     explanation.reasoning.push({
       factor: 'Xét nghiệm',
@@ -549,11 +549,11 @@ function explainAIReasoning(primaryDiagnosis, confidence, evidenceData) {
 }
 
 // ========================================
-// 8. DIFFERENTIAL DIAGNOSIS TREE
+// 8. DIFFERENTIAL Chẩn đoán TREE
 // ========================================
 
 /**
- * Generate decision tree for differential diagnosis
+ * Tạo ra decision tree for differential Chẩn đoán
  */
 function generateDiagnosisTree(symptoms, labResults, imaging) {
   const tree = {
@@ -561,7 +561,7 @@ function generateDiagnosisTree(symptoms, labResults, imaging) {
     branches: []
   };
 
-  // Symptom-based branching
+  // Triệu chứng-based branching
   if (symptoms) {
     const symptomsLower = symptoms.toLowerCase();
     if (symptomsLower.includes('sốt') || symptomsLower.includes('fever')) {
@@ -596,11 +596,11 @@ function generateDiagnosisTree(symptoms, labResults, imaging) {
 }
 
 // ========================================
-// 9. TREATMENT RECOMMENDATIONS
+// 9. Điều trị RECOMMENDATIONS
 // ========================================
 
 /**
- * Get evidence-based treatment recommendations
+ * Get evidence-based Điều trị recommendations
  */
 function getTreatmentRecommendations(diagnosis, severity, allergies) {
   const recommendations = {
@@ -631,7 +631,7 @@ function getTreatmentRecommendations(diagnosis, severity, allergies) {
     });
   }
 
-  // Check allergies
+  // Kiểm tra allergies
   if (allergies && allergies.length > 0) {
     recommendations.warnings.push({
       type: 'ALLERGY',

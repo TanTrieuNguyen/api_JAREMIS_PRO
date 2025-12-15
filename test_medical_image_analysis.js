@@ -7,7 +7,7 @@ const medicalImageAnalysis = require('./medicalImageAnalysis');
 
 console.log('🧪 TESTING MEDICAL IMAGE ANALYSIS MODULE\n');
 
-// Test 1: Image Type Detection
+// Kiểm thử 1: Phát hiện loại ảnh y tế
 console.log('📋 Test 1: Phát hiện loại ảnh từ tên file');
 const testFilenames = [
   'chest_xray_20250119.jpg',
@@ -32,7 +32,7 @@ testFilenames.forEach(filename => {
 
 console.log('\n✅ All tests completed!\n');
 
-// Test 2: Prompt Generation
+// Kiểm thử 2: Tạo prompt phân tích
 console.log('📋 Test 2: Tạo prompt phân tích');
 const sampleTypes = ['xray-chest', 'ct-brain', 'mri-spine', 'ecg', 'pet-scan'];
 sampleTypes.forEach(type => {

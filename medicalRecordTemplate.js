@@ -1,5 +1,5 @@
 /**
- * JAREMIS - Medical Record Template Generator
+ * JAREMIS - Medical Bản ghi Template Generator
  * Tạo Giấy khám bệnh theo mẫu Bộ Y Tế
  */
 
@@ -7,12 +7,12 @@ const fs = require('fs');
 const path = require('path');
 
 /**
- * Generate official medical examination certificate (Giấy khám bệnh)
+ * Tạo ra official medical examination certificate (Giấy khám bệnh)
  */
 function generateMedicalRecordHTML(patientRecord) {
   const { patientId, patientName, createdBy, createdAt, totalVisits, consultations } = patientRecord;
   
-  // Sort consultations by date (oldest first for medical record)
+  // Sort consultations by date (oldest first for medical Bản ghi)
   const sortedConsultations = [...consultations].sort((a, b) => 
     new Date(a.consultationDate) - new Date(b.consultationDate)
   );
@@ -78,7 +78,7 @@ function generateMedicalRecordHTML(patientRecord) {
     }
     
     .header-right {
-      text-align: right;
+      text-align: center;
       font-weight: bold;
       width: 50%;
       white-space: nowrap;
@@ -104,7 +104,7 @@ function generateMedicalRecordHTML(patientRecord) {
       letter-spacing: 1px;
     }
     
-    /* Patient info section - simple table with photo */
+    /* Bệnh nhân info section - simple table with photo */
     .patient-info-container {
       width: 100%;
       border-collapse: collapse;
@@ -304,7 +304,7 @@ function generateMedicalRecordHTML(patientRecord) {
       }
     }
     
-    /* Ensure consistent rendering for PDF export */
+    /* Ensure consistent Hiển thịing for PDF Xuất */
     * {
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
@@ -451,7 +451,7 @@ function generateMedicalRecordHTML(patientRecord) {
   </div>
   
   <script>
-    // Add checkbox toggle functionality in edit mode
+    // Add Kiểm trabox Chuyển đổi functionality in edit mode
     document.addEventListener('DOMContentLoaded', function() {
       const checkboxes = document.querySelectorAll('.checkbox');
       
@@ -470,14 +470,14 @@ function generateMedicalRecordHTML(patientRecord) {
           const group = this.getAttribute('data-group');
           
           if (group) {
-            // For grouped checkboxes, uncheck all in group first
+            // For grouped Kiểm traboxes, unKiểm tra all in group first
             const groupCheckboxes = document.querySelectorAll('.checkbox[data-group="' + group + '"]');
             groupCheckboxes.forEach(cb => cb.classList.remove('checked'));
             
-            // Then check this one
+            // Then Kiểm tra this one
             this.classList.add('checked');
           } else {
-            // For standalone checkboxes, just toggle
+            // For standalone Kiểm traboxes, just Chuyển đổi
             this.classList.toggle('checked');
           }
         });
@@ -507,7 +507,7 @@ function generateMedicalRecordHTML(patientRecord) {
 }
 
 /**
- * Generate examination visits section
+ * Tạo ra examination visits section
  */
 function generateExaminationVisits(consultations) {
   return consultations.map((visit, index) => {
@@ -571,7 +571,7 @@ function generateExaminationVisits(consultations) {
 }
 
 /**
- * Generate follow-up visits (tái khám)
+ * Tạo ra follow-up visits (tái khám)
  */
 function generateFollowUpVisits(consultations, currentIndex) {
   const followUps = [];
@@ -613,18 +613,18 @@ function generateFollowUpVisits(consultations, currentIndex) {
 }
 
 /**
- * Extract diagnosis from analysis text
+ * Extract Chẩn đoán from analysis text
  */
 function extractDiagnosis(analysis) {
   if (!analysis) return 'Đang theo dõi';
   
-  // Try to extract diagnosis section
+  // Try to extract Chẩn đoán section
   const diagnosisMatch = analysis.match(/chẩn đoán[:\s]*(.*?)(?:\n|$)/i);
   if (diagnosisMatch) {
     return diagnosisMatch[1].trim().substring(0, 200);
   }
   
-  // Return first 200 characters if no specific diagnosis found
+  // Return first 200 characters if no specific Chẩn đoán found
   return analysis.substring(0, 200) + (analysis.length > 200 ? '...' : '');
 }
 
@@ -645,7 +645,7 @@ function extractDietRecommendation(analysis) {
 }
 
 /**
- * Get vital signs summary
+ * Get Dấu hiệu sinh tồn summary
  */
 function getVitalSignsSummary(patientInfo) {
   if (!patientInfo) return 'Không có thông tin';
@@ -662,7 +662,7 @@ function getVitalSignsSummary(patientInfo) {
 }
 
 /**
- * Format date time
+ * Định dạng date time
  */
 function formatDateTime(date) {
   if (!date) return 'N/A';
@@ -677,7 +677,7 @@ function formatDateTime(date) {
 }
 
 /**
- * Format date only
+ * Định dạng date only
  */
 function formatDate(date) {
   if (!date) return 'N/A';

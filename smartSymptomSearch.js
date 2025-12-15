@@ -1,5 +1,5 @@
 /**
- * SMART SYMPTOM SEARCH MODULE
+ * SMART Triệu chứng SEARCH MODULE
  * Tách triệu chứng chính từ câu tự nhiên, loại bỏ trạng ngữ/từ phụ,
  * chọn nguồn web search phù hợp với từng loại triệu chứng.
  * 
@@ -66,7 +66,7 @@ Keyword triệu chứng:`;
     const response = await result.response;
     let keywords = response.text().trim();
     
-    // Clean up markdown/extra formatting
+    // Clean up markdown/extra Định dạngting
     keywords = keywords.replace(/^["'\`\*]+|["'\`\*]+$/g, '').trim();
     
     console.log(`🔍 Symptom extraction (AI): "${userInput}" → "${keywords}"`);
@@ -75,7 +75,7 @@ Keyword triệu chứng:`;
   } catch (error) {
     console.warn('⚠️ Symptom extraction failed:', error.message);
     
-    // Fallback: Enhanced regex cleanup để tách triệu chứng
+    // Dự phòng: Enhanced regex cleanup để tách triệu chứng
     let cleaned = userInput
       // Step 1: Remove numbers with units FIRST (before removing other words)
       .replace(/\d+\s*(độ|lần|giờ)/gi, '') // Remove "39 độ", "2 lần"
@@ -84,7 +84,7 @@ Keyword triệu chứng:`;
       // Step 2: Remove Vietnamese pronouns & modifiers
       .replace(/(^|\s)(tôi|con tôi|gia đình|chồng|vợ|bố|mẹ|con|em|anh|chị)(\s|$)/gi, ' ')
       .replace(/(^|\s)(bị|đang|có|cảm thấy|thấy)(\s|$)/gi, ' ')
-      // IMPORTANT: Remove time phrases (giữ lại mức độ như "dữ dội", "nặng")
+      // QUAN TRỌNG: Remove time phrases (giữ lại mức độ như "dữ dội", "nặng")
       .replace(/(^|\s)(từ|nay)\s+(sáng|chiều|tối|đêm|hôm|ngày)/gi, ' ') // "từ sáng nay" → removed
       .replace(/(^|\s)(hôm nay|hôm qua|sáng nay|chiều nay|tối nay|tối qua|sáng sớm)(\s|$)/gi, ' ')
       .replace(/(^|\s)(sáng|chiều|tối|đêm|nay|qua|rồi)(\s|$)/gi, ' ') // Remove standalone time words
@@ -96,9 +96,9 @@ Keyword triệu chứng:`;
       // Step 3: Remove English pronouns & modifiers
       .replace(/(^|\s)(i|my|me|his|her|their|our|son|daughter|parent|family|friend)(\s|$)/gi, ' ')
       .replace(/(^|\s)(has|have|had|been|am|is|are|was|were|being)(\s|$)/gi, ' ')
-      .replace(/(^|\s)(a|an|the)(\s|$)/gi, ' ') // Remove articles
+      .replace(/(^|\s)(a|an|the)(\s|$)/gi, ' ') // Xóa mạo từ
       .replace(/(^|\s)(for|since|from|to|at|in|on|about|around|with|by)(\s|$)/gi, ' ')
-      // KEEP English severity: severe, mild, chronic, acute
+      // GIỮ LẠI mức độ tiếng Anh: severe, mild, chronic, acute
       // .replace(/(^|\s)(very|extremely|severe|mild|intense|chronic)(\s|$)/gi, ' ') // REMOVED
       .replace(/(^|\s)(very|extremely)(\s|$)/gi, ' ') // Only remove generic intensifiers
       // Step 4: Clean up extra spaces & commas
@@ -369,7 +369,7 @@ function categorizeSymptomAndGetSources(symptomKeyword) {
     };
   }
   
-  // 8. DEFAULT - Mayo Clinic, WHO, Wikipedia Medical
+  // 8. Mặc định - Mayo Clinic, WHO, Wikipedia Medical
   return {
     category: 'general',
     sources: [
@@ -400,11 +400,11 @@ function categorizeSymptomAndGetSources(symptomKeyword) {
  */
 async function smartSymptomSearch(userInput) {
   try {
-    // Step 1: Extract symptom keywords (AI with fallback)
+    // Step 1: Extract Triệu chứng keywords (AI with Dự phòng)
     const extraction = await extractSymptomKeywords(userInput);
     
-    // Step 2: Categorize & get appropriate sources
-    // Use the extracted/cleaned keyword for both categorization AND web search
+    // Bước 2: Phân loại & lấy nguồn phù hợp
+    // Dùng keyword đã trích xuất/làm sạch cho cả phân loại VÀ tìm kiếm web
     const result = categorizeSymptomAndGetSources(extraction.keyword);
     
     return {
@@ -419,7 +419,7 @@ async function smartSymptomSearch(userInput) {
   } catch (error) {
     console.error('❌ Smart symptom search failed:', error);
     
-    // Final fallback: use original input with general sources
+    // Final Dự phòng: use original input with general sources
     return {
       originalInput: userInput,
       extractedKeyword: userInput,

@@ -1,19 +1,19 @@
-// Lightweight vanilla Animated Reply utility (no framework)
-// Usage:
+// Tiện ích hiển thị trả lời dạng animation (vanilla JavaScript, không dùng framework)
+// Cách dùng:
 //   const anim = AnimatedReply.mount(targetElement, {
 //       text: 'Xin chào, mình là JAREMIS...','mode':'word', wordDelay:45,
 //       startDelay:120,onComplete:()=>{}
 //   });
-//   // To finish instantly: anim.finish();
-//   // To replace with final HTML (e.g. KaTeX-rendered): anim.replace(finalHtml);
-//   // To destroy: anim.destroy();
+//   // Để kết thúc ngay lập tức: anim.finish();
+//   // Để thay thế bằng HTML cuối cùng (ví dụ KaTeX-rendered): anim.replace(finalHtml);
+//   // Để xóa: anim.destroy();
 (function(global){
   const MODES = ['char','word','line'];
   function splitSegments(text, mode){
     if(!text) return [];
     if(mode==='char') return Array.from(text);
     if(mode==='word') return text.split(/(\s+)/).filter(Boolean);
-    return String(text).split(/\r?\n/); // line
+    return String(text).split(/\r?\n/); // chế độ dòng
   }
   function AnimatedInstance(el, opts){
     this.el = el;

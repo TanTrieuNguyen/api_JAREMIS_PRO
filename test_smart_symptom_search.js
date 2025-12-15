@@ -5,7 +5,7 @@
 
 const { smartSymptomSearch } = require('./smartSymptomSearch');
 
-// ANSI colors for terminal output
+// Màu ANSI cho kết quả hiển thị trên terminal
 const colors = {
   reset: '\x1b[0m',
   green: '\x1b[32m',
@@ -86,7 +86,7 @@ async function runTests() {
         });
       }
 
-      // Check if category matches
+      // Kiểm tra nếu category khớp
       const categoryMatch = Array.isArray(test.expectedCategory)
         ? test.expectedCategory.includes(result.category)
         : result.category === test.expectedCategory;
@@ -121,7 +121,7 @@ async function runTests() {
   }
 }
 
-// Run tests
+// Chạy các kiểm thử
 runTests().catch(err => {
   console.error(`${colors.red}❌ Test suite crashed: ${err.message}${colors.reset}`);
   process.exit(1);

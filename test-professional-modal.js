@@ -1,5 +1,5 @@
 // ========================================
-// QUICK TEST: Professional Mode Modal Display
+// KIỂM THỚ NHANH: Hiển thị Modal chế độ Professional
 // ========================================
 
 const fs = require('fs');
@@ -22,99 +22,99 @@ function test(name, condition) {
     }
 }
 
-// Read file
+// Đọc nội dung file
 const content = fs.readFileSync(indexPath, 'utf8');
 
-// Test 1: Check .modal-backdrop.show CSS exists
+// Kiểm thử 1: Kiểm tra CSS .modal-backdrop.show tồn tại
 test(
     'CSS .modal-backdrop.show exists',
     content.includes('.modal-backdrop.show')
 );
 
-// Test 2: Check .modal-backdrop.show has display:flex
+// Kiểm thử 2: Kiểm tra .modal-backdrop.show có display:flex
 test(
     'CSS .modal-backdrop.show has display:flex',
     content.includes('.modal-backdrop.show') && 
     content.match(/\.modal-backdrop\.show\s*\{[^}]*display:\s*flex/s)
 );
 
-// Test 3: Check modal backdrop element exists
+// Kiểm thử 3: Kiểm tra modal backdrop element tồn tại
 test(
     'Modal backdrop element exists',
     content.includes('id="patient-info-modal-backdrop"')
 );
 
-// Test 4: Check submit button has no onclick duplicate
+// Kiểm thử 4: Kiểm tra nút submit không có onclick trùng lặp
 test(
     'Submit button has no onclick duplicate',
     !content.match(/<button[^>]+id="submit-patient-info-btn"[^>]+onclick=/i)
 );
 
-// Test 5: Check submitData function exists
+// Kiểm thử 5: Kiểm tra hàm submitData tồn tại
 test(
     'submitData function exists',
     content.includes('async function submitData()')
 );
 
-// Test 6: Check Professional mode check in submitData
+// Kiểm thử 6: Kiểm tra kiểm tra chế độ Professional trong submitData
 test(
     'Professional mode check in submitData',
     content.includes("if (currentMode === 'professional')") &&
     content.includes('openPatientInfoModal()')
 );
 
-// Test 7: Check pendingSubmitData is declared
+// Kiểm thử 7: Kiểm tra biến pendingSubmitData được khai báo
 test(
     'pendingSubmitData variable declared',
     content.includes('let pendingSubmitData = null')
 );
 
-// Test 8: Check openPatientInfoModal adds .show class
+// Kiểm thử 8: Kiểm tra openPatientInfoModal thêm .show class
 test(
     'openPatientInfoModal adds .show class',
     content.includes("backdrop.classList.add('show')")
 );
 
-// Test 9: Check closePatientInfoModal removes .show class
+// Kiểm thử 9: Kiểm tra closePatientInfoModal xóa .show class
 test(
     'closePatientInfoModal removes .show class',
     content.includes("backdrop.classList.remove('show')")
 );
 
-// Test 10: Check submitProfessionalWithPatientInfo validates patient name
+// Kiểm thử 10: Kiểm tra submitProfessionalWithPatientInfo xác thực tên bệnh nhân
 test(
     'submitProfessionalWithPatientInfo validates patient name',
     content.includes('if (!patientName)') &&
     content.includes('flashNotice')
 );
 
-// Test 11: Check event listener for submit-patient-info-btn
+// Kiểm thử 11: Kiểm tra event listener cho submit-patient-info-btn
 test(
     'Event listener for submit-patient-info-btn exists',
     content.includes('getElementById(\'submit-patient-info-btn\')') &&
     content.includes('addEventListener(\'click\'')
 );
 
-// Test 12: Check pendingSubmitData safe check
+// Kiểm thử 12: Kiểm tra kiểm tra an toàn pendingSubmitData
 test(
     'pendingSubmitData safe check before performSubmit',
     content.includes('if (pendingSubmitData && pendingSubmitData.message !== undefined)')
 );
 
-// Test 13: Check pendingSubmitData reset after submit
+// Kiểm thử 13: Kiểm tra reset pendingSubmitData sau khi submit
 test(
     'pendingSubmitData reset after submit',
     content.includes('pendingSubmitData = null')
 );
 
-// Test 14: Check Enter key listener calls submitData
+// Kiểm thử 14: Kiểm tra phím Enter gọi submitData
 test(
     'Enter key listener calls submitData',
     content.includes("if (e.key === 'Enter'") &&
     content.includes('submitData()')
 );
 
-// Test 15: Check send button listener calls submitData
+// Kiểm thử 15: Kiểm tra nút send gọi submitData
 test(
     'Send button listener calls submitData',
     content.includes("getElementById('send-btn')") &&

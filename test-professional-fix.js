@@ -24,30 +24,30 @@ function check(name, condition) {
     }
 }
 
-// Test 1: Nút send không có onclick duplicate
+// Kiểm thử 1: Nút send không có onclick trùng lặp
 check('Send button has no onclick attribute', 
     html.includes('id="send-btn" class="action-btn" title="Gửi (Enter)"') &&
     !html.match(/id="send-btn"[^>]*onclick="submitData\(\)"/));
 
-// Test 2: Modal CSS có .show class
+// Kiểm thử 2: Modal CSS có .show class
 check('CSS .modal-backdrop.show exists', 
     html.includes('.modal-backdrop.show'));
 
 check('CSS .modal-backdrop.show has display:flex', 
     html.match(/\.modal-backdrop\.show\s*{[^}]*display:\s*flex/s));
 
-// Test 3: submitData lưu pendingSubmitData
+// Kiểm thử 3: submitData lưu pendingSubmitData
 check('submitData saves pendingSubmitData', 
     html.includes('pendingSubmitData = { message, allImages };'));
 
 check('submitData logs saved pendingSubmitData', 
     html.includes("console.log('💾 Saved pendingSubmitData:', pendingSubmitData);"));
 
-// Test 4: openPatientInfoModal logs pendingSubmitData
+// Kiểm thử 4: openPatientInfoModal logs pendingSubmitData
 check('openPatientInfoModal logs pendingSubmitData', 
     html.includes("console.log('📂 Opening patient modal, pendingSubmitData:', pendingSubmitData);"));
 
-// Test 5: submitProfessionalWithPatientInfo có debug logs
+// Kiểm thử 5: submitProfessionalWithPatientInfo có debug logs
 check('submitProfessionalWithPatientInfo logs current pendingSubmitData', 
     html.includes("console.log('🔍 submitProfessionalWithPatientInfo called');"));
 
@@ -57,7 +57,7 @@ check('submitProfessionalWithPatientInfo logs pendingSubmitData value',
 check('submitProfessionalWithPatientInfo logs patient info', 
     html.includes("console.log('👤 Patient info:', patientInfo);"));
 
-// Test 6: CRITICAL - Save pendingSubmitData BEFORE closePatientInfoModal
+// Kiểm thử 6: QUAN TRỌNG - Lưu pendingSubmitData TRƯỚC KHI đóng modal
 check('Save pendingSubmitData to temp variable before closing modal', 
     html.includes('const savedData = pendingSubmitData;'));
 
@@ -74,37 +74,37 @@ if (submitFunc) {
     failed++;
 }
 
-// Test 7: Use savedData instead of pendingSubmitData after closing
+// Kiểm thử 7: Sử dụng savedData thay vì pendingSubmitData sau khi đóng
 check('performSubmit uses savedData.message', 
     html.includes('await performSubmit(savedData.message, savedData.allImages, patientInfo);'));
 
 check('Check savedData instead of pendingSubmitData', 
     html.includes('if (savedData && savedData.message !== undefined)'));
 
-// Test 8: Error handling for null savedData
+// Kiểm thử 8: Xử lý lỗi khi savedData null
 check('Show error when savedData is null', 
     html.includes("flashNotice('Lỗi: Không tìm thấy dữ liệu tin nhắn. Vui lòng thử lại.', 'error');"));
 
-// Test 9: closePatientInfoModal still resets pendingSubmitData
+// Kiểm thử 9: closePatientInfoModal vẫn reset pendingSubmitData
 check('closePatientInfoModal resets pendingSubmitData', 
     html.includes('pendingSubmitData = null;') &&
     html.match(/function closePatientInfoModal[\s\S]*?pendingSubmitData = null;/));
 
-// Test 10: Event listener for submit button exists
+// Kiểm thử 10: Event listener cho nút submit tồn tại
 check('Event listener for send-btn exists', 
     html.includes("sendBtn.addEventListener('click',"));
 
 check('Event listener calls submitData', 
     html.match(/sendBtn\.addEventListener\('click'[\s\S]*?submitData\(\)/));
 
-// Test 11: Event listener for patient submit button
+// Kiểm thử 11: Event listener cho nút submit bệnh nhân
 check('Event listener for submit-patient-info-btn exists', 
     html.includes("submitPatientBtn.addEventListener('click',"));
 
 check('Event listener calls submitProfessionalWithPatientInfo', 
     html.match(/submitPatientBtn\.addEventListener\('click'[\s\S]*?submitProfessionalWithPatientInfo\(\)/));
 
-// Test 12: No duplicate else blocks
+// Kiểm thử 12: Không có else blocks trùng lặp
 const elseBlocks = (html.match(/} else {[\s\S]*?flashNotice\('Lỗi: Không tìm thấy dữ liệu/g) || []).length;
 check('No duplicate error handling blocks', elseBlocks <= 1);
 

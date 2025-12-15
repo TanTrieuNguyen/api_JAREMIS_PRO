@@ -74,7 +74,7 @@ function detectImageType(filename) {
     return 'endoscopy';
   }
   
-  // Default fallback
+  // Mặc định Dự phòng
   return 'medical-image';
 }
 
@@ -438,7 +438,7 @@ ${patientContext ? `\n**THÔNG TIN BỆNH NHÂN:**\n${patientContext}\n` : ''}
  */
 async function analyzeImage(imageBase64, mimeType, imageType, genAI, patientContext = '') {
   try {
-    // Use stable Gemini model for production (not -latest suffix)
+    // Use stable Gemini Mô hình for production (not -laKiểm thử suffix)
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro-latest' });
     
     const prompt = getImageAnalysisPrompt(imageType, patientContext);
@@ -515,7 +515,7 @@ async function analyzeMedicalImages(files, genAI, patientContext = '') {
 }
 
 /**
- * Format kết quả phân tích ảnh thành markdown
+ * Định dạng kết quả phân tích ảnh thành markdown
  */
 function formatImageAnalysisReport(analyses) {
   if (!analyses || analyses.length === 0) {
@@ -542,7 +542,7 @@ function formatImageAnalysisReport(analyses) {
 }
 
 /**
- * Helper: Lấy icon cho từng loại ảnh
+ * Hàm hỗ trợ: Lấy icon cho từng loại ảnh
  */
 function getImageIcon(imageType) {
   const icons = {
@@ -566,7 +566,7 @@ function getImageIcon(imageType) {
 }
 
 /**
- * Helper: Lấy tên tiếng Việt cho loại ảnh
+ * Hàm hỗ trợ: Lấy tên tiếng Việt cho loại ảnh
  */
 function getImageTypeLabel(imageType) {
   const labels = {

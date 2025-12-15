@@ -4,7 +4,7 @@
  */
 
 // ========================================
-// DATABASE BỆNH NGUY HIỂM (HIGH SEVERITY)
+// Cơ sở dữ liệu BỆNH NGUY HIỂM (HIGH SEVERITY)
 // ========================================
 const CRITICAL_CONDITIONS = {
   // Bệnh tim mạch cấp tính
@@ -36,7 +36,7 @@ const CRITICAL_CONDITIONS = {
 };
 
 // ========================================
-// DATABASE BỆNH TRUNG BÌNH (MODERATE SEVERITY)
+// Cơ sở dữ liệu BỆNH TRUNG BÌNH (MODERATE SEVERITY)
 // ========================================
 const MODERATE_CONDITIONS = {
   'J44': { name: 'Bệnh phổi tắc nghẽn mạn tính (COPD)', mortality: 8, emergency: false, category: 'pulmonary' },
@@ -49,7 +49,7 @@ const MODERATE_CONDITIONS = {
 };
 
 // ========================================
-// DATABASE BỆNH NHẸ (LOW SEVERITY)
+// Cơ sở dữ liệu BỆNH NHẸ (LOW SEVERITY)
 // ========================================
 const MILD_CONDITIONS = {
   'J00': { name: 'Cảm lạnh thông thường', mortality: 0.01, emergency: false, category: 'respiratory' },
@@ -98,7 +98,7 @@ const YELLOW_FLAGS = [
 ];
 
 // ========================================
-// ASSESSMENT FUNCTIONS
+// CÁC HÀM ĐÁNH GIÁ
 // ========================================
 
 /**

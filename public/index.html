@@ -2078,19 +2078,19 @@
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
-        // Configure marked.js to allow HTML for citations
+        // Cấu hình marked.js để cho phép HTML cho citations
         if (typeof marked !== 'undefined') {
             marked.setOptions({
                 breaks: true,
                 gfm: true,
-                sanitize: false, // Allow HTML for citations
+                sanitize: false, // Cho phép HTML cho citations
                 smartLists: true,
                 smartypants: false
             });
         }
 
         // ------------------------------
-        // UI elements & state
+        // Các phần tử UI & trạng thái ứng dụng
         // ------------------------------
         const chatInput = document.getElementById('chat-input');
         const sendBtn = document.getElementById('send-btn');
@@ -2111,7 +2111,7 @@
         const authControls = document.getElementById('auth-controls');
 
         let useProModel = false;
-        let diagnosticMode = false; // Chat mode default
+        let diagnosticMode = false; // Mặc định chế độ Chat
         let recognition = null;
         let isRecording = false;
         let textBeforeRecording = '';
@@ -2119,11 +2119,11 @@
 
         let currentSessionId = null;
 
-        // Config: optional timeout cap for the 'flash' model. 0 disables auto-stop.
-        // Set e.g. window.FLASH_TIMEOUT_MS = 45000 to cap at 45s.
+        // Cấu hình: timeout tùy chọn cho model 'flash'. 0 tắt auto-stop.
+        // Đặt ví dụ window.FLASH_TIMEOUT_MS = 45000 để giới hạn 45s.
         window.FLASH_TIMEOUT_MS = window.FLASH_TIMEOUT_MS ?? 0;
 
-        // Helpers required by inline handlers and rendering
+        // Các hàm hỗ trợ cần thiết cho inline handlers và rendering
         function escapeHtml(str){
           if (str === null || str === undefined) return '';
           return String(str)
@@ -2140,7 +2140,7 @@
           el.style.height = Math.min(maxH, el.scrollHeight || 0) + 'px';
         }
 
-        // Mobile sidebar (hamburger) behavior: open/close existing sidebar overlay (no new elements)
+        // Sidebar mobile (hamburger): mở/đóng overlay sidebar hiệu có (không tạo element mới)
         (function(){
           const mobileBtn = document.getElementById('mobile-menu-btn');
           const drawerToggleBtn = document.getElementById('history-drawer-toggle');
@@ -2202,7 +2202,7 @@
         })();
 
         // ------------------------------
-        // SEND/STOP BUTTON CONTROL
+        // ĐIỀU KHIỂN NÚT GỬI/DỪNG
         // ------------------------------
         function showSendButton() {
             if (sendBtn) {
@@ -2226,7 +2226,7 @@
         function stopAIResponse() {
             console.log('🛑 User clicked Stop button');
             
-            // Abort current request
+            // Hủy yêu cầu hiện tại
             if (window._currentAbortController) {
                 try {
                     window._currentAbortController.abort();
@@ -2238,13 +2238,13 @@
                 window._currentAbortStartedAt = 0;
             }
             
-            // Show send button again
+            // Hiển thị lại nút gửi
             showSendButton();
             
-            // Flash notice
+            // Thông báo nhanh
             flashNotice('Đã dừng AI', 'success');
             
-            // Remove thinking animation from all bubbles
+            // Loại bỏ animation suy nghĩ khỏi tất cả bubble
             const thinkingBubbles = document.querySelectorAll('.chat-bubble .thinking-animation');
             thinkingBubbles.forEach(bubble => {
                 const parent = bubble.parentElement;
@@ -2255,7 +2255,7 @@
         }
 
         // ------------------------------
-        // Removed old toggleMode - now using 3-mode menu via openModeMenu()
+        // Đã xóa toggleMode cũ - bây giờ dùng menu 3 chế độ qua openModeMenu()
         
         function toggleThink(e) {
             e?.preventDefault();
@@ -2269,7 +2269,7 @@
             }
         }
 
-        // Toggle tool tray on mobile (nút dấu +)
+        // Chuyển đổi khay công cụ trên mobile (nút dấu +)
         function toggleToolTray(e) {
             e?.preventDefault();
             e?.stopPropagation();
@@ -2283,7 +2283,7 @@
                 return;
             }
             
-            // Toggle active state
+            // Chuyển đổi trạng thái active
             const isActive = toggleBtn.classList.contains('active');
             
             if (isActive) {
@@ -2313,13 +2313,13 @@
             }
         });
         // ------------------------------
-        // Authentication & user state (client session stored in localStorage)
+        // Xác thực & trạng thái người dùng (phiên client lưu trong localStorage)
         // ------------------------------
         document.addEventListener('DOMContentLoaded', () => {
             renderAuthControls();
             const u = getLocalUser();
             if (u) fetchAndRenderHistory(u.username);
-            // Restore anonymous session to keep context between page reloads
+            // Khôi phục phiên ẩn danh để giữ ngữ cảnh giữa các lần tải lại trang
             try {
                 const savedSess = localStorage.getItem('jaremis_session');
                 if (savedSess) currentSessionId = savedSess;
@@ -2475,12 +2475,12 @@
             }
         }
 
-        // New: Login with Google
+        // Mới: Đăng nhập bằng Google
         function loginWithGoogle() {
             window.location.href = '/auth/google';
         }
 
-        // New: Login with Facebook
+        // Mới: Đăng nhập bằng Facebook
         function loginWithFacebook() {
             window.location.href = '/auth/facebook';
         }
@@ -2495,7 +2495,7 @@
         }
 
         // ------------------------------
-        // History: fetch, render, open
+        // Lịch sử: lấy, hiển thị, mở
         // ------------------------------
         async function fetchAndRenderHistory(username) {
             if (!username) return;
@@ -2521,7 +2521,7 @@
             }
         }
 
-        // Group & render history thành LIST CUỘC TRÒ CHUYỆN với nút 3 chấm
+        // Nhóm & hiển thị lịch sử thành DANH SÁCH CUỘC TRÒ CHUYỆN với nút 3 chấm
         function renderHistoryList(list) {
           historyListEl.innerHTML = '';
           if (!list || list.length === 0) {
@@ -2529,7 +2529,7 @@
             historyActionsEl.innerHTML = '';
             return;
           }
-          // Gom theo sessionId
+          // Gom nhóm theo sessionId
           const sessions = {};
           list.forEach(entry => {
             const sid = entry.sessionId || ('legacy-' + entry.id);
@@ -2582,7 +2582,7 @@
           historyActionsEl.innerHTML = ''; // bỏ nút cũ
         }
 
-        // Toggle menu 3 chấm
+        // Chuyển đổi menu 3 chấm
         function toggleHistoryMenu(event, sessionId) {
           event.stopPropagation();
           const menu = document.getElementById(`menu-${sessionId}`);
@@ -2598,7 +2598,7 @@
           document.querySelectorAll('.history-dropdown').forEach(m => m.classList.remove('show'));
         });
 
-        // Rename conversation
+        // Đổi tên cuộc trò chuyện
         function renameConversation(sessionId) {
           const entries = historyCache.filter(e => (e.sessionId || ('legacy-'+e.id)) === sessionId);
           if (!entries.length) return;
@@ -2616,7 +2616,7 @@
           }
         }
 
-        // Delete conversation
+        // Xóa cuộc trò chuyện
         function deleteConversation(sessionId) {
           if (!confirm('Bạn có chắc muốn xóa cuộc trò chuyện này?')) return;
           
@@ -2666,7 +2666,7 @@
           
           convoEntries.forEach((entry, idx) => {
             try {
-              // Safe check: ensure entry exists
+              // Kiểm tra an toàn: đảm bảo entry tồn tại
               if (!entry || typeof entry !== 'object') {
                 console.warn(`⚠️ Invalid entry at index ${idx}:`, entry);
                 return;
@@ -2679,7 +2679,7 @@
                 type: entry.type
               });
               
-              // User bubble
+              // Bubble người dùng
               if (entry.input && entry.input.trim()) {
                 const userBubble = document.createElement('div');
                 userBubble.className = 'chat-bubble user-bubble';
@@ -2689,7 +2689,7 @@
                 successCount++;
               }
               
-              // Bot reply
+              // Phản hồi từ bot
               let botContent = '';
               if (entry.type === 'diagnose' && entry.diagnosis) {
                 botContent = entry.diagnosis;
@@ -2702,18 +2702,18 @@
                   const botBubble = document.createElement('div');
                   botBubble.className = 'chat-bubble bot-bubble';
                   
-                  // 🔥 FIX: Safely convert markdown with fallback
+                  // 🔥 SỬA: Chuyển đổi markdown an toàn với dự phòng
                   let renderedContent = botContent;
                   try {
                     if (typeof marked !== 'undefined' && marked.parse) {
                       renderedContent = marked.parse(botContent);
                     } else {
-                      // Fallback: Use plain text with line breaks
+                      // Dự phòng: Dùng văn bản thuần với ngắt dòng
                       renderedContent = botContent.replace(/\n/g, '<br>');
                     }
                   } catch (mdError) {
                     console.error(`  ❌ Markdown conversion error for entry ${idx + 1}:`, mdError);
-                    // Fallback: Use plain text with line breaks
+                    // Dự phòng: Dùng văn bản thuần với ngắt dòng
                     renderedContent = botContent.replace(/\n/g, '<br>');
                   }
                   
@@ -2763,11 +2763,11 @@
         }
 
         // ------------------------------
-        // Mic / SpeechRecognition - MULTI-LANGUAGE SUPPORT
+        // Mic / SpeechRecognition - HỖ TRỢ NHIỀU NGÔN NGỮ
         // ------------------------------
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition || null;
 
-        // Supported languages with auto-detection
+        // Các ngôn ngữ được hỗ trợ với tự động phát hiện
         const SUPPORTED_LANGUAGES = {
             'vi-VN': { name: 'Tiếng Việt', flag: '🇻🇳', priority: 1 },
             'en-US': { name: 'English (US)', flag: '🇺🇸', priority: 2 },
@@ -2787,14 +2787,14 @@
             'id-ID': { name: 'Bahasa Indonesia', flag: '🇮🇩', priority: 16 }
         };
 
-        // Current recognition language (default Vietnamese)
+        // Ngôn ngữ nhận dạng hiện tại (mặc định tiếng Việt)
         let currentRecognitionLang = localStorage.getItem('jaremis_speech_lang') || 'vi-VN';
 
         if (SpeechRecognition) {
             recognition = new SpeechRecognition();
             recognition.lang = currentRecognitionLang;
             recognition.interimResults = true;
-            recognition.maxAlternatives = 3; // Get multiple alternatives for better accuracy
+            recognition.maxAlternatives = 3; // Lấy nhiều lựa chọn để độ chính xác cao hơn
             recognition.continuous = false;
 
             recognition.onstart = () => {
@@ -2805,7 +2805,7 @@
                 textBeforeRecording = chatInput.value || '';
                 chatInput.focus();
                 
-                // Show language indicator
+                // Hiển thị chỉ báo ngôn ngữ
                 const indicator = document.getElementById('mic-indicator');
                 if (indicator) {
                     indicator.textContent = langInfo?.flag || '🎤';
@@ -2844,12 +2844,12 @@
                 let finalTranscript = '';
                 
                 for (let i = 0; i < event.results.length; i++) {
-                    // Get best alternative (highest confidence)
+                    // Lấy lựa chọn tốt nhất (độ tin cậy cao nhất)
                     const result = event.results[i];
                     let bestTranscript = result[0].transcript;
                     let bestConfidence = result[0].confidence;
                     
-                    // Check other alternatives for better confidence
+                    // Kiểm tra các lựa chọn khác để tìm độ tin cậy tốt hơn
                     for (let j = 1; j < result.length; j++) {
                         if (result[j].confidence > bestConfidence) {
                             bestTranscript = result[j].transcript;
@@ -2874,7 +2874,7 @@
             micBtn.style.pointerEvents = 'none';
         }
 
-        // Change recognition language
+        // Thay đổi ngôn ngữ nhận dạng
         function changeSpeechLanguage(langCode) {
             if (!SUPPORTED_LANGUAGES[langCode]) {
                 console.warn('Unsupported language:', langCode);
@@ -2894,16 +2894,16 @@
             flashNotice(`🎤 Đã chuyển sang ${langInfo.flag} ${langInfo.name}`, 'success');
         }
 
-        // Show language selection menu
+        // Hiển thị menu lựa chọn ngôn ngữ
         function showLanguageMenu(e) {
             e?.preventDefault();
             e?.stopPropagation();
             
-            // Remove existing menu if any
+            // Xóa menu hiện có nếu đang mở
             const existingMenu = document.getElementById('lang-menu');
             if (existingMenu) existingMenu.remove();
             
-            // Create menu
+            // Tạo menu mới
             const menu = document.createElement('div');
             menu.id = 'lang-menu';
             menu.style.cssText = `
@@ -2919,7 +2919,7 @@
                 min-width: 220px;
             `;
             
-            // Add header
+            // Thêm tiêu đề
             const header = document.createElement('div');
             header.style.cssText = `
                 padding: 8px 12px;
@@ -2932,7 +2932,7 @@
             header.textContent = '🎤 Chọn ngôn ngữ nhận diện';
             menu.appendChild(header);
             
-            // Add language options (sorted by priority)
+            // Thêm các tùy chọn ngôn ngữ (sắp xếp theo ưu tiên)
             const sortedLangs = Object.entries(SUPPORTED_LANGUAGES)
                 .sort((a, b) => a[1].priority - b[1].priority);
             
@@ -2976,22 +2976,22 @@
                 menu.appendChild(item);
             });
             
-            // Position menu near mic button
+            // Định vị menu gần nút mic
             const micRect = micBtn.getBoundingClientRect();
             menu.style.left = `${micRect.left}px`;
-            menu.style.top = `${micRect.top - 410}px`; // Above the button
+            menu.style.top = `${micRect.top - 410}px`; // Phía trên nút
             
-            // Adjust if menu goes off screen
+            // Điều chỉnh nếu menu ra ngoài màn hình
             document.body.appendChild(menu);
             const menuRect = menu.getBoundingClientRect();
             if (menuRect.top < 10) {
-                menu.style.top = `${micRect.bottom + 10}px`; // Below the button
+                menu.style.top = `${micRect.bottom + 10}px`; // Phía dưới nút
             }
             if (menuRect.right > window.innerWidth - 10) {
                 menu.style.left = `${window.innerWidth - menuRect.width - 10}px`;
             }
             
-            // Close menu when clicking outside
+            // Đóng menu khi click bên ngoài
             setTimeout(() => {
                 document.addEventListener('click', function closeMenu(e) {
                     if (!menu.contains(e.target)) {
@@ -3007,7 +3007,7 @@
             
             if (!SpeechRecognition) return;
             
-            // Right-click or long-press to show language menu
+            // Click chuột phải hoặc giữ lâu để hiện menu ngôn ngữ
             if (e && (e.button === 2 || e.type === 'contextmenu')) {
                 e.preventDefault();
                 showLanguageMenu(e);
@@ -3018,14 +3018,14 @@
             else stopRecognition();
         }
         
-        // Add right-click context menu for language selection
+        // Thêm menu chuột phải để chọn ngôn ngữ
         if (micBtn) {
             micBtn.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
                 showLanguageMenu(e);
             });
             
-            // Update tooltip with current language
+            // Cập nhật tooltip với ngôn ngữ hiện tại
             const langInfo = SUPPORTED_LANGUAGES[currentRecognitionLang];
             micBtn.title = `${langInfo.flag} Ghi giọng nói (${langInfo.name}). Nhấn để bắt đầu/dừng. Chuột phải để chọn ngôn ngữ.`;
         }
@@ -3034,7 +3034,7 @@
             if (!recognition) return;
            
             try {
-                // Update language before starting
+                // Cập nhật ngôn ngữ trước khi bắt đầu
                 recognition.lang = currentRecognitionLang;
                 textBeforeRecording = chatInput.value || '';
                 recognition.start();
@@ -3053,11 +3053,11 @@
             isRecording = false;
             micBtn.classList.remove('recording');
             
-            // Update tooltip with current language
+            // Cập nhật tooltip với ngôn ngữ hiện tại
             const langInfo = SUPPORTED_LANGUAGES[currentRecognitionLang];
             micBtn.title = `${langInfo.flag} Ghi giọng nói (${langInfo.name}). Nhấn để bắt đầu/dừng. Chuột phải để chọn ngôn ngữ.`;
             
-            // Hide language indicator
+            // Ẩn chỉ báo ngôn ngữ
             const indicator = document.getElementById('mic-indicator');
             if (indicator) {
                 indicator.style.display = 'none';
@@ -3099,22 +3099,22 @@
         }
 
         // ========================================
-        // PASTE IMAGE SUPPORT (Ctrl+V / Ctrl+C)
+        // HỖ TRỢ DÁN ẢNH (Ctrl+V / Ctrl+C)
         // ========================================
-        let pastedImages = []; // Store pasted images separately
+        let pastedImages = []; // Lưu các ảnh đã dán riêng biệt
 
-        // Listen for paste events globally
+        // Lắng nghe sự kiện paste toàn cục
         document.addEventListener('paste', function(event) {
             const items = (event.clipboardData || event.originalEvent.clipboardData).items;
             
             for (let i = 0; i < items.length; i++) {
                 if (items[i].type.indexOf('image') !== -1) {
-                    event.preventDefault(); // Prevent default paste behavior
+                    event.preventDefault(); // Ngăn hành vi paste mặc định
                     
                     const file = items[i].getAsFile();
                     if (!file) continue;
                     
-                    // Add to pasted images array
+                    // Thêm vào mảng ảnh đã dán
                     pastedImages.push(file);
                     
                     // Show preview
@@ -3131,7 +3131,7 @@
                     };
                     reader.readAsDataURL(file);
                     
-                    // Show notification
+                    // Hiển thị thông báo
                     if (typeof flashNotice === 'function') {
                         flashNotice('✅ Đã dán ảnh từ clipboard! Nhấn Gửi để phân tích.', 'success');
                     }
@@ -3142,7 +3142,7 @@
         });
 
         function removePastedImage(index) {
-            // Remove from pastedImages array
+            // Xóa khỏi mảng pastedImages
             pastedImages.splice(index, 1);
             
             // Re-render all previews
@@ -3184,7 +3184,7 @@
             });
         }
 
-        // Helper to get all images (file input + pasted)
+        // Helper lấy tất cả ảnh (file input + đã dán)
         function getAllImages() {
             const allFiles = [];
             
@@ -3199,11 +3199,11 @@
             return allFiles;
         }
 
-        // Update handleImageUpload to also render pasted images
+        // Cập nhật handleImageUpload để cũng render ảnh đã dán
         const originalHandleImageUpload = handleImageUpload;
         handleImageUpload = function(event) {
             originalHandleImageUpload(event);
-            // Also render pasted images if any
+            // Cũng render ảnh đã dán nếu có
             if (pastedImages.length > 0) {
                 renderImagePreviews();
             }
@@ -3212,7 +3212,7 @@
         // ========================================
         // ENHANCED IMAGE PREVIEW STYLES
         // ========================================
-        // Add CSS for paste badge dynamically
+        // Thêm CSS cho paste badge động
         const pasteStyles = document.createElement('style');
         pasteStyles.textContent = `
             .paste-badge {
@@ -3250,7 +3250,7 @@
         document.head.appendChild(pasteStyles);
 
         // ========================================
-        // FLASH NOTIFICATION HELPER
+        // HELPER THÔNG BÁO NHANH
         // ========================================
         function flashNotice(message, type = 'info') {
             const notice = document.createElement('div');
@@ -3308,10 +3308,10 @@
         document.head.appendChild(noticeAnimations);
 
         // ========================================
-        // SUBMIT DATA - Enhanced with Pasted Images
+        // GỬI DỮ LIỆU - Nâng cao với Ảnh Đã Dán
         // ========================================
         
-        // Store pending submit data when opening patient info modal
+        // Lưu dữ liệu submit đang chờ khi mở modal thông tin bệnh nhân
         let pendingSubmitData = null;
         
         async function submitData() {
@@ -3331,7 +3331,7 @@
             // If Professional mode, show patient info modal first
             if (currentMode === 'professional') {
                 console.log('🏥 Professional mode detected - opening patient info modal'); // DEBUG
-                // Ensure pendingSubmitData is properly structured
+                // Đảm bảo pendingSubmitData có cấu trúc đúng
                 pendingSubmitData = { 
                     message: message,
                     allImages: allImages || []
@@ -3341,7 +3341,7 @@
                 return;
             }
             
-            // Otherwise, proceed with normal submit
+            // Nếu không, tiến hành submit bình thường
             await performSubmit(message, allImages, null);
         }
         
@@ -3396,16 +3396,16 @@
             
             console.log('👤 Patient info:', patientInfo); // DEBUG
             
-            // IMPORTANT: Save pendingSubmitData to temp variable BEFORE closing modal
+            // QUAN TRỌNG: Lưu pendingSubmitData vào biến tạm TRƯỚC KHI đóng modal
             const savedData = pendingSubmitData;
             
             // Close modal first
             closePatientInfoModal();
             
-            // Reset pendingSubmitData after saving to temp variable
+            // Reset pendingSubmitData sau khi lưu vào biến tạm
             pendingSubmitData = null;
             
-            // Safe check for savedData
+            // Kiểm tra an toàn cho savedData
             if (savedData && typeof savedData === 'object') {
                 console.log('✅ Valid savedData, calling performSubmit'); // DEBUG
                 await performSubmit(savedData.message || '', savedData.allImages || [], patientInfo);
@@ -3416,7 +3416,7 @@
         }
         
         async function performSubmit(message, allImages, patientInfo) {
-            // Prevent double-submit
+            // Ngăn chặn submit hai lần
             if (window._currentAbortController) {
                 try {
                     const sig = window._currentAbortController.signal;
@@ -3442,7 +3442,7 @@
                 }
             }
 
-            // Choose endpoint based on currentMode
+            // Chọn endpoint dựa trên currentMode
             let endpoint = '/api/chat';
             if (currentMode === 'diagnose' || diagnosticMode) {
                 endpoint = '/api/diagnose';
@@ -3450,7 +3450,7 @@
                 endpoint = '/api/professional';
             }
             
-            // Prepare FormData
+            // Chuẩn bị FormData
             const formData = new FormData();
             formData.append('message', message);
             formData.append('labResults', message);
@@ -3464,20 +3464,20 @@
                 formData.append('doctorUsername', user.username);
             }
             
-            // Professional mode - add patient info
+            // Chế độ chuyên môn - thêm thông tin bệnh nhân
             if (currentMode === 'professional' && patientInfo) {
                 formData.append('patientInfo', JSON.stringify(patientInfo));
                 formData.append('patientId', 'P' + Date.now());
                 formData.append('symptomsStartDate', patientInfo.symptomsStartDate || '');
             }
 
-            // Append all images
+            // Đính kèm tất cả ảnh
             allImages.forEach((file, index) => {
                 const filename = file.name || `pasted-image-${index + 1}.png`;
                 formData.append('images', file, filename);
             });
 
-            // Add user message bubble
+            // Thêm bong bóng tin nhắn người dùng
             const userBubble = document.createElement('div');
             userBubble.className = 'chat-bubble user-bubble';
             userBubble.innerHTML = `
@@ -3487,20 +3487,20 @@
             chatMessages.appendChild(userBubble);
             chatMessages.scrollTop = chatMessages.scrollHeight;
 
-            // Clear input and images
+            // Xóa input và ảnh
             chatInput.value = '';
             imageInput.value = '';
             pastedImages = [];
             imagePreviewContainer.innerHTML = '';
             autoResize(chatInput);
 
-            // Add bot bubble with loading animation
+            // Thêm bong bóng bot với hiệu ứng đang tải
             const botBubble = document.createElement('div');
             botBubble.className = 'chat-bubble bot-bubble';
             chatMessages.appendChild(botBubble);
             chatMessages.scrollTop = chatMessages.scrollHeight;
 
-            // Show thinking animation
+            // Hiển thị hiệu ứng đang suy nghĩ
             if (currentMode === 'diagnose' || diagnosticMode) {
                 await animateAnalysisSteps(botBubble);
             } else if (currentMode === 'professional') {
@@ -3509,13 +3509,13 @@
                 showThinking(botBubble);
             }
 
-            // Send request
+            // Gửi yêu cầu
             try {
                 const controller = new AbortController();
                 window._currentAbortController = controller;
                 window._currentAbortStartedAt = Date.now();
                 
-                // Show stop button instead of send button
+                // Hiện nút dừng thay vì nút gửi
                 showStopButton();
 
                 const response = await fetch(endpoint, {
@@ -3537,30 +3537,30 @@
 
                 const result = await response.json();
                 
-                // Debug: log response with safe access
+                // Gỡ lỗi: log phản hồi với truy cập an toàn
                 console.log('📦 Response received:', result);
                 console.log('📦 Response keys:', result ? Object.keys(result) : 'null');
                 console.log('📦 Has reply?', result?.reply);
                 console.log('📦 Has replyHtml?', result?.replyHtml);
                 
-                // Validate response structure
+                // Xác thực cấu trúc phản hồi
                 if (!result || typeof result !== 'object') {
                     console.error('❌ Invalid response type:', typeof result);
                     throw new Error('Response không hợp lệ từ server');
                 }
                 
-                // Additional safety check for required fields based on mode
+                // Kiểm tra an toàn bổ sung cho các trường bắt buộc theo mode
                 const hasContent = result.reply || result.replyHtml || result.diagnosis || result.consultation || result.consultationHtml;
                 if (!hasContent) {
                     console.warn('⚠️ Response missing content:', result);
                     throw new Error('Server không trả về nội dung phản hồi');
                 }
                 
-                // Clear abort controller
+                // Xóa abort controller
                 window._currentAbortController = null;
                 window._currentAbortStartedAt = 0;
                 
-                // Show send button again
+                // Hiện lại nút gửi
                 showSendButton();
 
                 // ========================================
@@ -3584,18 +3584,18 @@
                     }, 100);
                 }
 
-                // Render response
+                // Hiển thị phản hồi
                 if (currentMode === 'diagnose' || diagnosticMode) {
                     renderDiagnosisResponse(result, botBubble);
                 } else if (currentMode === 'professional') {
                     renderProfessionalResponse(result, botBubble);
                 } else {
-                    // Render chat response with animated typing
+                    // Render phản hồi chat với hiệu ứng gõ chữ
                     const replyHtml = result.replyHtml || result.reply || 'Không có phản hồi';
                     await renderBotReplyAnimated(botBubble, replyHtml);
                 }
 
-                // Show citations if available
+                // Hiện citations nếu có
                 if (result.citations && result.citations.length > 0) {
                     const citationBubble = document.createElement('div');
                     citationBubble.className = 'chat-bubble bot-bubble';
@@ -3610,7 +3610,7 @@
                 
                 stopThinking(botBubble);
                 
-                // Safe error message handling
+                // Xử lý thông báo lỗi an toàn
                 const errorMessage = error?.message || error?.error || String(error) || 'Lỗi không xác định';
                 botBubble.innerHTML = `
                     <div style="color:var(--error-color);">
@@ -3621,7 +3621,7 @@
                 window._currentAbortController = null;
                 window._currentAbortStartedAt = 0;
                 
-                // Show send button again on error
+                // Hiện lại nút gửi on error
                 showSendButton();
             }
         }
@@ -3754,20 +3754,20 @@
                 }
             }
             
-            // Main diagnosis - PRIORITIZE markdown over HTML
-            // diagnosisHtml doesn't parse markdown tables, so use diagnosis (raw markdown) instead
+            // Chẩn đoán chính - ƯU TIÊN markdown hơn HTML
+            // diagnosisHtml không parse bảng markdown, nên dùng diagnosis (markdown thô)
             if (result.diagnosis) {
                 console.log('✅ Using diagnosis (converting markdown with GFM tables)');
                 console.log('📝 Raw diagnosis (first 500 chars):', result.diagnosis.substring(0, 500));
                 console.log('🔧 marked.js available?', typeof marked !== 'undefined');
                 
-                // Convert markdown to HTML
+                // Chuyển markdown sang HTML
                 if (typeof marked !== 'undefined') {
                     try {
-                        // IMPORTANT: Parse full markdown including tables
+                        // QUAN TRỌNG: Parse toàn bộ markdown bao gồm bảng
                         const parsedHtml = marked.parse(result.diagnosis, {
                             breaks: true,
-                            gfm: true, // GitHub Flavored Markdown (supports tables)
+                            gfm: true, // GitHub Flavored Markdown (hỗ trợ bảng)
                             tables: true,
                             headerIds: false,
                             mangle: false
@@ -3879,7 +3879,7 @@
 
             // XAI Explanation
             if (result.xaiExplanation) {
-                // xaiExplanation might be string or object
+                // xaiExplanation có thể là string hoặc object
                 let xaiText = '';
                 if (typeof result.xaiExplanation === 'string') {
                     xaiText = result.xaiExplanation;
@@ -3949,7 +3949,7 @@
             
             console.log('🩺 Rendering professional response:', result);
             
-            // ALWAYS use consultation (raw markdown) instead of consultationHtml for proper rendering
+            // LUÔN dùng consultation (markdown thô) thay vì consultationHtml để render đúng
             const consultationText = result.consultation || result.analysis || result.reply || '';
             
             if (!consultationText) {
@@ -4032,7 +4032,7 @@
                 }
             });
 
-            // Send button click (backup for onclick)
+            // Click nút gửi (dự phòng cho onclick)
             const sendBtn = document.getElementById('send-btn');
             if (sendBtn) {
                 sendBtn.addEventListener('click', (e) => {
@@ -4042,7 +4042,7 @@
                 });
             }
 
-            // Patient info modal submit button
+            // Nút gửi của modal thông tin bệnh nhân
             const submitPatientBtn = document.getElementById('submit-patient-info-btn');
             if (submitPatientBtn) {
                 submitPatientBtn.addEventListener('click', (e) => {
@@ -4051,14 +4051,14 @@
                 });
             }
 
-            // Generate session ID on load
+            // Tạo ID phiên khi tải trang
             if (!currentSessionId) {
                 generateSessionId();
             }
         });
 
         // ========================================
-        // ANIMATE ANALYSIS STEPS (UX)
+        // ANIMATE CÁC BƯỚC PHÂN TÍCH (UX)
         // ========================================
         async function animateAnalysisSteps(bubbleElement) {
             stopThinking(bubbleElement);
@@ -4108,7 +4108,7 @@
                 { text: 'Đang phân tích hồ sơ bệnh nhân...', delay: 1000 }
             ];
             
-            // Only add image processing step if there are images
+            // Chỉ thêm bước xử lý ảnh nếu có ảnh
             if (hasImages) {
                 steps.push({ text: 'Đang xử lý ảnh y tế (X-ray/MRI/CT)...', delay: 1500 });
             }
@@ -4144,15 +4144,15 @@
             bubbleElement.scrollTop = bubbleElement.scrollHeight;
         }
 
-        // Auto-wrap math expressions in LaTeX delimiters
-        // Detects common math patterns like x^2, √5, fractions, equations
+        // Tự động bọc biểu thức toán học trong dấu phân cách LaTeX
+        // Phát hiện các mẫu toán học phổ biến như x^2, √5, phân số, phương trình
         function autoWrapMathExpressions(text) {
             if (!text || typeof text !== 'string') return text;
             
-            // Skip if already has LaTeX delimiters
+            // Bỏ qua nếu đã có dấu phân cách LaTeX
             if (text.includes('$') || text.includes('\\(') || text.includes('\\[')) return text;
             
-            // Protect code blocks and inline code from modification
+            // Bảo vệ code blocks và inline code khỏi bị sửa đổi
             const codeBlocks = [];
             const inlineCode = [];
             
@@ -4168,9 +4168,9 @@
                 return `__INLINE_CODE_${inlineCode.length - 1}__`;
             });
             
-            // === PHASE 1: Complex patterns first ===
+            // === GIAI ĐOẠN 1: Các mẫu phức tạp trước ===
             
-            // 1. Equations with sqrt: x = √5, x = -√5
+            // 1. Phương trình với căn bậc hai: x = √5, x = -√5
             text = text.replace(/\b([a-zA-Z])\s*=\s*-?\s*√(\d+)/g, '$$$1 = -\\sqrt{$2}$$');
             text = text.replace(/\b([a-zA-Z])\s*=\s*√(\d+)/g, '$$$1 = \\sqrt{$2}$$');
             
@@ -4184,32 +4184,32 @@
             text = text.replace(/√(\d+)/g, '$\\sqrt{$1}$');
             text = text.replace(/√([a-zA-Z])/g, '$\\sqrt{$1}$');
             
-            // === PHASE 2: Exponents ===
+            // === GIAI ĐOẠN 2: Số mũ ===
             
-            // 5. Expression with exponent in parentheses: (x+1)^2
+            // 5. Biểu thức với số mũ trong ngoặc: (x+1)^2
             text = text.replace(/\(([^)]+)\)\^(\d+)/g, '$($1)^{$2}$');
             
-            // 6. Variable/number with exponent: x^2, 2^10
+            // 6. Biến/số với số mũ: x^2, 2^10
             text = text.replace(/\b([a-zA-Z0-9]+)\^(\d+)\b/g, '$$$1^{$2}$$');
             text = text.replace(/\b([a-zA-Z])\^([a-zA-Z0-9]+)\b/g, '$$$1^{$2}$$');
             
-            // === PHASE 3: Equations ===
+            // === GIAI ĐOẠN 3: Phương trình ===
             
-            // 7. Simple equations: x = 5, x + y = 10
-            // (skip if already wrapped in previous phases)
+            // 7. Phương trình đơn giản: x = 5, x + y = 10
+            // (bỏ qua nếu đã được bọc trong các giai đoạn trước)
             text = text.replace(/(?<!\$)\b([a-zA-Z][²³⁴⁵⁶⁷⁸⁹⁰]*)\s*=\s*([0-9\.\-+]+)\b(?!\$)/g, '$$$1 = $2$$');
             
-            // 8. Equations with operators: x + y = 10
+            // 8. Phương trình với toán tử: x + y = 10
             text = text.replace(/\b([a-zA-Z])\s*([+\-])\s*([a-zA-Z0-9])\s*=\s*([0-9\.\-+]+)/g, '$$$1 $2 $3 = $4$$');
             
-            // === PHASE 4: Fractions ===
+            // === GIAI ĐOẠN 4: Phân số ===
             
-            // 9. Fractions a/b → $\frac{a}{b}$ (only in math context, not URLs)
+            // 9. Phân số a/b → $\frac{a}{b}$ (chỉ trong ngữ cảnh toán học, không phải URL)
             text = text.replace(/(?<![\w:\/])\b(\d+)\/(\d+)\b(?![\w\/])/g, '$\\frac{$1}{$2}$');
             
-            // === PHASE 5: Special symbols ===
+            // === GIAI ĐOẠN 5: Ký hiệu đặc biệt ===
             
-            // 10. Special symbols (wrap individually)
+            // 10. Ký hiệu đặc biệt (bọc riêng lẻ)
             text = text.replace(/±/g, '$\\pm$');
             text = text.replace(/×/g, '$\\times$');
             text = text.replace(/÷/g, '$\\div$');
@@ -4219,18 +4219,18 @@
             text = text.replace(/∞/g, '$\\infty$');
             text = text.replace(/≈/g, '$\\approx$');
             
-            // === PHASE 6: Unicode superscripts ===
+            // === GIAI ĐOẠN 6: Ký tự mũ Unicode ===
             
-            // 11. Superscript numbers to proper exponents: x² → $x^2$
+            // 11. Số ở dạng mũ sang số mũ đúng: x² → $x^2$
             text = text.replace(/([a-zA-Z])([²³⁴⁵⁶⁷⁸⁹⁰]+)/g, (match, letter, superscripts) => {
                 const normalMap = {'²':'2','³':'3','⁴':'4','⁵':'5','⁶':'6','⁷':'7','⁸':'8','⁹':'9','⁰':'0'};
                 const exp = superscripts.split('').map(c => normalMap[c] || c).join('');
                 return `$${letter}^{${exp}}$`;
             });
             
-            // === PHASE 7: Clean up ===
+            // === GIAI ĐOẠN 7: Dọn dẹp ===
             
-            // 12. Merge consecutive $ delimiters ($$$ → $$, but keep display $$ separate from inline $)
+            // 12. Gộp các dấu phân cách $ liên tiếp ($$$ → $$, nhưng giữ $$ hiển thị riêng với $ nội tuyến)
             text = text.replace(/\$\$/g, '__DISPLAY__');
             text = text.replace(/\$+/g, '$');
             text = text.replace(/__DISPLAY__/g, '$$');
@@ -4239,7 +4239,7 @@
             text = text.replace(/\$([^$]+)\$\s*\$([^$]+)\$/g, '$$$1 $2$$');
             text = text.replace(/\$([^$]+)\$\s*\$([^$]+)\$/g, '$$$1 $2$$'); // Run twice for chains
             
-            // Restore code blocks and inline code
+            // Khôi phục code blocks và inline code
             text = text.replace(/__CODE_BLOCK_(\d+)__/g, (_, i) => codeBlocks[i]);
             text = text.replace(/__INLINE_CODE_(\d+)__/g, (_, i) => inlineCode[i]);
             
@@ -4252,11 +4252,11 @@
             // Auto-wrap math expressions in LaTeX delimiters
             htmlContent = autoWrapMathExpressions(htmlContent);
             
-            // Parse markdown to HTML - ALWAYS parse if marked is available
+            // Parse markdown sang HTML - LUÔN parse nếu marked khả dụng
             let finalHtml = htmlContent;
             if (typeof marked !== 'undefined' && marked.parse) {
                 try {
-                    // Enable GFM (GitHub Flavored Markdown) for tables
+                    // Bật GFM (GitHub Flavored Markdown) cho bảng
                     finalHtml = marked.parse(htmlContent, {
                         breaks: true,
                         gfm: true, // Support tables, strikethrough, etc.
@@ -4274,17 +4274,17 @@
                 }
             }
             
-            // Create wrapper
+            // Tạo phần bọc
             const wrapper = document.createElement('div');
             wrapper.className = 'bot-reply-content';
             wrapper.style.opacity = '0';
             bubbleElement.innerHTML = '';
             bubbleElement.appendChild(wrapper);
             
-            // Gemini-style: Show content immediately with fade-in (no char-by-char)
+            // Kiểu Gemini: Hiện nội dung ngay với fade-in (không gõ từng ký tự)
             wrapper.innerHTML = finalHtml;
             
-            // Render LaTeX math BEFORE fade-in to avoid flicker
+            // Render toán LaTeX TRƯỚC khi fade-in để tránh nhấp nháy
             if (typeof renderMathInElement === 'function') {
                 try {
                     renderMathInElement(wrapper, {
@@ -4301,13 +4301,13 @@
                 }
             }
             
-            // Fade in animation AFTER LaTeX is rendered
+            // Animation fade in SAU KHI LaTeX được render
             requestAnimationFrame(() => {
                 wrapper.style.transition = 'opacity 0.4s ease-out';
                 wrapper.style.opacity = '1';
             });
             
-            // Smooth scroll to bottom
+            // Cuộn mượt xuống cuối
             setTimeout(() => {
                 chatMessages.scrollTo({
                     top: chatMessages.scrollHeight,
@@ -4662,23 +4662,23 @@ document.addEventListener('DOMContentLoaded', ()=>{
 (function(){
   if (window._jaremis_shortcuts_installed) return; window._jaremis_shortcuts_installed = true;
 
-  // Safe helper to click an element by id
+  // Hàm hỗ trợ an toàn để click phần tử theo id
   function tryClick(id){ try{ const el = document.getElementById(id); if(el){ el.click(); return true; } }catch(e){} return false; }
 
-  // Provide lightweight global stubs (will defer to real implementations when available)
+  // Cung cấp global stubs nhẹ (sẽ defer sang triển khai thật khi có)
   window.jaremis = window.jaremis || {};
   window.jaremis.ensureRenderMath = function(el){ if (window.renderMathIn) return window.renderMathIn(el); /* no-op until katex loader runs */ };
-  // Keep existing wrapResultMath/addResultBoxStyles if present; otherwise noop
-  if (!window.wrapResultMath) window.wrapResultMath = function(b){ /* will be replaced by real implementation if defined later */ };
+  // Giữ các hàm wrapResultMath/addResultBoxStyles hiện có nếu có; nếu không thì noop
+  if (!window.wrapResultMath) window.wrapResultMath = function(b){ /* sẽ được thay thế bởi triển khai thực tế nếu được định nghĩa sau */ };
   if (!window.addResultBoxStyles) window.addResultBoxStyles = function(){ };
 
-  // Keyboard shortcuts mapping (use Ctrl+letter / Ctrl+Shift+letter). Avoid overriding basic input behavior.
+  // Ánh xạ phím tắt (dùng Ctrl+chữ / Ctrl+Shift+chữ). Tránh ghi đè hành vi nhập cơ bản.
   document.addEventListener('keydown', function(e){
     const tgt = e.target || {};
     const tag = (tgt.tagName || '').toUpperCase();
     const isEditable = tag === 'INPUT' || tag === 'TEXTAREA' || tgt.isContentEditable;
 
-    // ESC -> stop AI (works globally)
+    // ESC -> dừng AI (hoạt động toàn cục)
     if (e.key === 'Escape') {
       if (window._currentAbortController) {
         e.preventDefault();
@@ -4687,12 +4687,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
       }
     }
 
-    // Ctrl+Enter -> send (works even when typing)
+    // Ctrl+Enter -> gửi (hoạt động cả khi đang gõ)
     if (e.ctrlKey && !e.shiftKey && e.key === 'Enter') {
       e.preventDefault(); tryClick('send-btn'); return;
     }
 
-    // If typing in a text field, do not hijack other shortcuts (except send)
+    // Nếu đang gõ trong trường văn bản, không chiếm phím tắt khác (trừ send)
     if (isEditable) return;
 
     // Map single Ctrl+letter and Ctrl+Shift+letter combinations
@@ -4714,7 +4714,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
     }
   }, true);
 
-  // Ensure chatInput Ctrl+Enter works even if focus is inside textarea
+  // Đảm bảo chatInput Ctrl+Enter hoạt động cả khi focus trong textarea
   try { const ci = document.getElementById('chat-input'); const sb = document.getElementById('send-btn');
     if (ci && sb) {
       ci.addEventListener('keydown', function(ev){ if (ev.ctrlKey && ev.key === 'Enter') { ev.preventDefault(); sb.click(); } });
@@ -4725,11 +4725,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
 </script>
 <!-- KaTeX helper & auto-render (Doctor-style) -->
 <script>
-// Define helper like Doctor's implementation and an unobtrusive observer
+// Định nghĩa helper giống Doctor implementation và observer không gây phiền
 if (!window._jaremis_katex_setup) {
   window._jaremis_katex_setup = true;
 
-  // renderMathIn wrapper (safe: no throw, ignores code/pre)
+  // renderMathIn wrapper (an toàn: không ném lỗi, bỏ qua code/pre)
   function renderMathIn(el){
     if (!el || !window.renderMathInElement) return;
     try{
@@ -4745,14 +4745,14 @@ if (!window._jaremis_katex_setup) {
         ignoredClasses: ['no-math','katex']
       });
     }catch(err){
-      // don't interfere with app; just warn
+      // không can thiệp vào ứng dụng; chỉ cảnh báo
       console.warn('renderMathIn error', err);
     }
   }
 
   window.renderMathIn = renderMathIn;
 
-  // Normalize LaTeX delimiters inside text nodes of an element.
+  // Chuẩn hóa dấu phân cách LaTeX bên trong các node văn bản của một phần tử.
   function normalizeLatexInElement(el){
     if(!el) return;
     try{
@@ -4762,7 +4762,7 @@ if (!window._jaremis_katex_setup) {
       nodes.forEach(n => {
         let s = n.nodeValue;
         if(!s || (!s.includes('$') && !s.includes('\\(') && !s.includes('\\['))) return;
-        // Collapse repeated dollar signs (e.g. $$$ -> $$)
+        // Thu gọn các dấu dollar lặp lại (ví dụ $$$ -> $$)
         s = s.replace(/\${3,}/g, '$$');
         // Convert display $$...$$ to \[ ... \]
         s = s.replace(/\$\$(.*?)\$\$/gs, '\\[$1\\]');
@@ -4783,16 +4783,16 @@ if (!window._jaremis_katex_setup) {
       const nodes = [];
       while(walker.nextNode()) nodes.push(walker.currentNode);
       for(const n of nodes){
-        // skip text nodes that are inside a KaTeX-rendered element
+        // bỏ qua text nodes nằm trong element đã render KaTeX
         if(n.parentElement && n.parentElement.closest && n.parentElement.closest('.katex')) continue;
         let s = n.nodeValue;
         if(!s || !s.includes('$')) continue;
-        // Remove unescaped single or double dollar signs left over (keep escaped \$)
-        // Use lookbehind to avoid removing \$
+        // Xóa dấu dollar đơn hoặc kép không escape còn sót lại (giữ \$)
+        // Dùng lookbehind để tránh xóa \$
         try{
           s = s.replace(/(?<!\\)\${1,2}/g, '');
         }catch(e){
-          // fallback for older engines: remove all $ then restore escaped sequences
+          // dự phòng cho engine cũ hơn: xóa tất cả $ rồi khôi phục chuỗi escape
           s = s.replace(/\\\$/g, '__ESC_DOLLAR__').replace(/\$/g,'').replace(/__ESC_DOLLAR__/g,'\\$');
         }
         n.nodeValue = s;
@@ -4811,11 +4811,11 @@ if (!window._jaremis_katex_setup) {
     bubble.dataset.katexRendered = '1';
   }
 
-  // Auto-render existing chat bubbles and newly added ones.
+  // Tự động render các bubble chat hiện có và mới thêm.
   document.addEventListener('DOMContentLoaded', ()=>{
     const container = document.getElementById('chat-messages');
     if (!container) return;
-    // Render existing bubbles
+    // Render các bubble hiện có
     container.querySelectorAll('.chat-bubble').forEach(renderBubbleIfNeeded);
     // Observe added nodes
     const mo = new MutationObserver(muts=>{
@@ -4835,7 +4835,7 @@ if (!window._jaremis_katex_setup) {
 <!-- Animated Reply Script -->
 <script src="animated-reply.js"></script>
 <script>
-// Configure marked.js for better markdown rendering
+// Cấu hình marked.js cho việc render markdown tốt hơn
 if (typeof marked !== 'undefined') {
     marked.setOptions({
         breaks: true,
@@ -4845,25 +4845,25 @@ if (typeof marked !== 'undefined') {
     });
 }
 
-// Function to render bot reply with Gemini-style streaming animation
+// Hàm hiển thị phản hồi của bot với hiệu ứng streaming kiểu Gemini
 async function renderBotReplyAnimated(bubbleElement, htmlContent) {
     stopThinking(bubbleElement);
     
-    // Auto-wrap math expressions in LaTeX delimiters
+    // Tự động bọc biểu thức toán trong dấu phân cách LaTeX
     htmlContent = autoWrapMathExpressions(htmlContent);
     
-    // Parse markdown to HTML if content looks like markdown
+    // Phân tích markdown sang HTML nếu nội dung trông giống markdown
     let finalHtml = htmlContent;
     if (typeof marked !== 'undefined' && (htmlContent.includes('##') || htmlContent.includes('|') || htmlContent.includes('-'))) {
         try {
-            // Enable GFM (GitHub Flavored Markdown) for tables
+            // Bật GFM (GitHub Flavored Markdown) cho bảng
             finalHtml = marked.parse(htmlContent, {
                 breaks: true,
-                gfm: true, // Support tables, strikethrough, etc.
+                gfm: true, // Hỗ trợ bảng, gạch ngang, v.v.
                 tables: true
             });
         } catch (e) {
-            console.warn('Markdown parse error:', e);
+            console.warn('Lỗi phân tích Markdown:', e);
         }
     }
     
@@ -4874,7 +4874,7 @@ async function renderBotReplyAnimated(bubbleElement, htmlContent) {
     bubbleElement.innerHTML = '';
     bubbleElement.appendChild(wrapper);
     
-    // Gemini-style: Show content immediately with fade-in (no char-by-char)
+    // Kiểu Gemini: Hiện nội dung ngay với fade-in (không gõ từng ký tự)
     wrapper.innerHTML = finalHtml;
     
     // Render LaTeX math BEFORE fade-in to avoid flicker
@@ -4894,7 +4894,7 @@ async function renderBotReplyAnimated(bubbleElement, htmlContent) {
         }
     }
     
-    // Fade in animation AFTER LaTeX is rendered
+    // Animation fade in SAU KHI LaTeX được render
     requestAnimationFrame(() => {
         wrapper.style.transition = 'opacity 0.4s ease-out';
         wrapper.style.opacity = '1';
@@ -4997,7 +4997,7 @@ function buildSearchCacheData() {
   if(!historyCache || !historyCache.length) return;
   
   historyCache.forEach(entry => {
-    // Safe check: ensure entry exists and is valid
+    // Kiểm tra an toàn: đảm bảo entry tồn tại và hợp lệ
     if (!entry || typeof entry !== 'object') {
       console.warn('⚠️ Invalid history entry:', entry);
       return;
@@ -5385,13 +5385,13 @@ function handleAvatarUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
   
-  // Check file type
+  // Kiểm tra loại file
   if (!file.type.startsWith('image/')) {
     alert('Vui lòng chọn file ảnh hợp lệ!');
     return;
   }
   
-  // Check file size (max 2MB)
+  // Kiểm tra kích thước file (tối đa 2MB)
   if (file.size > 2 * 1024 * 1024) {
     alert('Kích thước ảnh tối đa là 2MB!');
     return;
@@ -5858,7 +5858,7 @@ function addExportButtons(reportWindow, patientId, doctorId) {
         pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
       };
       
-      // Hide buttons before export
+      // Ẩn các nút trước khi xuất
       const buttons = doc.querySelector('[style*="position: fixed"]');
       if (buttons) buttons.style.display = 'none';
       
@@ -5871,7 +5871,7 @@ function addExportButtons(reportWindow, patientId, doctorId) {
       });
     };
     
-    // Add download function to window
+    // Thêm hàm download vào window
     reportWindow.downloadAsWord = async function(patientId, doctorId) {
       try {
         const response = await fetch('/api/patient-record/' + patientId + '/export-word?doctor=' + encodeURIComponent(doctorId));
@@ -5891,13 +5891,13 @@ function addExportButtons(reportWindow, patientId, doctorId) {
       }
     };
     
-    // Add edit function
+    // Thêm hàm chỉnh sửa
     reportWindow.editMedicalReport = function() {
       const editable = doc.querySelectorAll('.info-value, .subsection, .bullet-item, .editable-field');
       const editBtn = doc.querySelector('button[onclick="editMedicalReport()"]');
       
       if (editBtn.textContent.includes('Chỉnh sửa')) {
-        // Enable editing
+        // Bật chế độ chỉnh sửa
         editable.forEach(el => {
           el.contentEditable = true;
           el.style.backgroundColor = '#fffacd';
@@ -5905,7 +5905,7 @@ function addExportButtons(reportWindow, patientId, doctorId) {
           el.style.border = '1px dashed #999';
         });
         
-        // Enable editable fields
+        // Bật các trường có thể chỉnh sửa
         if (typeof reportWindow.enableEditMode === 'function') {
           reportWindow.enableEditMode();
         }
@@ -5913,7 +5913,7 @@ function addExportButtons(reportWindow, patientId, doctorId) {
         editBtn.innerHTML = '<i class="fas fa-save"></i> Lưu';
         editBtn.style.background = '#4CAF50';
       } else {
-        // Save changes
+        // Lưu thay đổi
         editable.forEach(el => {
           el.contentEditable = false;
           el.style.backgroundColor = '';
@@ -5921,7 +5921,7 @@ function addExportButtons(reportWindow, patientId, doctorId) {
           el.style.border = '';
         });
         
-        // Disable editable fields
+        // Tắt các trường có thể chỉnh sửa
         if (typeof reportWindow.disableEditMode === 'function') {
           reportWindow.disableEditMode();
         }
@@ -6138,21 +6138,21 @@ async function savePatientProfile(event, patientId) {
   }
 }
 
-// Initialize on load
+// Khởi tạo khi tải
 document.addEventListener('DOMContentLoaded', () => {
   updateAccountUI();
   updateModeButton();
   updateAccountRole();
 });
 
-// Close mode menu when clicking backdrop
+// Đóng menu chế độ khi click backdrop
 document.getElementById('mode-menu-backdrop')?.addEventListener('click', (e) => {
   if (e.target.id === 'mode-menu-backdrop') {
     closeModeMenu();
   }
 });
 
-// Close profile modal when clicking backdrop
+// Đóng modal hồ sơ khi click backdrop
 document.getElementById('profile-modal-backdrop')?.addEventListener('click', (e) => {
   if (e.target.id === 'profile-modal-backdrop') {
     closeProfileModal();
@@ -6208,9 +6208,9 @@ document.getElementById('profile-modal-backdrop')?.addEventListener('click', (e)
   </div>
 </div>
 
-<!-- Close modal backdrops on click -->
+<!-- Đóng modal backdrop khi click -->
 <script>
-// Close patient info modal when clicking backdrop
+// Đóng modal thông tin bệnh nhân khi click backdrop
 document.getElementById('patient-info-modal-backdrop')?.addEventListener('click', (e) => {
   if (e.target.id === 'patient-info-modal-backdrop') {
     closePatientInfoModal();

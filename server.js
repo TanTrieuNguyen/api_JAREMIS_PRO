@@ -9,7 +9,7 @@ const { google } = require('googleapis');
 const path = require('path');
 const { generateMedicalRecordHTML } = require('./medicalRecordTemplate');
 
-// NEW: Server-side LaTeX rendering utilities
+// MỚI: Công cụ render LaTeX phía server
 const katex = require('katex');
 const { JSDOM } = require('jsdom');
 const createDOMPurify = require('dompurify');
@@ -22,15 +22,15 @@ const upload = multer({ dest: 'uploads/' });
 const API_KEY = process.env.GOOGLE_API_KEY;
 if (!API_KEY) console.warn('Cảnh báo: GOOGLE_API_KEY chưa được đặt.');
 const genAI = new GoogleGenerativeAI(API_KEY || '');
-// Helper: detect invalid/expired API key errors
+// Hàm hỗ trợ: Phát hiện lỗi API key không hợp lệ hoặc hết hạn
 function isInvalidApiKeyError(err){
   const msg = (err && (err.message || err.toString())) || '';
   return /API key expired|API_KEY_INVALID|invalid api key/i.test(msg);
 }
-// Optional: customize birth year shown in self-introduction
+// Tùy chọn: Tùy chỉnh năm sinh hiển thị trong phần giới thiệu bản thân
 const APP_BIRTH_YEAR = process.env.APP_BIRTH_YEAR || '2025';
 
-// Ephemeral session history for non-logged users
+// Lịch sử phiên tạm thời cho người dùng chưa đăng nhập
 const sessionHistories = new Map(); // sessionId -> [{input, reply, ...}]
 function pushSessionHistory(sessionId, entry, maxItems = 200){
   if (!sessionId) return;
@@ -55,7 +55,7 @@ function getRecentSessionChatHistory(sessionId, limit = 60, maxChars = 45000){
   return result;
 }
 
-// Math detection to adjust timeouts/model behavior
+// Phát hiện câu hỏi toán học để điều chỉnh timeout và hành vi model
 function isMathy(text=''){
   const t = String(text).toLowerCase();
   return /(\bgiải\b|=|\+|\-|\*|\^|\\frac|\\sqrt|\d\s*[a-z]|\bx\b|\by\b)/i.test(t);
@@ -95,11 +95,11 @@ function ensureUsersFile() {
 }
 ensureUsersFile();
 
-// === Google Drive sync for users.json ===
+// === Đồng bộ Google Drive cho users.json ===
 const { readUsersData, updateUsersData } = require('./driveJsonService');
 const DRIVE_USERS_FILE_ID = process.env.DRIVE_USERS_FILE_ID || '1ame57YNTu-GADOjVxeUtoK7cy0VZmvDj';
 
-// === Google Drive client helper ===
+// === Hàm hỗ trợ khởi tạo Google Drive client ===
 async function getDriveClient() {
   const auth = new google.auth.GoogleAuth({
     keyFile: process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH, // Đường dẫn file JSON
@@ -108,7 +108,7 @@ async function getDriveClient() {
   return google.drive({ version: 'v3', auth });
 }
 
-// Đọc users từ Google Drive (nếu có fileId), fallback về file local nếu lỗi
+// Đọc danh sách users từ Google Drive (nếu có fileId), fallback về file local nếu lỗi
 async function readUsers() {
     try {
         const data = await readUsersData(); // đọc từ Drive
@@ -128,7 +128,7 @@ async function readUsers() {
     }
 }
 
-// Ghi users lên Google Drive (nếu có fileId), đồng thời ghi file local
+// Ghi danh sách users lên Google Drive (nếu có fileId), đồng thời ghi file local
 async function saveUsers(users) {
   const data = JSON.stringify(users, null, 2);
   fs.writeFileSync(usersPath, data, 'utf8');
@@ -139,11 +139,13 @@ async function saveUsers(users) {
     } catch(e) { console.error('Lỗi ghi users lên Drive:', e); }
   }
 }
+// Tìm người dùng theo username
 async function findUserByUsername(username) {
   if (!username) return null;
   const users = await readUsers();
   return users.find(u => u.username && u.username.toLowerCase() === username.toLowerCase()) || null;
 }
+// Thêm một entry vào lịch sử của người dùng, giới hạn số lượng tối đa
 async function pushUserHistory(username, historyEntry, maxItems = 500) {
   try {
     const users = await readUsers();
@@ -159,6 +161,7 @@ async function pushUserHistory(username, historyEntry, maxItems = 500) {
     return false;
   }
 }
+// Lấy lịch sử chat gần đây của người dùng, giới hạn số lượng và ký tự
 async function getRecentChatHistory(username, limit = 360, maxChars = 180000) {
   const user = await findUserByUsername(username);
   if (!user || !Array.isArray(user.history)) return [];
@@ -175,6 +178,7 @@ async function getRecentChatHistory(username, limit = 360, maxChars = 180000) {
   return result;
 }
 
+// Tìm kiếm hướng dẫn y tế từ ClinicalTrials.gov và PubMed
 async function searchMedicalGuidelines(query) {
   try {
     const [clinicalResponse, pubmedResponse] = await Promise.allSettled([
@@ -199,15 +203,17 @@ async function searchMedicalGuidelines(query) {
   } catch (err) { console.error('Lỗi tìm kiếm tài liệu:', err); return []; }
 }
 
-// === USER MEMORY SYSTEM ===
+// === HỆ THỐNG BỘ NHớ NGƯỜI DÙNG ===
 // Bộ nhớ người dùng lưu trữ thông tin đã chia sẻ
 const userMemories = new Map(); // username -> { summary: string, facts: [] }
 
+// Lấy thông tin bộ nhớ của người dùng
 function getUserMemory(username) {
   if (!username) return null;
   return userMemories.get(username) || null;
 }
 
+// Trích xuất và ghép thông tin mới vào bộ nhớ người dùng
 function mergeFactsIntoMemory(username, newMessage) {
   if (!username) return;
   
@@ -244,12 +250,12 @@ function mergeFactsIntoMemory(username, newMessage) {
   userMemories.set(username, current);
 }
 
-// === REAL-TIME SEARCH SYSTEM ===
+// === HỆ THỐNG TÌM KIẾM THỜI GIAN THỰC ===
 async function searchRealTimeInfo(query) {
   // Placeholder function - có thể tích hợp với Google Search API hoặc SerpAPI
   // Hiện tại trả về empty để tránh lỗi
   try {
-    // TODO: Implement real-time search with Google Custom Search API
+    // CẦN LÀM: Triển khai tìm kiếm thời gian thực với Google Custom Search API
     // const response = await axios.get('https://www.googleapis.com/customsearch/v1', {
     //   params: {
     //     key: process.env.GOOGLE_SEARCH_API_KEY,
@@ -266,6 +272,7 @@ async function searchRealTimeInfo(query) {
   }
 }
 
+// Phân tích kết quả chẩn đoán từ văn bản trả về
 function parseDiagnosisResponse(text) {
   const result = { differentialDiagnosis: [], diseases: [], confidence: 0, whoGuideline: '' };
   const diffRegex = /## Chẩn đoán phân biệt(?: \(WHO\))?\n([\s\S]*?)(?:\n##|$)/m;
@@ -283,6 +290,7 @@ function parseDiagnosisResponse(text) {
   return result;
 }
 
+// Làm giàu thông tin chẩn đoán với mô tả từ bộ mã ICD
 function enrichWithICDDescriptions(diagnoses) {
   return diagnoses.map(entry => {
     const icdCodeMatch = entry.match(/\((.*?)\)$/);
@@ -292,7 +300,7 @@ function enrichWithICDDescriptions(diagnoses) {
   });
 }
 
-// NEW: Server-side LaTeX pre-render helper
+// MỚI: Hàm hỗ trợ pre-render LaTeX phía server
 function escapeHtml(str) {
   if (str === null || str === undefined) return '';
   return String(str)
@@ -305,19 +313,19 @@ function escapeHtml(str) {
 
 function renderLatexInText(text) {
   if (!text) return '';
-  // quick check
+  // Kiểm tra nhanh
   if (!/[\\$]/.test(text)) return escapeHtml(text).replace(/\n/g, '<br>');
   try {
-    // collapse repeated dollars (e.g. $$ -> $)
+    // Gộp các dấu dollar lặp lại (ví dụ: $$$ -> $)
     let src = String(text).replace(/\${3,}/g, '$');
 
-    // Normalize simple fractions like a/b or (a+b)/(c+d) into \frac{a}{b}
+    // Chuẩn hóa phân số đơn giản như a/b hoặc (a+b)/(c+d) thành \frac{a}{b}
     function normalizeSimpleFraction(s){
       try {
         const str = String(s || '').trim();
         if (!str || str.indexOf('/') === -1) return str;
-        if (/\\(frac|dfrac|tfrac)\b/.test(str)) return str; // already has frac
-        // Case 1: (A)/(B)
+        if (/\\(frac|dfrac|tfrac)\b/.test(str)) return str; // đã có frac rồi
+        // Trường hợp 1: (A)/(B)
         let m = str.match(/^\(\s*([^()]+?)\s*\)\s*\/\s*\(\s*([^()]+?)\s*\)$/s);
         if (m) return `\\frac{${m[1]}}{${m[2]}}`;
         // Case 2: A/B where A,B are simple tokens (numbers/letters/dots)
@@ -327,14 +335,14 @@ function renderLatexInText(text) {
       } catch (_) { return s; }
     }
 
-    // regex to match $...$, \[...\], or \(...\) only (avoid single-$ inline to reduce false positives)
+    // regex để khớp $...$, \[...\], hoặc \(...\) (tránh dấu $ đơn để giảm false positives)
     const re = /(\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\]|\\\(([\s\S]*?)\\\))/g;
     let lastIndex = 0;
     let out = '';
     let m;
     while ((m = re.exec(src)) !== null) {
       const idx = m.index;
-      // append escaped non-math chunk
+      // Thêm phần text không phải toán học đã escape
       if (idx > lastIndex) {
         out += escapeHtml(src.slice(lastIndex, idx)).replace(/\n/g, '<br>');
       }
@@ -342,7 +350,7 @@ function renderLatexInText(text) {
       const display = !!(m[2] || m[3]);
       let rendered = '';
       try {
-        // Heuristic: avoid KaTeX when content likely not math and contains Unicode (e.g., Vietnamese)
+        // Heuristic: tránh KaTeX khi nội dung không phải toán và chứa Unicode (ví dụ tiếng Việt)
         const hasNonAscii = /[^\x00-\x7F]/.test(latex);
         const looksLikeMath = /\\[a-zA-Z]+|[=+\\\-\/*^_{}]|\\frac|\\sqrt|\\sum|\\int|\\pi|\\alpha|\\beta|\\gamma|\d+/.test(latex);
         if (hasNonAscii && !looksLikeMath) {
@@ -353,7 +361,7 @@ function renderLatexInText(text) {
           rendered = DOMPurify.sanitize(rendered);
         }
       } catch (e) {
-        // fallback: escape and keep original delimiters
+        // fallback: escape và giữ nguyên delimiter gốc
         const wrapped = display ? `$${latex}$` : `\\(${latex}\\)`;
         rendered = escapeHtml(wrapped);
       }
@@ -371,19 +379,19 @@ function renderLatexInText(text) {
 }
 
 
-// Helper to select model with fallback
+// Hàm hỗ trợ: Chọn model với fallback
 function selectModelIds(requested) {
-  // Prefer stable, widely supported defaults on v1beta
-  // Use -latest variants to match ListModels results and avoid 404
+  // Ưu tiên các phiên bản ổn định, hỗ trợ rộng rãi trên v1beta
+  // Sử dụng biến thể -latest để khớp với kết quả ListModels và tránh lỗi 404
   return {
     primary: 'gemini-1.5-flash-latest',
     fallback: 'gemini-1.5-pro-latest'
   };
 }
 
-// Update display map to include fallbacks
+// Cập nhật bảng tên hiển thị bao gồm các fallback
 const DISPLAY_NAME_MAP = {
-  // Current defaults
+  // Mặc định hiện tại
   'gemini-pro': 'Jaremis-pro',
   'gemini-1.0-pro': 'Jaremis-1.0-pro',
   'gemini-pro-vision': 'Jaremis-vision',
@@ -396,7 +404,7 @@ const DISPLAY_NAME_MAP = {
   'gemini-2.0-flash': 'Jaremis-2.0-flash',
   'gemini-2.0-pro-exp': 'Jaremis-2.0-pro',
   'gemini-2.0-pro': 'Jaremis-2.0-pro',
-  // Legacy keys (kept for compatibility if ever referenced)
+  // Các key cũ (giữ để tương thích nếu có tham chiếu)
   'gemini-1.5-flash-latest': 'Jaremis-1.5-flash',
   'gemini-1.5-pro-latest': 'Jaremis-1.5-pro',
   'gemini-1.5-flash': 'Jaremis-1.5-flash',
@@ -405,7 +413,7 @@ const DISPLAY_NAME_MAP = {
   'gemini-1.5-flash-8b': 'Jaremis-1.5-flash-8b'
 };
 
-// Dynamic model discovery and selection to avoid 404 on unsupported API versions/models
+// Phát hiện và chọn model động để tránh lỗi 404 khi phiên bản API/model không được hỗ trợ
 const MODEL_PREFS = {
   flash: [
     'gemini-2.5-flash-latest',
@@ -442,6 +450,7 @@ const MODEL_PREFS = {
 };
 
 let _modelCache = { when: 0, names: new Set(), supports: {} };
+// Lấy danh sách các model khả dụng từ API, cache kết quả 10 phút
 async function listAvailableModels() {
   const now = Date.now();
   if (_modelCache.when && now - _modelCache.when < 10 * 60 * 1000) return _modelCache;
@@ -453,7 +462,7 @@ async function listAvailableModels() {
     const supports = {};
     for (const m of models) {
       if (m.name) {
-        // Normalize: strip 'models/' prefix so IDs match preference lists
+        // Chuẩn hóa: loại bỏ prefix 'models/' để ID khớp với danh sách ưu tiên
         const raw = m.name;
         const id = raw.startsWith('models/') ? raw.slice(7) : raw;
         names.add(id);
@@ -468,8 +477,9 @@ async function listAvailableModels() {
   return _modelCache;
 }
 
+// Giải quyết model IDs phù hợp nhất với yêu cầu và năng lực hệ thống
 async function resolveModelIds(requested = 'flash', needVision = false) {
-  // default fallbacks if listing fails
+  // fallback mặc định nếu list thất bại
   let base = selectModelIds(requested);
   let primary = base.primary;
   let fallback = base.fallback;
@@ -486,6 +496,7 @@ async function resolveModelIds(requested = 'flash', needVision = false) {
   return { primary, fallback };
 }
 
+// Lấy danh sách các model ứng viên theo thứ tự ưu tiên
 async function getCandidateModels(requested = 'flash', needVision = false) {
   const prefs = needVision ? MODEL_PREFS.vision : (requested === 'pro' ? MODEL_PREFS.pro : MODEL_PREFS.flash);
   try {
@@ -527,7 +538,7 @@ app.post('/api/login', async (req, res) => {
   } catch (e) { console.error('Login error:', e); return res.status(500).json({ error: 'Lỗi server khi đăng nhập' }); }
 });
 
-// Check if username is available
+// Kiểm tra xem tên đăng nhập có khả dụng không
 app.get('/api/check-username', async (req, res) => {
   try {
     const { username } = req.query;
@@ -683,7 +694,7 @@ function detectLanguage(rawText) {
   return best;
 }
 
-// Instant-answer heuristics for very simple queries
+// Phát hiện trả lời nhanh cho câu hỏi rất đơn giản
 function simpleAnswer(message, lang) {
   const txt = (message || '').trim();
   const lower = txt.toLowerCase();
@@ -747,12 +758,12 @@ function simpleAnswer(message, lang) {
    -------------------------- */
 app.post('/api/chat', upload.array('images'), async (req, res) => {
   try {
-    // Safe access to req.body - handle both JSON and FormData
+    // Truy cập an toàn req.body - xử lý cả JSON và FormData
     const body = req.body || {};
     const message = (body.message || '').toString().trim();
     const files = req.files || [];
     
-    // Validate input
+    // Xác thực đầu vào
     if (!message && files.length === 0) {
       return res.status(400).json({ error: 'Vui lòng nhập tin nhắn hoặc đính kèm ảnh' });
     }
@@ -817,14 +828,14 @@ app.post('/api/chat', upload.array('images'), async (req, res) => {
       ? `\n[BỘ NHỚ NGƯỜI DÙNG - TÓM TẮT]\n${memory.summary}\n`
       : '';
 
-    // Sensitive topics detection
+    // Phát hiện chủ đề nhạy cảm (y tế, tâm lý)
     const sensitiveRegex = /(ung thư|khối u|u ác|đau ngực|khó thở|xuất huyết)/i;
     const isSensitive = sensitiveRegex.test(message);
     const reassuranceBlock = isSensitive
       ? `\n[HƯỚNG DẪN GIỌNG ĐIỆU]\n- Chủ đề nhạy cảm: trấn an, tránh gây hoang mang.\n- Nêu dấu hiệu cần đi khám khẩn nếu có.\n- Nhắc không chẩn đoán chính thức trong chế độ Chat.\n`
       : '';
 
-    // NOTE: sanitized prompt
+    // LƯU Ý: System prompt đã được làm sạch và tối ưu hóa
     const systemPrompt = `Bạn là một trợ lý thông minh, thân thiện, trả lời ngắn gọn, rõ ràng bằng đúng ngôn ngữ của người dùng.
 Tên bạn là JAREMIS-AI, được tạo bởi TT1403 (Nguyễn Tấn Triệu), ANT (Đỗ Văn Vĩnh An) và Lý Thúc Duy. Bạn tự hào là AI do người Việt phát triển; khi người dùng dùng tiếng Việt, hãy ưu tiên tiếng Việt và thể hiện sự trân trọng đối với lịch sử, văn hóa và con người Việt Nam.
 Nếu người dùng yêu cầu CHẨN ĐOÁN Y KHOA hoặc xin chẩn đoán lâm sàng, KHÔNG cung cấp chẩn đoán chi tiết — hãy gợi ý họ dùng chế độ "Diagnose" và luôn nhắc tham khảo ý kiến bác sĩ. Giữ ngữ cảnh phù hợp, không lặp lại nguyên văn dài dòng từ lịch sử.
@@ -923,8 +934,8 @@ YÊU CẦU:
 - Không nhắc lại toàn bộ lịch sử, chỉ tổng hợp tinh gọn.
 - Trả lời bằng đúng ngôn ngữ người dùng (${userLang}).`;
 
-    // Strict timeout for flash
-    // Process images for chat endpoint
+    // Timeout nghiêm ngặt cho flash
+    // Xử lý ảnh cho endpoint chat
     const imageParts = files.length > 0 ? await Promise.all(files.map(async file => ({ 
       inlineData: { 
         data: fs.readFileSync(file.path).toString('base64'), 
@@ -1031,8 +1042,8 @@ YÊU CẦU:
 /* --------------------------
    STREAMING: Chat stream endpoint (SSE for Gemini-style animation)
    -------------------------- */
-// NOTE: Use GET for SSE (EventSource only supports GET). We keep flexible param reading so
-// if a POST is accidentally sent (legacy), it still works.
+// LƯU Ý: Dùng GET cho SSE (EventSource chỉ hỗ trợ GET). Vẫn đọc param linh hoạt để
+// nếu có POST gửi nhầm (legacy) thì vẫn hoạt động được.
 app.get('/api/chat-stream', async (req, res) => {
    try {
      if (!API_KEY) {
@@ -1295,8 +1306,8 @@ YÊU CẦU:
 /* --------------------------
    STREAMING: Chat stream endpoint (SSE for Gemini-style animation)
    -------------------------- */
-// NOTE: Use GET for SSE (EventSource only supports GET). We keep flexible param reading so
-// if a POST is accidentally sent (legacy), it still works.
+// LƯU Ý: Dùng GET cho SSE (EventSource chỉ hỗ trợ GET). Vẫn đọc param linh hoạt để
+// nếu có POST gửi nhầm (legacy) thì vẫn hoạt động được.
 app.get('/api/chat-stream', async (req, res) => {
    try {
      if (!API_KEY) {
@@ -1677,7 +1688,7 @@ app.post('/api/professional', upload.array('images'), async (req, res) => {
       return res.status(400).json({ error: 'Vui lòng cung cấp thông tin triệu chứng hoặc hình ảnh' });
     }
 
-    // Validate file size
+    // Kiểm tra kích thước file
     const MAX_FILE_BYTES = 4 * 1024 * 1024;
     for (const f of files) {
       if (f.size > MAX_FILE_BYTES) {
@@ -1691,7 +1702,7 @@ app.post('/api/professional', upload.array('images'), async (req, res) => {
     const modelId = ids.primary;
     const displayModel = DISPLAY_NAME_MAP[modelId] || modelId;
 
-    // Process images
+    // Xử lý hình ảnh
     const imageParts = await Promise.all(files.map(async file => ({ 
       inlineData: { 
         data: fs.readFileSync(file.path).toString('base64'), 
@@ -1702,7 +1713,7 @@ app.post('/api/professional', upload.array('images'), async (req, res) => {
     // Search medical guidelines
     const references = await searchMedicalGuidelines(message);
 
-    // Build detailed patient context
+    // Xây dựng bối cảnh bệnh nhân chi tiết
     let patientContext = '';
     if (patientInfo) {
       patientContext = `
@@ -1865,13 +1876,13 @@ ${files.length ? `*Mô tả chi tiết findings, so sánh chuẩn, radiological 
 - ✅ KẾT THÚC: "---\n\nTrân trọng,\n\n**JAREMIS-AI Medical Assistant**\n*Professional Mode*"
 `;
 
-    // Generate the professional consultation report
+    // Tạo báo cáo tư vấn chuyên nghiệp
     const model = genAI.getGenerativeModel({ model: modelId });
     const result = await model.generateContent([prompt, ...imageParts]);
     const response = await result.response;
     const consultationText = response.text ? response.text() : (typeof response === 'string' ? response : '');
 
-    // Save to history
+    // Lưu vào lịch sử
     const submittedBy = req.body.submittedBy || null;
     const sessionId = req.body.sessionId || null;
     const historyEntry = {
@@ -1894,14 +1905,14 @@ ${files.length ? `*Mô tả chi tiết findings, so sánh chuẩn, radiological 
       }
     }
 
-    // Cleanup uploaded files
+    // Xóa các file đã tải lên
     files.forEach(file => { 
       try { 
         if (fs.existsSync(file.path)) fs.unlinkSync(file.path); 
       } catch(e){} 
     });
 
-    // Send response
+    // Gửi phản hồi
     res.json({
       modelUsed: displayModel,
       consultation: consultationText,
@@ -1918,7 +1929,7 @@ ${files.length ? `*Mô tả chi tiết findings, so sánh chuẩn, radiological 
       }); 
     } catch(e){}
     
-    // Check for quota exceeded error (429)
+    // Kiểm tra lỗi vượt hạn mức (429)
     const errorMsg = error.message || '';
     const isQuotaError = errorMsg.includes('429') || errorMsg.includes('quota') || errorMsg.includes('Quota exceeded');
     
@@ -1947,10 +1958,10 @@ ${files.length ? `*Mô tả chi tiết findings, so sánh chuẩn, radiological 
 
 // ==== PATIENT MEDICAL RECORDS ENDPOINTS ====
 
-// Patient Records file path
+// Đường dẫn file hồ sơ bệnh nhân
 const patientRecordsPath = path.join(__dirname, 'patientRecords.json');
 
-// Read patient records from file
+// Đọc hồ sơ bệnh nhân từ file
 function readPatientRecords() {
   try {
     if (!fs.existsSync(patientRecordsPath)) {
@@ -1965,7 +1976,7 @@ function readPatientRecords() {
   }
 }
 
-// Save patient records to file
+// Lưu hồ sơ bệnh nhân vào file
 function savePatientRecords(records) {
   try {
     fs.writeFileSync(patientRecordsPath, JSON.stringify(records, null, 2), 'utf8');
@@ -1974,13 +1985,13 @@ function savePatientRecords(records) {
   }
 }
 
-// Find patient record by ID
+// Tìm hồ sơ bệnh nhân theo ID
 function findPatientRecord(patientId) {
   const records = readPatientRecords();
   return records.find(r => r.patientId === patientId);
 }
 
-// GET /api/patient-records - Get list of patient records for a doctor
+// GET /api/patient-records - Lấy danh sách hồ sơ bệnh nhân của bác sĩ
 app.get('/api/patient-records', (req, res) => {
   try {
     const doctor = req.query.doctor;
@@ -2012,7 +2023,7 @@ app.get('/api/patient-records', (req, res) => {
   }
 });
 
-// GET /api/patient-record/:patientId - Get detailed patient record
+// GET /api/patient-record/:patientId - Lấy chi tiết hồ sơ bệnh nhân
 app.get('/api/patient-record/:patientId', (req, res) => {
   try {
     const { patientId } = req.params;
@@ -2039,7 +2050,7 @@ app.get('/api/patient-record/:patientId', (req, res) => {
   }
 });
 
-// GET /api/patient-record/:patientId/medical-report - Generate HTML medical report
+// GET /api/patient-record/:patientId/medical-report - Tạo báo cáo y tế HTML
 app.get('/api/patient-record/:patientId/medical-report', (req, res) => {
   try {
     const { patientId } = req.params;
@@ -2068,7 +2079,7 @@ app.get('/api/patient-record/:patientId/medical-report', (req, res) => {
   }
 });
 
-// PUT /api/patient-record/:patientId/profile - Update patient profile
+// PUT /api/patient-record/:patientId/profile - Cập nhật hồ sơ bệnh nhân
 app.put('/api/patient-record/:patientId/profile', (req, res) => {
   try {
     const { patientId } = req.params;
@@ -2089,12 +2100,12 @@ app.put('/api/patient-record/:patientId/profile', (req, res) => {
       return res.status(403).json({ success: false, error: 'Access denied' });
     }
     
-    // Update patient name if provided
+    // Cập nhật tên bệnh nhân nếu được cung cấp
     if (patientInfo.name) {
       record.patientName = patientInfo.name;
     }
     
-    // Update patient info in latest consultation
+    // Cập nhật thông tin bệnh nhân trong lần khám mới nhất
     if (record.consultations && record.consultations.length > 0) {
       const latestConsultation = record.consultations[record.consultations.length - 1];
       latestConsultation.patientInfo = { 
@@ -2113,7 +2124,7 @@ app.put('/api/patient-record/:patientId/profile', (req, res) => {
   }
 });
 
-// GET /api/patient-record/:patientId/export-word - Export medical report as Word document
+// GET /api/patient-record/:patientId/export-word - Xuất báo cáo y tế dạng Word
 app.get('/api/patient-record/:patientId/export-word', (req, res) => {
   try {
     const { patientId } = req.params;
@@ -2140,7 +2151,7 @@ app.get('/api/patient-record/:patientId/export-word', (req, res) => {
     const bodyMatch = htmlReport.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
     const bodyContent = bodyMatch ? bodyMatch[1] : htmlReport;
     
-    // Remove script tags and clean up for Word
+    // Xóa thẻ script và dọn dẹp cho Word
     let cleanContent = bodyContent
       .replace(/<script[\s\S]*?<\/script>/gi, '')
       .replace(/<button[\s\S]*?<\/button>/gi, '')
@@ -2151,7 +2162,7 @@ app.get('/api/patient-record/:patientId/export-word', (req, res) => {
     cleanContent = cleanContent.replace(/<div class="medical-certificate">/gi, '');
     cleanContent = cleanContent.replace(/<\/div>\s*<\/body>/gi, '</body>');
     
-    // Ensure all tables have proper Word attributes
+    // Đảm bảo tất cả bảng có thuộc tính Word phù hợp
     cleanContent = cleanContent.replace(/<table/gi, '<table border="0" cellspacing="0" cellpadding="0"');
     
     // Convert HTML to Word-compatible format - Universal for WPS & Word 2019
@@ -2386,7 +2397,7 @@ ${cleanContent}
   }
 });
 
-// Start the server
+// Khởi động server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Server đang chạy trên cổng ${PORT}`);
