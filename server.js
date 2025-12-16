@@ -66,6 +66,33 @@ function isWeatherQuery(text=''){
   return /(\bthời tiết\b|\bweather\b|\bnhiệt độ\b|\btemperature\b|\bmưa\b|\brain\b|\bnắng\b|\bsunny\b|\bmây\b|\bcloud\b|\bgió\b|\bwind\b|\bđộ ẩm\b|\bhumidity\b)/i.test(t);
 }
 
+// Phát hiện hình ảnh y tế (X-quang, MRI, CT, PET scan) từ tên file hoặc nội dung message
+function detectMedicalImage(files = [], message = '') {
+  const imagingKeywords = /\b(x-?quang|x-?ray|xquang|mri|ct\s*scan|ct|pet\s*scan|pet|siêu âm|ultrasound|chụp cắt lớp|chụp chiếu|phim chụp|imaging|radiolog)\b/i;
+  
+  // Kiểm tra message
+  if (imagingKeywords.test(message)) {
+    return true;
+  }
+  
+  // Kiểm tra tên file
+  for (const file of files) {
+    if (file.originalname && imagingKeywords.test(file.originalname)) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+// Cảnh báo cho hình ảnh y tế ở chế độ Chat/Diagnose
+function getMedicalImageWarning(lang = 'vi') {
+  if (lang === 'vi') {
+    return `\n\n🔴 **CẢNH BÁO QUAN TRỌNG:**\n⚠️ **Không dựa vào thông tin từ AI hoặc Internet để tự chẩn đoán tại nhà.**\n\nKết quả phân tích hình ảnh y tế từ AI chỉ mang tính tham khảo và có thể không chính xác. Bạn **BẮT BUỘC** phải:\n- Tham khảo ý kiến bác sĩ có chuyên môn\n- Được bác sĩ khám trực tiếp và đọc phim chính xác\n- Thực hiện các xét nghiệm bổ sung nếu cần\n\n📍 Hãy đến cơ sở y tế để được đánh giá và chẩn đoán y tế chính xác nhất!`;
+  }
+  return `\n\n🔴 **IMPORTANT WARNING:**\n⚠️ **Do not rely on AI or Internet information for self-diagnosis at home.**\n\nMedical image analysis from AI is for reference only and may not be accurate. You **MUST**:\n- Consult a qualified medical doctor\n- Get examined in person and have images read by a doctor\n- Undergo additional tests if needed\n\n📍 Please visit a medical facility for accurate medical evaluation and diagnosis!`;
+}
+
 function computeHardLimitMs(modelId, message){
   const math = isMathy(message);
   const weather = isWeatherQuery(message);
@@ -519,9 +546,20 @@ app.post('/api/register', async (req, res) => {
     if (users.find(u => u.email.toLowerCase() === email.toLowerCase())) return res.status(400).json({ error: 'Email đã được sử dụng' });
     const salt = bcrypt.genSaltSync(10);
     const hash = bcrypt.hashSync(password, salt);
-    const newUser = { id: Date.now(), username, email, passwordHash: hash, createdAt: new Date().toISOString(), history: [] };
+    const newUser = { 
+      id: Date.now(), 
+      username, 
+      email, 
+      passwordHash: hash, 
+      createdAt: new Date().toISOString(), 
+      history: [],
+      // Hệ thống phân quyền
+      accountType: 'normal', // 'normal' | 'doctor'
+      verificationStatus: 'unverified', // 'unverified' | 'pending' | 'verified' | 'rejected'
+      verificationData: null // { medicalLicenseNumber, workplace, documents, submittedAt, reviewedAt, reviewedBy, rejectionReason }
+    };
     users.push(newUser); await saveUsers(users);
-    return res.json({ success: true, user: { username: newUser.username, email: newUser.email } });
+    return res.json({ success: true, user: { username: newUser.username, email: newUser.email, accountType: newUser.accountType, verificationStatus: newUser.verificationStatus } });
   } catch (e) { console.error('Register error:', e); return res.status(500).json({ error: 'Lỗi server khi đăng ký' }); }
 });
 
@@ -534,7 +572,15 @@ app.post('/api/login', async (req, res) => {
     if (!user) return res.status(401).json({ error: 'Không tìm thấy tài khoản' });
     const match = bcrypt.compareSync(password, user.passwordHash);
     if (!match) return res.status(401).json({ error: 'Mật khẩu không đúng' });
-    return res.json({ success: true, user: { username: user.username, email: user.email } });
+    return res.json({ 
+      success: true, 
+      user: { 
+        username: user.username, 
+        email: user.email,
+        accountType: user.accountType || 'normal',
+        verificationStatus: user.verificationStatus || 'unverified'
+      } 
+    });
   } catch (e) { console.error('Login error:', e); return res.status(500).json({ error: 'Lỗi server khi đăng nhập' }); }
 });
 
@@ -551,6 +597,154 @@ app.get('/api/check-username', async (req, res) => {
   } catch (e) {
     console.error('Check username error:', e);
     return res.status(500).json({ error: 'Lỗi server khi kiểm tra username' });
+  }
+});
+
+/* --------------------------
+   DOCTOR VERIFICATION ENDPOINTS
+   -------------------------- */
+
+// Submit verification request (gửi yêu cầu xác minh bác sĩ)
+app.post('/api/verify-doctor/submit', upload.array('documents'), async (req, res) => {
+  try {
+    const { username, medicalLicenseNumber, workplace, email } = req.body;
+    const files = req.files || [];
+
+    if (!username) return res.status(400).json({ error: 'Thiếu tham số username' });
+    if (!medicalLicenseNumber) return res.status(400).json({ error: 'Vui lòng cung cấp số giấy phép hành nghề' });
+    if (!workplace && !email) return res.status(400).json({ error: 'Vui lòng cung cấp nơi công tác hoặc email cơ sở y tế' });
+
+    const users = await readUsers();
+    const userIndex = users.findIndex(u => u.username && u.username.toLowerCase() === username.toLowerCase());
+    if (userIndex === -1) return res.status(404).json({ error: 'Không tìm thấy tài khoản' });
+
+    const user = users[userIndex];
+
+    // Lưu thông tin xác minh
+    const verificationData = {
+      medicalLicenseNumber,
+      workplace: workplace || '',
+      workplaceEmail: email || '',
+      documents: files.map(f => ({
+        filename: f.filename,
+        originalname: f.originalname,
+        path: f.path,
+        mimetype: f.mimetype,
+        size: f.size
+      })),
+      submittedAt: new Date().toISOString(),
+      reviewedAt: null,
+      reviewedBy: null,
+      rejectionReason: null
+    };
+
+    user.accountType = 'doctor';
+    user.verificationStatus = 'pending';
+    user.verificationData = verificationData;
+
+    users[userIndex] = user;
+    await saveUsers(users);
+
+    return res.json({ 
+      success: true, 
+      message: 'Yêu cầu xác minh đã được gửi. Chúng tôi sẽ xem xét trong vòng 24-48 giờ.',
+      verificationStatus: 'pending'
+    });
+  } catch (e) {
+    console.error('Verify doctor submit error:', e);
+    // Xóa file đã upload nếu có lỗi
+    try { (req.files || []).forEach(f => { if (fs.existsSync(f.path)) fs.unlinkSync(f.path); }); } catch(e){}
+    return res.status(500).json({ error: 'Lỗi server khi gửi yêu cầu xác minh' });
+  }
+});
+
+// Get verification status (kiểm tra trạng thái xác minh)
+app.get('/api/verify-doctor/status', async (req, res) => {
+  try {
+    const { username } = req.query;
+    if (!username) return res.status(400).json({ error: 'Thiếu tham số username' });
+
+    const user = await findUserByUsername(username);
+    if (!user) return res.status(404).json({ error: 'Không tìm thấy tài khoản' });
+
+    return res.json({
+      accountType: user.accountType || 'normal',
+      verificationStatus: user.verificationStatus || 'unverified',
+      canUseProfessional: user.accountType === 'doctor' && user.verificationStatus === 'verified',
+      verificationData: user.verificationData ? {
+        submittedAt: user.verificationData.submittedAt,
+        reviewedAt: user.verificationData.reviewedAt,
+        rejectionReason: user.verificationData.rejectionReason
+      } : null
+    });
+  } catch (e) {
+    console.error('Get verification status error:', e);
+    return res.status(500).json({ error: 'Lỗi server khi kiểm tra trạng thái xác minh' });
+  }
+});
+
+// Admin: Approve verification (chỉ dành cho admin - cần thêm authentication sau)
+app.post('/api/verify-doctor/approve', async (req, res) => {
+  try {
+    const { username, adminKey } = req.body;
+    
+    // Simple admin key check (nên thay bằng JWT authentication trong production)
+    const ADMIN_KEY = process.env.ADMIN_VERIFICATION_KEY || 'JAREMIS_ADMIN_2025';
+    if (adminKey !== ADMIN_KEY) return res.status(403).json({ error: 'Không có quyền thực hiện thao tác này' });
+
+    if (!username) return res.status(400).json({ error: 'Thiếu tham số username' });
+
+    const users = await readUsers();
+    const userIndex = users.findIndex(u => u.username && u.username.toLowerCase() === username.toLowerCase());
+    if (userIndex === -1) return res.status(404).json({ error: 'Không tìm thấy tài khoản' });
+
+    const user = users[userIndex];
+    if (!user.verificationData) return res.status(400).json({ error: 'Tài khoản chưa gửi yêu cầu xác minh' });
+
+    user.verificationStatus = 'verified';
+    user.verificationData.reviewedAt = new Date().toISOString();
+    user.verificationData.reviewedBy = 'admin';
+
+    users[userIndex] = user;
+    await saveUsers(users);
+
+    return res.json({ success: true, message: 'Đã phê duyệt yêu cầu xác minh bác sĩ' });
+  } catch (e) {
+    console.error('Approve verification error:', e);
+    return res.status(500).json({ error: 'Lỗi server khi phê duyệt xác minh' });
+  }
+});
+
+// Admin: Reject verification
+app.post('/api/verify-doctor/reject', async (req, res) => {
+  try {
+    const { username, adminKey, reason } = req.body;
+    
+    const ADMIN_KEY = process.env.ADMIN_VERIFICATION_KEY || 'JAREMIS_ADMIN_2025';
+    if (adminKey !== ADMIN_KEY) return res.status(403).json({ error: 'Không có quyền thực hiện thao tác này' });
+
+    if (!username) return res.status(400).json({ error: 'Thiếu tham số username' });
+    if (!reason) return res.status(400).json({ error: 'Vui lòng cung cấp lý do từ chối' });
+
+    const users = await readUsers();
+    const userIndex = users.findIndex(u => u.username && u.username.toLowerCase() === username.toLowerCase());
+    if (userIndex === -1) return res.status(404).json({ error: 'Không tìm thấy tài khoản' });
+
+    const user = users[userIndex];
+    if (!user.verificationData) return res.status(400).json({ error: 'Tài khoản chưa gửi yêu cầu xác minh' });
+
+    user.verificationStatus = 'rejected';
+    user.verificationData.reviewedAt = new Date().toISOString();
+    user.verificationData.reviewedBy = 'admin';
+    user.verificationData.rejectionReason = reason;
+
+    users[userIndex] = user;
+    await saveUsers(users);
+
+    return res.json({ success: true, message: 'Đã từ chối yêu cầu xác minh' });
+  } catch (e) {
+    console.error('Reject verification error:', e);
+    return res.status(500).json({ error: 'Lỗi server khi từ chối xác minh' });
   }
 });
 
@@ -839,6 +1033,29 @@ app.post('/api/chat', upload.array('images'), async (req, res) => {
     const systemPrompt = `Bạn là một trợ lý thông minh, thân thiện, trả lời ngắn gọn, rõ ràng bằng đúng ngôn ngữ của người dùng.
 Tên bạn là JAREMIS-AI, được tạo bởi TT1403 (Nguyễn Tấn Triệu), ANT (Đỗ Văn Vĩnh An) và Lý Thúc Duy. Bạn tự hào là AI do người Việt phát triển; khi người dùng dùng tiếng Việt, hãy ưu tiên tiếng Việt và thể hiện sự trân trọng đối với lịch sử, văn hóa và con người Việt Nam.
 Nếu người dùng yêu cầu CHẨN ĐOÁN Y KHOA hoặc xin chẩn đoán lâm sàng, KHÔNG cung cấp chẩn đoán chi tiết — hãy gợi ý họ dùng chế độ "Diagnose" và luôn nhắc tham khảo ý kiến bác sĩ. Giữ ngữ cảnh phù hợp, không lặp lại nguyên văn dài dòng từ lịch sử.
+
+⚕️ **QUAN TRỌNG - CHÍNH SÁCH THUỐC (MEDICATION POLICY):**
+- TUYỆT ĐỐI KHÔNG gợi ý, đề xuất, khuyến nghị bất kỳ loại thuốc nào (tên thương mại, generic, OTC, prescription) trừ khi người dùng HỎI TRỰC TIẾP về thuốc cho bệnh cụ thể (VD: "bị cảm mua thuốc gì?", "viêm họng uống thuốc gì?")
+- Thay vào đó, tập trung vào:
+  • Hướng dẫn đi bác sĩ ngay (khoa nào, chuyên môn gì)
+  • Gợi ý xét nghiệm cần làm để chẩn đoán chính xác
+  • Biện pháp an toàn tại nhà (nghỉ ngơi, dinh dưỡng, theo dõi triệu chứng)
+- TRƯỜNG HỢP ĐẶC BIỆT: Nếu người dùng hỏi TRỰC TIẾP về thuốc ("mua thuốc gì", "dùng thuốc gì") thì MỚI cung cấp, nhưng BẮT BUỘC phải kèm:
+  
+  🔴 **CẢNH BÁO QUAN TRỌNG:**
+  ⚠️ **KHÔNG TỰ Ý MUA/DÙNG THUỐC NÀY NẾU KHÔNG CÓ:**
+  - Chỉ định rõ ràng từ bác sĩ
+  - Xét nghiệm xác định bệnh
+  - Tư vấn về liều lượng phù hợp
+  
+  🚫 **CHỐNG CHỈ ĐỊNH (Không dùng cho):**
+  [Liệt kê đầy đủ: phụ nữ có thai/cho con bú, trẻ em dưới X tuổi, người suy gan/thận, dị ứng thành phần...]
+  
+  ⚡ **TÁC DỤNG PHỤ CÓ THỂ GẶP:**
+  [Liệt kê đầy đủ]
+  
+  💊 **KHUYẾN CÁO:** Đến bác sĩ/dược sĩ để được tư vấn trước khi mua!
+
 MỤC TIÊU:
 1. Trả lời có cấu trúc: Tổng quan ngắn -> Các điểm chính -> Giải thích dễ hiểu -> Gợi ý bước an toàn -> Khích lệ (nếu phù hợp).
 2. Giải thích thuật ngữ y khoa bằng lời đơn giản. Chủ động góp ý về dinh dưỡng/phục hồi. Chủ động hỏi người dùng có cần hỗ trợ thêm theo chủ đề đang nói.
@@ -847,7 +1064,7 @@ MỤC TIÊU:
 4.5. QUAN TRỌNG: Luôn ưu tiên thông tin từ [THÔNG TIN MỚI NHẤT TỪ WEB] nếu có - đây là dữ liệu real-time mới nhất.
 4.6. Khi có thông tin conflicting giữa knowledge cũ vs web data mới → luôn dùng web data mới và ghi rõ "theo thông tin mới nhất"
 5. Không bịa đặt. Nếu thiếu dữ kiện: yêu cầu cung cấp thêm.
-6. Không đưa phác đồ điều trị, liều thuốc chi tiết.
+6. KHÔNG đưa phác đồ điều trị, liều thuốc chi tiết (trừ khi người dùng hỏi trực tiếp - xem policy thuốc bên trên).
 7. Không lặp lại nguyên văn dài từ lịch sử – chỉ tham chiếu ngắn gọn.
 8. Khích lệ tích cực vừa phải, không sáo rỗng.
 Luôn nhắc: Thông tin chỉ tham khảo, không thay thế bác sĩ.
@@ -997,9 +1214,14 @@ YÊU CẦU:
     const response = await result.response;
     const assistantText = response.text ? response.text() : (typeof response === 'string' ? response : '');
 
+    // Phát hiện hình ảnh y tế và thêm cảnh báo cho chế độ Chat
+    const hasMedicalImage = detectMedicalImage(files, message);
+    const medicalImageWarning = hasMedicalImage ? getMedicalImageWarning(userLang) : '';
+    const finalReply = assistantText + medicalImageWarning;
+
     // Server-side pre-render LaTeX to sanitized HTML and include it in the response
     let replyHtml = null;
-    try { replyHtml = renderLatexInText(assistantText); } catch (e) { replyHtml = null; }
+    try { replyHtml = renderLatexInText(finalReply); } catch (e) { replyHtml = null; }
 
     // Sau khi có assistantText:
     if (submittedBy) {
@@ -1010,25 +1232,27 @@ YÊU CẦU:
         type: 'chat',
         timestamp: new Date().toISOString(),
         input: message,
-        reply: assistantText,
+        reply: finalReply,
         modelUsed: displayModel,
         detectedLang: userLang,
-        langScore: detected.score
+        langScore: detected.score,
+        hasMedicalImage: hasMedicalImage
       };
       try { pushUserHistory(submittedBy, entry); } catch (e) { console.warn('Không lưu history chat', e); }
     } else if (sessionId) {
-      const entry = { id: Date.now(), sessionId, type: 'chat', timestamp: new Date().toISOString(), input: message, reply: assistantText, modelUsed: displayModel, detectedLang: userLang, langScore: detected.score };
+      const entry = { id: Date.now(), sessionId, type: 'chat', timestamp: new Date().toISOString(), input: message, reply: finalReply, modelUsed: displayModel, detectedLang: userLang, langScore: detected.score, hasMedicalImage: hasMedicalImage };
       pushSessionHistory(sessionId, entry);
     }
 
     return res.json({
       success: true,
-      reply: assistantText,
+      reply: finalReply,
       replyHtml: replyHtml,
       modelUsed: displayModel,
       usedHistory: historyBlocks.length,
       usedMemory: !!(memory && memory.summary),
       sensitive: isSensitive,
+      hasMedicalImageWarning: hasMedicalImage,
       detectedLang: userLang,
       detectionScore: detected.score,
       detectionReasons: detected.reasons
@@ -1592,36 +1816,99 @@ app.post('/api/diagnose', upload.array('images'), async (req, res) => {
 
     const references = await searchMedicalGuidelines(labResults);
 
-    const prompt = `Đóng vai bác sĩ chuyên khoa. 
-      Tên là JAREMIS
+    const prompt = `Đóng vai bác sĩ chuyên khoa hỗ trợ chẩn đoán cho BỆNH NHÂN.
+Tên là JAREMIS-AI
 
-      Phân tích theo hướng dẫn WHO:
+⚕️ **QUAN TRỌNG - CHÍNH SÁCH THUỐC:**
+- TUYỆT ĐỐI KHÔNG đề xuất, gợi ý bất kỳ loại thuốc nào (kể cả OTC, prescription drugs, supplements)
+- KHÔNG đưa tên thuốc (generic, thương mại), liều lượng, phác đồ điều trị
+- Thay vào đó TẬP TRUNG VÀO:
+  • Hướng dẫn ĐI BÁC SĨ ngay (khoa nào? chuyên khoa gì?)
+  • Gợi ý XÉT NGHIỆM cần làm để chẩn đoán chính xác
+  • Biện pháp an toàn tại nhà (nghỉ ngơi, dinh dưỡng, theo dõi triệu chứng)
+  • Dấu hiệu nguy hiểm cần đến cấp cứu ngay
 
-      **Dữ liệu bệnh nhân:**
-      ${labResults ? `- Xét nghiệm: ${labResults}\n` : ''}
-      ${files.length ? `- Hình ảnh y tế: [${files.length} ảnh]` : ''}
+TRỪ KHI: Người dùng HỎI TRỰC TIẾP về thuốc cho bệnh cụ thể (VD: "bệnh này mua thuốc gì?"), khi đó MỚI cung cấp nhưng BẮT BUỘC kèm:
 
-      **Yêu cầu phân tích:**
-      1. Chẩn đoán phân biệt với ICD-10 codes (tối đa 5)
-      2. Liệt kê 3 bệnh khả thi nhất với xác suất
-      3. Độ tin cậy tổng (0-100%)
-      4. Khuyến nghị xét nghiệm theo WHO
-      5. Ghi rõ phiên bản hướng dẫn WHO sử dụng
+🔴 **CẢNH BÁO ĐỎ:**
+⚠️ KHÔNG TỰ Ý MUA/DÙNG CÁC THUỐC TRÊN NẾU KHÔNG CÓ:
+- Chỉ định rõ ràng từ bác sĩ có chuyên môn
+- Xét nghiệm xác định chính xác bệnh
+- Tư vấn về liều lượng, thời gian điều trị phù hợp với tình trạng cá nhân
 
-      **Định dạng bắt buộc:**
-      Chẩn đoán phân biệt
-      - [Bệnh 1] (Mã ICD-10)
-      ...
-      Khả năng chẩn đoán
-      • [Bệnh] (Xác suất: XX%)
-      ...
-      Độ tin cậy: XX%
-      Hướng dẫn WHO: [Tên và phiên bản]`;
+🚫 CHỐNG CHỈ ĐỊNH (Không dùng cho):
+[Liệt kê chi tiết: phụ nữ mang thai/cho con bú, trẻ em <X tuổi, người bệnh gan/thận, dị ứng...]
+
+⚡ TÁC DỤNG PHỤ: [Liệt kê đầy đủ]
+
+Phân tích theo hướng dẫn WHO:
+
+**Dữ liệu bệnh nhân:**
+${labResults ? `- Triệu chứng/Xét nghiệm: ${labResults}\n` : ''}
+${files.length ? `- Hình ảnh y tế: [${files.length} ảnh]` : ''}
+
+**YÊU CẦU PHÂN TÍCH - ĐỊNH DẠNG ĐẸP:**
+
+## 🏥 1. CHẨN ĐOÁN PHÂN BIỆT
+Liệt kê 3-5 chẩn đoán khả thi với ICD-10 codes:
+
+| 🏥 Chẩn đoán | Mã ICD-10 | Xác suất | Triệu chứng khớp |
+|-------------|-----------|----------|------------------|
+| **[Bệnh 1]** | [Mã] | [%] ⭐⭐⭐ | [Chi tiết] |
+| **[Bệnh 2]** | [Mã] | [%] ⭐⭐ | [Chi tiết] |
+
+## 📊 2. ĐÁNH GIÁ TỔNG QUAN
+- Độ tin cậy chẩn đoán: XX%
+- Mức độ nguy hiểm: Thấp/Trung bình/Cao/Khẩn cấp
+- Khuyến nghị: Đi bác sĩ ngay/trong 24h/trong tuần
+
+## 🔬 3. XÉT NGHIỆM ĐỀ XUẤT
+PHẢI dùng bảng markdown đẹp:
+
+| 🔬 Xét nghiệm | Mục đích | Độ ưu tiên | Chi phí ước tính (VNĐ) |
+|-------------|----------|------------|----------------------|
+| **Công thức máu** | Phát hiện nhiễm trùng | 🔴 Khẩn cấp | ~100,000 |
+| **[XN 2]** | [Mục đích] | 🟡 Sớm | [Chi phí] |
+
+## 🏥 4. HƯỚNG DẪN ĐI BÁC SĨ
+- **Khoa khám:** [Tên khoa cụ thể]
+- **Chuyên khoa:** [Nếu cần]
+- **Thời gian:** [Ngay/trong 24h/tuần tới]
+- **Lý do:** [Giải thích]
+
+## ⚠️ 5. DẤU HIỆU NGUY HIỂM - CẦN CẤP CỨU NGAY
+- 🚨 [Dấu hiệu 1]
+- 🚨 [Dấu hiệu 2]
+
+## 💡 6. BIỆN PHÁP AN TOÀN TẠI NHÀ
+- Nghỉ ngơi: [Chi tiết]
+- Dinh dưỡng: [Gợi ý]
+- Theo dõi: [Triệu chứng cần theo dõi]
+
+## 📚 7. CĂN CỨ KHOA HỌC
+- Hướng dẫn WHO: [Tên và phiên bản]
+- Guidelines khác: [Nếu có]
+
+**NHẮC LẠI:** Kết quả chỉ mang tính tham khảo. Hãy đến bác sĩ để được khám, xét nghiệm và điều trị chính xác!
+
+---
+
+**ĐỊNH DẠNG:**
+- PHẢI dùng emoji: 🏥📊🔬⚠️💡📚🚨
+- PHẢI dùng bảng markdown cho Chẩn đoán, Xét nghiệm
+- Spacing đẹp: 2 dòng trống giữa các mục lớn
+- TRÁNH: ═█░▓▒╔╗║
+- KHÔNG đề xuất thuốc trừ khi người dùng hỏi trực tiếp`;
 
     const model = genAI.getGenerativeModel({ model: modelId });
     const result = await model.generateContent([prompt, ...imageParts]);
     const response = await result.response;
     const diagnosisText = response.text ? response.text() : (typeof response === 'string' ? response : '');
+
+    // Phát hiện hình ảnh y tế và thêm cảnh báo cho chế độ Diagnose
+    const hasMedicalImage = detectMedicalImage(files, labResults);
+    const medicalImageWarning = hasMedicalImage ? getMedicalImageWarning('vi') : '';
+    const finalDiagnosisText = diagnosisText + medicalImageWarning;
 
     const parsedData = parseDiagnosisResponse(diagnosisText);
     parsedData.differentialDiagnosisFull = enrichWithICDDescriptions(parsedData.differentialDiagnosis);
@@ -1638,7 +1925,8 @@ app.post('/api/diagnose', upload.array('images'), async (req, res) => {
       modelUsed: displayModel,
       diseases: parsedData.diseases || [],
       confidence: parsedData.confidence || 0,
-      diagnosis: diagnosisText
+      diagnosis: finalDiagnosisText,
+      hasMedicalImage: hasMedicalImage
     };
     if (submittedBy) {
       try { pushUserHistory(submittedBy, historyEntry); } catch (e) { console.warn('Không lưu được lịch sử cho user', submittedBy); }
@@ -1649,10 +1937,11 @@ app.post('/api/diagnose', upload.array('images'), async (req, res) => {
     res.json({
       modelUsed: displayModel,
       ...parsedData,
-      diagnosis: diagnosisText,
-      diagnosisHtml: renderLatexInText(diagnosisText),
+      diagnosis: finalDiagnosisText,
+      diagnosisHtml: renderLatexInText(finalDiagnosisText),
       references: references.slice(0,3),
       icdDescriptions: parsedData.differentialDiagnosisFull,
+      hasMedicalImageWarning: hasMedicalImage,
       warning: '⚠️ **Cảnh báo:** Kết quả chỉ mang tính tham khảo. Luôn tham khảo ý kiến bác sĩ!'
     });
 
@@ -1675,6 +1964,43 @@ app.post('/api/diagnose', upload.array('images'), async (req, res) => {
    -------------------------- */
 app.post('/api/professional', upload.array('images'), async (req, res) => {
   try {
+    // KIỂM TRA QUYỀN TRUY CẬP - CHẾ ĐỘ PROFESSIONAL CHỈ CHO BÁC SĨ ĐÃ XÁC MINH
+    const submittedBy = req.body.submittedBy || null;
+    
+    if (!submittedBy) {
+      return res.status(403).json({ 
+        error: 'Vui lòng đăng nhập để sử dụng chế độ Professional',
+        requireLogin: true 
+      });
+    }
+
+    const user = await findUserByUsername(submittedBy);
+    if (!user) {
+      return res.status(403).json({ 
+        error: 'Tài khoản không tồn tại',
+        requireLogin: true 
+      });
+    }
+
+    // Kiểm tra accountType và verificationStatus
+    const accountType = user.accountType || 'normal';
+    const verificationStatus = user.verificationStatus || 'unverified';
+
+    if (accountType !== 'doctor' || verificationStatus !== 'verified') {
+      const messages = {
+        'unverified': 'Chế độ Professional chỉ dành cho bác sĩ đã xác minh. Vui lòng gửi yêu cầu xác minh với giấy phép hành nghề hoặc email cơ sở y tế.',
+        'pending': 'Yêu cầu xác minh của bạn đang được xem xét. Vui lòng đợi trong 24-48 giờ.',
+        'rejected': `Yêu cầu xác minh của bạn đã bị từ chối. ${user.verificationData?.rejectionReason || 'Vui lòng liên hệ hỗ trợ để biết thêm thông tin.'}`
+      };
+
+      return res.status(403).json({ 
+        error: messages[verificationStatus] || messages['unverified'],
+        accountType,
+        verificationStatus,
+        requireVerification: true
+      });
+    }
+
     const message = req.body.message || req.body.labResults || req.body.symptoms || '';
     const files = req.files || [];
     const patientInfo = req.body.patientInfo ? JSON.parse(req.body.patientInfo) : null;
@@ -1683,6 +2009,7 @@ app.post('/api/professional', upload.array('images'), async (req, res) => {
     console.log('📝 Message:', message);
     console.log('👤 Patient info:', patientInfo);
     console.log('📷 Images:', files.length);
+    console.log('👨‍⚕️ Verified doctor:', submittedBy);
     
     if (!message && files.length === 0) {
       return res.status(400).json({ error: 'Vui lòng cung cấp thông tin triệu chứng hoặc hình ảnh' });
@@ -1827,15 +2154,49 @@ ${files.length ? `*Mô tả chi tiết findings, so sánh chuẩn, radiological 
 | **[XN 2]** | [Mục đích] | 🟡 Sớm | [Chi phí] | [TG] |
 
 
-## 💊 5. GỢI Ý ĐIỀU TRỊ
+## 💊 5. GỢI Ý ĐIỀU TRỊ CHO BÁC SĨ
 
-### A. PHARMACOTHERAPY:
+⚕️ **CHÍNH SÁCH:** Gợi ý thuốc cho BÁC SĨ tham khảo. BẮT BUỘC mỗi thuốc có đầy đủ thông tin an toàn.
 
-| 💊 Thuốc | Liều dùng | Cơ chế | Chống chỉ định | Tương tác |
-|---------|-----------|--------|----------------|-----------|
-| **[Generic]** ([Commercial]) | [Liều] | [Mechanism] | [CI] | [Interactions] |
+### A. PHARMACOTHERAPY
 
-*Lưu ý: Đã kiểm tra tiền sử, dị ứng "${patientInfo?.allergies || 'không rõ'}", thuốc đang dùng*
+**BẮT BUỘC dùng bảng markdown:**
+
+| 💊 Thuốc | Liều dùng | Đường dùng | Monitoring |
+|---------|-----------|------------|------------|
+| **[Generic]** ([Commercial]) | [Dose/kg/day] | PO/IV/IM | [Parameters] |
+
+**Chi tiết từng thuốc:**
+
+#### 1. [Tên Generic] (Tên thương mại: [Commercial])
+
+**Cơ chế:** [Mechanism]
+**Liều dùng:** 
+- Người lớn: [Liều]
+- Trẻ em: [Liều/kg]
+- Điều chỉnh suy gan/thận: [Chi tiết]
+**Đường dùng:** PO/IV/IM
+
+🚫 **CHỐNG CHỈ ĐỊNH (BẮT BUỘC):**
+- Phụ nữ mang thai (trimester X) / cho con bú
+- Trẻ em dưới [X] tuổi
+- Suy gan/thận mức độ [X]
+- Dị ứng với [thành phần]
+- [Bệnh lý kèm theo cụ thể]
+
+⚠️ **TƯƠNG TÁC THUỐC (BẮT BUỘC):**
+- [Thuốc A]: [Tương tác và hậu quả]
+- [Kiểm tra với thuốc đang dùng: "${patientInfo?.currentMedications || 'không rõ'}"]
+
+⚡ **TÁC DỤNG PHỤ (BẮT BUỘC):**
+- Thường gặp: [Liệt kê]
+- Nghiêm trọng: [Liệt kê]
+
+🔬 **THEO DÕI:** [Xét nghiệm, tần suất, red flags]
+
+---
+
+*Lưu ý: Đã kiểm tra tiền sử, dị ứng "${patientInfo?.allergies || 'không rõ'}", thuốc đang dùng "${patientInfo?.currentMedications || 'không rõ'}"*
 
 ### B. NON-PHARMACOLOGICAL:
 - Lifestyle, diet, exercise, physical therapy, surgical options (nếu cần)
@@ -1876,14 +2237,55 @@ ${files.length ? `*Mô tả chi tiết findings, so sánh chuẩn, radiological 
 - ✅ KẾT THÚC: "---\n\nTrân trọng,\n\n**JAREMIS-AI Medical Assistant**\n*Professional Mode*"
 `;
 
-    // Tạo báo cáo tư vấn chuyên nghiệp
-    const model = genAI.getGenerativeModel({ model: modelId });
-    const result = await model.generateContent([prompt, ...imageParts]);
-    const response = await result.response;
-    const consultationText = response.text ? response.text() : (typeof response === 'string' ? response : '');
+    // Tạo báo cáo tư vấn chuyên nghiệp với error handling và fallback
+    let consultationText = '';
+    let usedModel = modelId;
+    
+    try {
+      const model = genAI.getGenerativeModel({ model: modelId });
+      const result = await model.generateContent([prompt, ...imageParts]);
+      const response = await result.response;
+      consultationText = response.text ? response.text() : (typeof response === 'string' ? response : '');
+      usedModel = modelId;
+    } catch (error1) {
+      console.warn(`⚠️ Primary model ${modelId} failed:`, error1.message);
+      
+      // Try fallback model
+      try {
+        const fallbackModelId = ids.fallback || 'gemini-1.5-pro';
+        console.log(`🔄 Trying fallback model: ${fallbackModelId}`);
+        
+        const fallbackModel = genAI.getGenerativeModel({ model: fallbackModelId });
+        const result = await fallbackModel.generateContent([prompt, ...imageParts]);
+        const response = await result.response;
+        consultationText = response.text ? response.text() : (typeof response === 'string' ? response : '');
+        usedModel = fallbackModelId;
+      } catch (error2) {
+        console.error('❌ Fallback model also failed:', error2.message);
+        
+        // Last attempt with gemini-pro
+        try {
+          console.log('🔄 Last attempt with gemini-pro');
+          const lastModel = genAI.getGenerativeModel({ model: 'gemini-pro' });
+          const result = await lastModel.generateContent([prompt, ...imageParts]);
+          const response = await result.response;
+          consultationText = response.text ? response.text() : (typeof response === 'string' ? response : '');
+          usedModel = 'gemini-pro';
+        } catch (error3) {
+          console.error('❌ All models failed');
+          files.forEach(file => { try { if (fs.existsSync(file.path)) fs.unlinkSync(file.path); } catch(e){} });
+          
+          return res.status(503).json({
+            error: 'Dịch vụ AI tạm thời quá tải. Vui lòng thử lại sau vài phút.',
+            details: 'Tất cả các model AI đều đang bận. Đây là lỗi từ Google Gemini API, không phải lỗi hệ thống.',
+            suggestion: 'Vui lòng thử lại sau 2-5 phút hoặc liên hệ hỗ trợ nếu lỗi vẫn tiếp diễn.',
+            retryAfter: 120
+          });
+        }
+      }
+    }
 
     // Lưu vào lịch sử
-    const submittedBy = req.body.submittedBy || null;
     const sessionId = req.body.sessionId || null;
     const historyEntry = {
       id: Date.now(),
@@ -1893,7 +2295,7 @@ ${files.length ? `*Mô tả chi tiết findings, so sánh chuẩn, radiological 
       input: message,
       patientInfo: patientInfo,
       imagesCount: files.length,
-      modelUsed: displayModel,
+      modelUsed: DISPLAY_NAME_MAP[usedModel] || usedModel,
       consultation: consultationText
     };
     
@@ -1914,7 +2316,7 @@ ${files.length ? `*Mô tả chi tiết findings, so sánh chuẩn, radiological 
 
     // Gửi phản hồi
     res.json({
-      modelUsed: displayModel,
+      modelUsed: DISPLAY_NAME_MAP[usedModel] || usedModel,
       consultation: consultationText,
       consultationHtml: renderLatexInText(consultationText),
       references: references.slice(0, 5),
